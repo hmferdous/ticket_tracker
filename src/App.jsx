@@ -3,6 +3,7 @@ import { useAuth } from "./context/AuthContext"
 import Login from "./pages/Login"
 import Signup from "./pages/Signup"
 import Dashboard from "./pages/agent/Dashboard"
+import Clients from "./pages/agent/Clients"
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -22,6 +23,7 @@ export default function App() {
       <Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
       <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
+      <Route path="/clients" element={<PrivateRoute><Clients /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )

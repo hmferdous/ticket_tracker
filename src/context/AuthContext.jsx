@@ -11,13 +11,13 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null)
-      if (session?.user) fetchAgent(session.user.id)
+      if (session?.user) fetchAgent(session.user)
       else setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null)
-      if (session?.user) fetchAgent(session.user.id)
+      if (session?.user) fetchAgent(session.user)
       else {
         setAgent(null)
         setLoading(false)
@@ -27,26 +27,63 @@ export const AuthProvider = ({ children }) => {
     return () => subscription.unsubscribe()
   }, [])
 
-  const fetchAgent = async (userId) => {
+  const fetchAgent = async (user) => {
     const { data } = await supabase
       .from("agents")
       .select("*")
-      .eq("user_id", userId)
+      .eq("user_id", user.id)
       .single()
-    setAgent(data)
+
+    if (data) {
+      setAgent(data)
+      setLoading(false)
+      return
+    }
+
+    // Agent row missing — create it now that the user has an active session.
+    // This handles the case where the signup-time insert was blocked by RLS
+    // because email confirmation was required and there was no session yet.
+    const trialEndsAt = new Date()
+    trialEndsAt.setDate(trialEndsAt.getDate() + 30)
+
+    // ignoreDuplicates: true maps to ON CONFLICT DO NOTHING, so an existing
+    // row is never overwritten. The unique constraint on user_id is the
+    // database-level guard against races; this is the API-level complement.
+    await supabase
+      .from("agents")
+      .upsert(
+        {
+          user_id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name ?? null,
+          plan: "trial",
+          trial_ends_at: trialEndsAt.toISOString(),
+        },
+        { onConflict: "user_id", ignoreDuplicates: true }
+      )
+
+    // Fetch the row unconditionally — ON CONFLICT DO NOTHING returns nothing,
+    // so a chained .select() would be null on a race. A separate select is
+    // always correct regardless of whether the upsert inserted or skipped.
+    const { data: agentRow } = await supabase
+      .from("agents")
+      .select("*")
+      .eq("user_id", user.id)
+      .single()
+
+    setAgent(agentRow)
     setLoading(false)
   }
 
   const signUp = async (email, password, fullName) => {
-    const { data, error } = await supabase.auth.signUp({ email, password })
+    // Store full_name in auth metadata so fetchAgent can use it when it
+    // auto-creates the agent row on first login (after email confirmation).
+    const { data, error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    })
     if (error) return { error }
-    if (data.user) {
-      await supabase.from("agents").insert({
-        user_id: data.user.id,
-        email,
-        full_name: fullName,
-      })
-    }
     return { data }
   }
 

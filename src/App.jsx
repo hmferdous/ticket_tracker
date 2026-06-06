@@ -4,6 +4,8 @@ import Login from "./pages/Login"
 import Signup from "./pages/Signup"
 import Dashboard from "./pages/agent/Dashboard"
 import Clients from "./pages/agent/Clients"
+import Suppliers from "./pages/agent/Suppliers"
+import Tickets from "./pages/agent/Tickets"
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -24,6 +26,8 @@ export default function App() {
       <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/clients" element={<PrivateRoute><Clients /></PrivateRoute>} />
+      <Route path="/suppliers" element={<PrivateRoute><Suppliers /></PrivateRoute>} />
+      <Route path="/tickets" element={<PrivateRoute><Tickets /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )

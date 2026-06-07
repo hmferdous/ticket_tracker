@@ -30,22 +30,41 @@ No component library — build clean custom components
 - Show success/error toast or message after save
 
 ## Ticket Form Fields
-- Remove reported_price from the ticket form entirely
-- purchase_price field label: Purchase Price
-- office_markup field: optional, labeled Office Markup, shown as a sub-field under purchase_price with helper text: Your contribution to company fund — for reporting only
-- sell_price field label: Sell Price
-- Margin shown as read-only auto-calculated field: sell_price - purchase_price
-- Collapsible Record Payment section at bottom — optional for all ticket types
+- Purchase Price — mandatory. Label: Purchase Price. Used for all calculations. Maps to purchase_price.
+- Supplier Purchase Price — optional. Label: Supplier Purchase Price. Maps to gds_price. Informational only. Pro plan feature — gated later. Shown below Purchase Price.
+- Office Markup — never shown in form. Auto-calculated on save: purchase_price - gds_price. Only calculated if gds_price is entered.
+- Sell Price — mandatory. Label: Sell Price.
+- Issue Date — optional date field. Label: Issue Date. Maps to issue_date.
+- Remove dynamic margin calculation display from the form entirely.
+- Remove reported_price from the ticket form entirely.
 
-## Ticket Form — Payment Section
-- Collapsible section at the bottom of the ticket modal
-- Collapsed by default, optional for all ticket types
-- Label: Record Payment with a chevron toggle
-- Fields when expanded: Amount Received, Payment Channel (dropdown), Transaction ID, Notes
-- Paid in full checkbox — when ticked auto-fills amount = sell_price
-- Works for both walk-in passengers and trade clients
-- If filled on save: creates payment row + ticket_payments allocation in one transaction
-- If left collapsed: ticket saves with payment_status = unpaid
+## Ticket Form — Payment Sections
+Two separate collapsible sections, both collapsed by default, both optional:
+
+Section 1 — Client Payment:
+  - Amount Received (numeric)
+  - Payment Channel (dropdown: Cash, bKash, Bank, Office, EBL, DBBL, IBBL, City, BRAC, UCB)
+  - Transaction ID (text)
+  - Notes (text)
+  - Paid in full checkbox — auto-fills amount = sell_price
+
+Section 2 — Supplier Payment:
+  - Amount Paid (numeric)
+  - Payment Channel (same dropdown)
+  - Transaction ID (text)
+  - Notes (text)
+  - Paid in full checkbox — auto-fills amount = purchase_price (not sell_price)
+
+On save:
+  - If Client Payment amount > 0: create payment row (type: client_payment) + ticket_payments allocation row
+  - If Supplier Payment amount > 0: create payment row (type: supplier_payment) + ticket_payments allocation row
+  - Both are independent transactions
+  - gds_price saved to tickets table if entered
+  - office_markup = purchase_price - gds_price saved silently if gds_price entered, otherwise null
+
+## Plan Gating (future)
+- Supplier Purchase Price field hidden for non-pro users
+- Office markup dashboard section hidden for non-pro users
 
 ## Ticket List
 - Single flat list — no separate tabs for reissues, voids, refunds

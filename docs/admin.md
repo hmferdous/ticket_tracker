@@ -19,3 +19,10 @@
 - semi_annual: 8500 BDT per 6 months
 - annual: 15000 BDT per year
 - Plan changes are manual — admin updates via admin panel after receiving payment
+
+## Feature Gating by Plan
+- trial: all core features available, Supplier Purchase Price field hidden
+- monthly: all core features available, Supplier Purchase Price field hidden
+- semi_annual: all core features available, Supplier Purchase Price field hidden
+- annual: all features including Supplier Purchase Price and office markup dashboard
+- Pro feature flag: check agent.plan === 'annual' before showing gated fields

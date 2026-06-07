@@ -15,9 +15,11 @@ Never disable RLS on any table
 - `reminders` — email reminder rules per ticket
 
 ## Key Fields on Tickets
-- purchase_price — total cost to agent (GDS price + office_markup combined)
-- office_markup — agent's contribution to company fund. Informational only. No effect on payments, refunds or allocations. Used only for dashboard reporting and tracking total company contribution over time.
+- purchase_price — total cost to agent. Mandatory. Used for all calculations (margin, payments, refunds).
+- gds_price — optional. Raw airline/GDS cost before company markup. Label in form: Supplier Purchase Price. Informational only — no effect on any calculation. Pro plan feature (gated later).
+- office_markup — auto-calculated on save as purchase_price - gds_price. Never entered in form. Stored silently. Used only for dashboard reporting of company contribution. Null if gds_price not entered.
 - sell_price — actual price charged to client (real number, private)
+- issue_date — optional. Date the ticket was issued.
 - amount_paid — derived from SUM(ticket_payments.allocated_amount) for this ticket
 - payment_status — unpaid, partial, paid (derived from amount_paid vs sell_price)
 - status — booked, collected, supplier_paid, flown, closed, reissued, void

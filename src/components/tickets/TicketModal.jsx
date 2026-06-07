@@ -1,8 +1,16 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
+import { AIRLINES } from "../../lib/airlines"
+import SearchableDropdown from "../ui/SearchableDropdown"
+import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
 
-const STATUSES = ["booked", "collected", "supplier_paid", "flown", "closed"]
+const CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
+
+const AIRLINE_OPTIONS = AIRLINES.map((a) => ({
+  value: a.code,
+  label: `${a.code} — ${a.name}`,
+}))
 
 const EMPTY = {
   passenger_name: "",
@@ -10,28 +18,39 @@ const EMPTY = {
   ticket_number: "",
   pnr: "",
   route: "",
+  issue_date: "",
   travel_date: "",
   return_date: "",
   client_id: "",
   supplier_id: "",
   purchase_price: "",
+  gds_price: "",
   sell_price: "",
-  reported_price: "",
-  status: "booked",
+  status: "booked",  // not shown in form; preserved on edit, defaulted to booked on add
   narration: "",
 }
+
+const EMPTY_PAYMENT = { amount: "", channel: "", trx_id: "", notes: "", paid_in_full: false }
 
 export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
   const { agent } = useAuth()
   const [form, setForm] = useState(EMPTY)
   const [clients, setClients] = useState([])
   const [suppliers, setSuppliers] = useState([])
+  const [clientPay, setClientPay] = useState(EMPTY_PAYMENT)
+  const [supplierPay, setSupplierPay] = useState(EMPTY_PAYMENT)
+  const [clientPayOpen, setClientPayOpen] = useState(false)
+  const [supplierPayOpen, setSupplierPayOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
     if (!isOpen) return
     setError("")
+    setClientPay(EMPTY_PAYMENT)
+    setSupplierPay(EMPTY_PAYMENT)
+    setClientPayOpen(false)
+    setSupplierPayOpen(false)
     setForm(
       ticket
         ? {
@@ -40,13 +59,14 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
             ticket_number: ticket.ticket_number ?? "",
             pnr: ticket.pnr ?? "",
             route: ticket.route ?? "",
+            issue_date: ticket.issue_date ?? "",
             travel_date: ticket.travel_date ?? "",
             return_date: ticket.return_date ?? "",
             client_id: ticket.client_id ?? "",
             supplier_id: ticket.supplier_id ?? "",
             purchase_price: ticket.purchase_price ?? "",
+            gds_price: ticket.gds_price ?? "",
             sell_price: ticket.sell_price ?? "",
-            reported_price: ticket.reported_price ?? "",
             status: ticket.status ?? "booked",
             narration: ticket.narration ?? "",
           }
@@ -65,25 +85,91 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
   }
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
+  const setC = (field) => (e) => setClientPay((p) => ({ ...p, [field]: e.target.value }))
+  const setS = (field) => (e) => setSupplierPay((p) => ({ ...p, [field]: e.target.value }))
+
+  const handleClientPaidInFull = (e) => {
+    if (e.target.checked) {
+      setClientPay((p) => ({ ...p, paid_in_full: true, amount: String(form.sell_price) }))
+    } else {
+      setClientPay((p) => ({ ...p, paid_in_full: false, amount: "" }))
+    }
+  }
+
+  const handleSupplierPaidInFull = (e) => {
+    if (e.target.checked) {
+      setSupplierPay((p) => ({ ...p, paid_in_full: true, amount: String(form.purchase_price) }))
+    } else {
+      setSupplierPay((p) => ({ ...p, paid_in_full: false, amount: "" }))
+    }
+  }
+
+  const handleAddNewClient = async (name) => {
+    const { data } = await supabase
+      .from("clients")
+      .insert({ name, agent_id: agent.id })
+      .select("id, name")
+      .single()
+    if (data) {
+      setClients((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+      setForm((f) => ({ ...f, client_id: data.id }))
+    }
+  }
+
+  const handleSameAsPassenger = async () => {
+    const name = form.passenger_name.trim()
+    if (!name) return
+    const existing = clients.find((c) => c.name.toLowerCase() === name.toLowerCase())
+    if (existing) {
+      setForm((f) => ({ ...f, client_id: existing.id }))
+      return
+    }
+    const { data } = await supabase
+      .from("clients")
+      .insert({ name, agent_id: agent.id })
+      .select("id, name")
+      .single()
+    if (data) {
+      setClients((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+      setForm((f) => ({ ...f, client_id: data.id }))
+    }
+  }
+
+  const handleAddNewSupplier = async (name) => {
+    const { data } = await supabase
+      .from("suppliers")
+      .insert({ name, agent_id: agent.id })
+      .select("id, name")
+      .single()
+    if (data) {
+      setSuppliers((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+      setForm((f) => ({ ...f, supplier_id: data.id }))
+    }
+  }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
     setLoading(true)
 
+    const purchasePrice = parseFloat(form.purchase_price)
+    const gdsPrice = form.gds_price !== "" ? parseFloat(form.gds_price) : null
+
     const payload = {
       passenger_name: form.passenger_name.trim(),
       carrier: form.carrier.trim(),
       ticket_number: form.ticket_number.trim() || null,
-      pnr: form.pnr.trim() || null,
+      pnr: form.pnr.trim(),
       route: form.route.trim(),
+      issue_date: form.issue_date || null,
       travel_date: form.travel_date,
       return_date: form.return_date || null,
       client_id: form.client_id || null,
       supplier_id: form.supplier_id || null,
-      purchase_price: parseFloat(form.purchase_price),
+      purchase_price: purchasePrice,
+      gds_price: gdsPrice,
+      office_markup: gdsPrice !== null ? purchasePrice - gdsPrice : null,
       sell_price: parseFloat(form.sell_price),
-      reported_price: form.reported_price !== "" ? parseFloat(form.reported_price) : null,
       status: form.status,
       narration: form.narration.trim() || null,
     }
@@ -104,14 +190,75 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
         .single()
     }
 
-    setLoading(false)
-
     if (result.error) {
       setError(result.error.message)
+      setLoading(false)
       return
     }
 
-    onSaved(result.data)
+    const savedTicket = result.data
+    const today = new Date().toISOString().split("T")[0]
+
+    // Client payment — independent transaction
+    const clientAmount = parseFloat(clientPay.amount)
+    if (clientAmount > 0) {
+      const { data: payRow, error: payErr } = await supabase
+        .from("payments")
+        .insert({
+          agent_id: agent.id,
+          client_id: savedTicket.client_id,
+          type: "client_payment",
+          amount: clientAmount,
+          unallocated_amount: clientAmount,
+          channel: clientPay.channel || null,
+          trx_id: clientPay.trx_id.trim() || null,
+          notes: clientPay.notes.trim() || null,
+          payment_date: today,
+        })
+        .select("id")
+        .single()
+
+      if (!payErr && payRow) {
+        await supabase.from("ticket_payments").insert({
+          payment_id: payRow.id,
+          ticket_id: savedTicket.id,
+          allocated_amount: clientAmount,
+          type: "client",
+        })
+      }
+    }
+
+    // Supplier payment — independent transaction
+    const supplierAmount = parseFloat(supplierPay.amount)
+    if (supplierAmount > 0) {
+      const { data: payRow, error: payErr } = await supabase
+        .from("payments")
+        .insert({
+          agent_id: agent.id,
+          supplier_id: savedTicket.supplier_id,
+          type: "supplier_payment",
+          amount: supplierAmount,
+          unallocated_amount: supplierAmount,
+          channel: supplierPay.channel || null,
+          trx_id: supplierPay.trx_id.trim() || null,
+          notes: supplierPay.notes.trim() || null,
+          payment_date: today,
+        })
+        .select("id")
+        .single()
+
+      if (!payErr && payRow) {
+        await supabase.from("ticket_payments").insert({
+          payment_id: payRow.id,
+          ticket_id: savedTicket.id,
+          allocated_amount: supplierAmount,
+          type: "supplier",
+        })
+      }
+    }
+
+    setLoading(false)
+    onSaved(savedTicket)
     onClose()
   }
 
@@ -119,7 +266,8 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
     if (e.target === e.currentTarget) onClose()
   }
 
-  const inputCls = "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+  const inputCls =
+    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 
   if (!isOpen) return null
 
@@ -154,7 +302,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
           )}
 
           <form id="ticket-form" onSubmit={handleSubmit} className="space-y-5">
-            {/* Passenger info */}
+            {/* Passenger */}
             <fieldset>
               <legend className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Passenger</legend>
               <div className="grid grid-cols-2 gap-3">
@@ -162,70 +310,130 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Passenger Name <span className="text-red-500">*</span>
                   </label>
-                  <input type="text" required value={form.passenger_name} onChange={set("passenger_name")} placeholder="Full name" className={inputCls} />
+                  <input
+                    type="text"
+                    required
+                    value={form.passenger_name}
+                    onChange={set("passenger_name")}
+                    placeholder="Full name"
+                    className={inputCls}
+                  />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Carrier <span className="text-red-500">*</span>
                   </label>
-                  <input type="text" required value={form.carrier} onChange={set("carrier")} placeholder="e.g. Biman, Emirates" className={inputCls} />
+                  <SearchableDropdown
+                    options={AIRLINE_OPTIONS}
+                    value={form.carrier}
+                    onChange={(val) => setForm((f) => ({ ...f, carrier: val }))}
+                    placeholder="Search airline or code…"
+                    allowCustom={true}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Ticket Number</label>
-                  <input type="text" value={form.ticket_number} onChange={set("ticket_number")} placeholder="e.g. 996-1234567890" className={inputCls} />
+                  <input
+                    type="text"
+                    value={form.ticket_number}
+                    onChange={set("ticket_number")}
+                    placeholder="e.g. 996-1234567890"
+                    className={inputCls}
+                  />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">PNR</label>
-                  <input type="text" value={form.pnr} onChange={set("pnr")} placeholder="e.g. ABC123" className={inputCls} />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    PNR <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={form.pnr}
+                    onChange={set("pnr")}
+                    placeholder="e.g. ABC123"
+                    className={inputCls}
+                  />
                 </div>
               </div>
             </fieldset>
 
-            {/* Travel info */}
+            {/* Travel */}
             <fieldset>
               <legend className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Travel</legend>
               <div className="grid grid-cols-2 gap-3">
-                <div className="col-span-2 sm:col-span-1">
+                <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Route <span className="text-red-500">*</span>
                   </label>
-                  <input type="text" required value={form.route} onChange={set("route")} placeholder="e.g. DAC-DXB" className={inputCls} />
+                  <input
+                    type="text"
+                    required
+                    value={form.route}
+                    onChange={set("route")}
+                    placeholder="e.g. DAC-DXB"
+                    className={inputCls}
+                  />
                 </div>
-                <div />
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
+                  <input
+                    type="date"
+                    value={form.issue_date}
+                    onChange={set("issue_date")}
+                    className={inputCls}
+                  />
+                </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Travel Date <span className="text-red-500">*</span>
                   </label>
-                  <input type="date" required value={form.travel_date} onChange={set("travel_date")} className={inputCls} />
+                  <input
+                    type="date"
+                    required
+                    value={form.travel_date}
+                    onChange={set("travel_date")}
+                    className={inputCls}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Return Date</label>
-                  <input type="date" value={form.return_date} onChange={set("return_date")} className={inputCls} />
+                  <input
+                    type="date"
+                    value={form.return_date}
+                    onChange={set("return_date")}
+                    className={inputCls}
+                  />
                 </div>
               </div>
             </fieldset>
 
-            {/* Client & Supplier */}
+            {/* Links */}
             <fieldset>
               <legend className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Links</legend>
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
-                  <select value={form.client_id} onChange={set("client_id")} className={inputCls}>
-                    <option value="">— None —</option>
-                    {clients.map((c) => (
-                      <option key={c.id} value={c.id}>{c.name}</option>
-                    ))}
-                  </select>
+                  <SearchableEntityDropdown
+                    entities={clients}
+                    value={form.client_id}
+                    onChange={(id) => setForm((f) => ({ ...f, client_id: id }))}
+                    placeholder="Search client…"
+                    onAddNew={handleAddNewClient}
+                    extraOption={{
+                      label: "Same as passenger",
+                      onSelect: handleSameAsPassenger,
+                    }}
+                  />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
-                  <select value={form.supplier_id} onChange={set("supplier_id")} className={inputCls}>
-                    <option value="">— None —</option>
-                    {suppliers.map((s) => (
-                      <option key={s.id} value={s.id}>{s.name}</option>
-                    ))}
-                  </select>
+                  <SearchableEntityDropdown
+                    entities={suppliers}
+                    value={form.supplier_id}
+                    onChange={(id) => setForm((f) => ({ ...f, supplier_id: id }))}
+                    placeholder="Search supplier…"
+                    onAddNew={handleAddNewSupplier}
+                  />
                 </div>
               </div>
             </fieldset>
@@ -233,44 +441,219 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
             {/* Financials */}
             <fieldset>
               <legend className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Financials</legend>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Purchase Price <span className="text-red-500">*</span>
-                  </label>
-                  <input type="number" required min="0" step="0.01" value={form.purchase_price} onChange={set("purchase_price")} placeholder="0.00" className={inputCls} />
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                {/* Left: purchase price + supplier purchase price sub-field */}
+                <div className="space-y-2">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Purchase Price <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      step="0.01"
+                      value={form.purchase_price}
+                      onChange={set("purchase_price")}
+                      placeholder="0.00"
+                      className={inputCls}
+                    />
+                  </div>
+                  <div className="pl-3 border-l-2 border-gray-100">
+                    <label className="block text-sm font-medium text-gray-600 mb-1">Supplier Purchase Price</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      value={form.gds_price}
+                      onChange={set("gds_price")}
+                      placeholder="0.00"
+                      className={inputCls}
+                    />
+                    <p className="mt-1 text-xs text-gray-400">Informational only — no effect on calculations</p>
+                  </div>
                 </div>
+
+                {/* Right: sell price */}
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">
                     Sell Price <span className="text-red-500">*</span>
                   </label>
-                  <input type="number" required min="0" step="0.01" value={form.sell_price} onChange={set("sell_price")} placeholder="0.00" className={inputCls} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Reported Price</label>
-                  <input type="number" min="0" step="0.01" value={form.reported_price} onChange={set("reported_price")} placeholder="0.00" className={inputCls} />
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    step="0.01"
+                    value={form.sell_price}
+                    onChange={set("sell_price")}
+                    placeholder="0.00"
+                    className={inputCls}
+                  />
                 </div>
               </div>
             </fieldset>
 
-            {/* Status & narration */}
+            {/* Notes */}
             <fieldset>
-              <legend className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Status & Notes</legend>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
-                  <select value={form.status} onChange={set("status")} className={inputCls}>
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>{s.replace("_", " ").replace(/\b\w/g, (l) => l.toUpperCase())}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Narration</label>
-                  <textarea value={form.narration} onChange={set("narration")} placeholder="Any notes about this ticket…" rows={3} className={`${inputCls} resize-none`} />
-                </div>
-              </div>
+              <legend className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Notes</legend>
+              <textarea
+                value={form.narration}
+                onChange={set("narration")}
+                placeholder="Any notes about this ticket…"
+                rows={3}
+                className={`${inputCls} resize-none`}
+              />
             </fieldset>
+
+            {/* Client Payment — collapsible */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setClientPayOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-700 transition-colors"
+              >
+                <span>Client Payment</span>
+                <svg
+                  className={`w-4 h-4 text-gray-400 transition-transform ${clientPayOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {clientPayOpen && (
+                <div className="px-4 py-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount Received</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={clientPay.amount}
+                        onChange={setC("amount")}
+                        placeholder="0.00"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>
+                      <select value={clientPay.channel} onChange={setC("channel")} className={inputCls}>
+                        <option value="">— Select —</option>
+                        {CHANNELS.map((ch) => (
+                          <option key={ch} value={ch}>{ch}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Transaction ID</label>
+                    <input
+                      type="text"
+                      value={clientPay.trx_id}
+                      onChange={setC("trx_id")}
+                      placeholder="Reference or TrxID"
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <input
+                      type="text"
+                      value={clientPay.notes}
+                      onChange={setC("notes")}
+                      placeholder="Optional note"
+                      className={inputCls}
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={clientPay.paid_in_full}
+                      onChange={handleClientPaidInFull}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Paid in full (fills sell price)
+                  </label>
+                </div>
+              )}
+            </div>
+
+            {/* Supplier Payment — collapsible */}
+            <div className="border border-gray-200 rounded-lg overflow-hidden">
+              <button
+                type="button"
+                onClick={() => setSupplierPayOpen((o) => !o)}
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-700 transition-colors"
+              >
+                <span>Supplier Payment</span>
+                <svg
+                  className={`w-4 h-4 text-gray-400 transition-transform ${supplierPayOpen ? "rotate-180" : ""}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+              {supplierPayOpen && (
+                <div className="px-4 py-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount Paid</label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={supplierPay.amount}
+                        onChange={setS("amount")}
+                        placeholder="0.00"
+                        className={inputCls}
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>
+                      <select value={supplierPay.channel} onChange={setS("channel")} className={inputCls}>
+                        <option value="">— Select —</option>
+                        {CHANNELS.map((ch) => (
+                          <option key={ch} value={ch}>{ch}</option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Transaction ID</label>
+                    <input
+                      type="text"
+                      value={supplierPay.trx_id}
+                      onChange={setS("trx_id")}
+                      placeholder="Reference or TrxID"
+                      className={inputCls}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <input
+                      type="text"
+                      value={supplierPay.notes}
+                      onChange={setS("notes")}
+                      placeholder="Optional note"
+                      className={inputCls}
+                    />
+                  </div>
+                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      checked={supplierPay.paid_in_full}
+                      onChange={handleSupplierPaidInFull}
+                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    Paid in full (fills purchase price)
+                  </label>
+                </div>
+              )}
+            </div>
           </form>
         </div>
 

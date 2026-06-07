@@ -3,8 +3,33 @@ import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { useNavigate } from "react-router-dom"
 import TicketModal from "../../components/tickets/TicketModal"
+import VoidConfirmModal from "../../components/tickets/VoidConfirmModal"
+import RefundModal from "../../components/tickets/RefundModal"
+import ReissueModal from "../../components/tickets/ReissueModal"
+import RecordPaymentModal from "../../components/tickets/RecordPaymentModal"
+import TicketDetailModal from "../../components/tickets/TicketDetailModal"
 import SearchableDropdown from "../../components/ui/SearchableDropdown"
 import { AIRLINES } from "../../lib/airlines"
+
+// Row-level actions available for a ticket, based on its current state
+function getRowActions(ticket) {
+  const notVoid = ticket.status !== "void"
+  const notReissued = ticket.status !== "reissued"
+  const actions = []
+
+  if (notVoid && notReissued && ticket.refund_status !== "closed") actions.push("void")
+  if (notVoid && notReissued && ticket.refund_status === null) actions.push("refund")
+  if (notVoid && notReissued && ticket.refund_status !== "initiated") actions.push("reissue")
+  if (ticket.payment_status !== "paid" && notVoid) actions.push("record_payment")
+
+  if (ticket.refund_status && ticket.refund_status !== "closed") {
+    if (ticket.refund_received == null) actions.push("record_supplier_refund")
+    if (ticket.refund_paid == null) actions.push("record_client_refund")
+  }
+
+  actions.push("view")
+  return actions
+}
 
 const AIRLINE_FILTER_OPTIONS = [
   { value: "", label: "All Airlines" },
@@ -14,22 +39,22 @@ const AIRLINE_FILTER_OPTIONS = [
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 200]
 
 const STATUS_CHIP_OPTIONS = [
-  "UNPAID",
-  "PARTIAL",
-  "PAID",
-  "UPCOMING",
-  "FLYING TODAY",
-  "FLOWN",
-  "RETURN PENDING",
-  "VOID",
-  "REISSUED",
-  "REFUND",
-  "REFUNDED",
+  "Unpaid",
+  "Partial",
+  "Paid",
+  "Upcoming",
+  "Flying today",
+  "Flown",
+  "Return pending",
+  "Void",
+  "Reissued",
+  "Refund",
+  "Refunded",
 ]
 
 function Badge({ label, className }) {
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${className}`}>
+    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${className}`}>
       {label}
     </span>
   )
@@ -41,41 +66,41 @@ function computeChips(ticket) {
 
   // Payment chips
   if (ticket.payment_status === "unpaid") {
-    chips.push({ label: "UNPAID", cls: "bg-red-100 text-red-700" })
+    chips.push({ label: "Unpaid", cls: "bg-red-100 text-red-700" })
   } else if (ticket.payment_status === "partial") {
-    chips.push({ label: "PARTIAL", cls: "bg-yellow-100 text-yellow-700" })
+    chips.push({ label: "Partial", cls: "bg-yellow-100 text-yellow-700" })
   } else if (ticket.payment_status === "paid") {
-    chips.push({ label: "PAID", cls: "bg-green-100 text-green-700" })
+    chips.push({ label: "Paid", cls: "bg-green-100 text-green-700" })
   }
 
   // Flight chips — based on travel_date and return_date
   if (ticket.travel_date) {
     if (ticket.travel_date > today) {
-      chips.push({ label: "UPCOMING", cls: "bg-blue-100 text-blue-700" })
+      chips.push({ label: "Upcoming", cls: "bg-blue-100 text-blue-700" })
     } else if (ticket.travel_date === today) {
-      chips.push({ label: "FLYING TODAY", cls: "bg-purple-100 text-purple-700" })
+      chips.push({ label: "Flying today", cls: "bg-purple-100 text-purple-700" })
     } else if (ticket.return_date && ticket.return_date >= today) {
-      chips.push({ label: "RETURN PENDING", cls: "bg-orange-100 text-orange-700" })
+      chips.push({ label: "Return pending", cls: "bg-orange-100 text-orange-700" })
     } else {
-      chips.push({ label: "FLOWN", cls: "bg-gray-100 text-gray-500" })
+      chips.push({ label: "Flown", cls: "bg-gray-100 text-gray-500" })
     }
   }
 
   // Lifecycle chips
   if (ticket.is_void) {
-    chips.push({ label: "VOID", cls: "bg-gray-100 text-gray-500" })
+    chips.push({ label: "Void", cls: "bg-gray-100 text-gray-500" })
   }
   if (ticket.status === "reissued") {
-    chips.push({ label: "REISSUED", cls: "bg-orange-100 text-orange-700" })
+    chips.push({ label: "Reissued", cls: "bg-orange-100 text-orange-700" })
   }
   if (ticket.is_reissue) {
-    chips.push({ label: "REISSUE", cls: "bg-blue-100 text-blue-700" })
+    chips.push({ label: "Reissue", cls: "bg-blue-100 text-blue-700" })
   }
   if (ticket.refund_status === "initiated") {
-    chips.push({ label: "REFUND", cls: "bg-yellow-100 text-yellow-700" })
+    chips.push({ label: "Refund", cls: "bg-yellow-100 text-yellow-700" })
   }
   if (ticket.refund_status === "closed") {
-    chips.push({ label: "REFUNDED", cls: "bg-red-100 text-red-700" })
+    chips.push({ label: "Refunded", cls: "bg-red-100 text-red-700" })
   }
 
   return chips
@@ -89,6 +114,43 @@ function TicketChips({ ticket }) {
       {chips.map((chip, i) => (
         <Badge key={i} label={chip.label} className={chip.cls} />
       ))}
+    </div>
+  )
+}
+
+function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
+  return (
+    <div className="relative inline-block text-left">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        aria-label="Row actions"
+      >
+        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        </svg>
+      </button>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={onClose} />
+          <div className="absolute right-0 top-full z-20 mt-1 w-52 bg-white rounded-lg shadow-lg border border-gray-100 py-1">
+            {items.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => {
+                  onClose()
+                  item.onClick()
+                }}
+                className={`block w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 transition-colors ${item.cls}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -125,6 +187,14 @@ export default function Tickets() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [seeding, setSeeding] = useState(false)
+
+  // Row-level action modals
+  const [voidingTicket, setVoidingTicket] = useState(null)
+  const [refundModal, setRefundModal] = useState(null) // { ticket, mode: 'initiate' | 'supplier' | 'client' }
+  const [reissuingTicket, setReissuingTicket] = useState(null)
+  const [recordPaymentTicket, setRecordPaymentTicket] = useState(null)
+  const [viewingTicket, setViewingTicket] = useState(null)
+  const [openActionMenuId, setOpenActionMenuId] = useState(null)
 
   // Filter dropdown data
   const [clients, setClients] = useState([])
@@ -425,6 +495,45 @@ export default function Tickets() {
     }
   }
 
+  const openVoid = (ticket) => setVoidingTicket(ticket)
+  const openRefund = (ticket, mode) => setRefundModal({ ticket, mode })
+  const openReissue = (ticket) => setReissuingTicket(ticket)
+  const openRecordPayment = (ticket) => setRecordPaymentTicket(ticket)
+  const openView = (ticket) => setViewingTicket(ticket)
+
+  const handleNavigate = (id) => {
+    const target = tickets.find((t) => t.id === id)
+    if (target) setViewingTicket(target)
+  }
+
+  const handleReissueSaved = ({ parentId, child }) => {
+    setTickets((prev) => [
+      child,
+      ...prev.map((t) => (t.id === parentId ? { ...t, status: "reissued" } : t)),
+    ])
+  }
+
+  const actionConfig = (action, ticket) => {
+    switch (action) {
+      case "void":
+        return { label: "Void", cls: "text-red-600", onClick: () => openVoid(ticket) }
+      case "refund":
+        return { label: "Refund", cls: "text-purple-600", onClick: () => openRefund(ticket, "initiate") }
+      case "reissue":
+        return { label: "Reissue", cls: "text-orange-600", onClick: () => openReissue(ticket) }
+      case "record_payment":
+        return { label: "Record Payment", cls: "text-green-600", onClick: () => openRecordPayment(ticket) }
+      case "record_supplier_refund":
+        return { label: "Record Supplier Refund", cls: "text-purple-600", onClick: () => openRefund(ticket, "supplier") }
+      case "record_client_refund":
+        return { label: "Record Client Refund", cls: "text-purple-600", onClick: () => openRefund(ticket, "client") }
+      case "view":
+        return { label: "View", cls: "text-gray-600", onClick: () => openView(ticket) }
+      default:
+        return null
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
@@ -688,19 +797,24 @@ export default function Tickets() {
                               </button>
                             </div>
                           ) : (
-                            <div className="flex items-center justify-end gap-3">
-                              <button
-                                onClick={() => openEdit(ticket)}
-                                className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                              >
-                                Edit
-                              </button>
-                              <button
-                                onClick={() => setConfirmDeleteId(ticket.id)}
-                                className="text-red-500 hover:text-red-600 font-medium transition-colors"
-                              >
-                                Delete
-                              </button>
+                            <div className="flex justify-end">
+                              <RowActionsMenu
+                                isOpen={openActionMenuId === ticket.id}
+                                onToggle={() =>
+                                  setOpenActionMenuId((id) => (id === ticket.id ? null : ticket.id))
+                                }
+                                onClose={() => setOpenActionMenuId(null)}
+                                items={[
+                                  { key: "edit", label: "Edit", cls: "text-blue-600", onClick: () => openEdit(ticket) },
+                                  ...getRowActions(ticket)
+                                    .map((action) => {
+                                      const config = actionConfig(action, ticket)
+                                      return config ? { key: action, ...config } : null
+                                    })
+                                    .filter(Boolean),
+                                  { key: "delete", label: "Delete", cls: "text-red-600", onClick: () => setConfirmDeleteId(ticket.id) },
+                                ]}
+                              />
                             </div>
                           )}
                         </td>
@@ -761,6 +875,43 @@ export default function Tickets() {
         onClose={() => setModalOpen(false)}
         onSaved={handleSaved}
         ticket={editingTicket}
+      />
+
+      <VoidConfirmModal
+        isOpen={!!voidingTicket}
+        onClose={() => setVoidingTicket(null)}
+        ticket={voidingTicket}
+        onSaved={handleSaved}
+      />
+
+      <RefundModal
+        isOpen={!!refundModal}
+        onClose={() => setRefundModal(null)}
+        ticket={refundModal?.ticket}
+        mode={refundModal?.mode}
+        onSaved={handleSaved}
+      />
+
+      <ReissueModal
+        isOpen={!!reissuingTicket}
+        onClose={() => setReissuingTicket(null)}
+        ticket={reissuingTicket}
+        onSaved={handleReissueSaved}
+      />
+
+      <RecordPaymentModal
+        isOpen={!!recordPaymentTicket}
+        onClose={() => setRecordPaymentTicket(null)}
+        ticket={recordPaymentTicket}
+        onSaved={handleSaved}
+      />
+
+      <TicketDetailModal
+        isOpen={!!viewingTicket}
+        onClose={() => setViewingTicket(null)}
+        ticket={viewingTicket}
+        tickets={tickets}
+        onNavigate={handleNavigate}
       />
     </div>
   )

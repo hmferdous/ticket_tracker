@@ -1,6 +1,19 @@
 import { useEffect, useRef, useState } from "react"
 
+const ID_PREFIXES = { client: "C", supplier: "S" }
+
+// Builds the "[C-028] Ehsan Vai" style label when entityType/idField are given,
+// falling back to the plain name otherwise.
+function entityLabel(entity, entityType, idField) {
+  const prefix = ID_PREFIXES[entityType]
+  const num = idField ? entity[idField] : null
+  if (!prefix || num == null) return entity.name
+  return `[${prefix}-${String(num).padStart(3, "0")}] ${entity.name}`
+}
+
 // Searchable dropdown for entities (clients, suppliers) that have {id, name}.
+// - entityType: 'client' | 'supplier' — selects the ID prefix for display ([C-028] / [S-031])
+// - idField: name of the sequential id column (e.g. 'client_id_number') used for display + search
 // - extraOption: optional { label, onSelect } shown pinned at top regardless of search
 // - onAddNew: async fn(name) called when user selects the "Add new" item
 // - onChange: called with entity.id string
@@ -11,6 +24,8 @@ export default function SearchableEntityDropdown({
   placeholder = "Search…",
   onAddNew,
   extraOption,
+  entityType,
+  idField,
 }) {
   const [query, setQuery] = useState("")
   const [isOpen, setIsOpen] = useState(false)
@@ -18,10 +33,12 @@ export default function SearchableEntityDropdown({
   const containerRef = useRef(null)
   const listRef = useRef(null)
 
+  const labelFor = (entity) => entityLabel(entity, entityType, idField)
+
   // Sync input display when external value or entities list changes
   useEffect(() => {
     const match = entities.find((e) => e.id === value)
-    setQuery(match ? match.name : "")
+    setQuery(match ? labelFor(match) : "")
   }, [value, entities])
 
   // Close on outside click and reset display
@@ -30,7 +47,7 @@ export default function SearchableEntityDropdown({
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         setIsOpen(false)
         const match = entities.find((en) => en.id === value)
-        setQuery(match ? match.name : "")
+        setQuery(match ? labelFor(match) : "")
       }
     }
     document.addEventListener("mousedown", handler)
@@ -38,9 +55,17 @@ export default function SearchableEntityDropdown({
   }, [value, entities])
 
   const filtered = query.trim()
-    ? entities.filter((e) =>
-        e.name.toLowerCase().includes(query.toLowerCase())
-      )
+    ? entities.filter((e) => {
+        const q = query.trim().toLowerCase()
+        if (e.name.toLowerCase().includes(q)) return true
+        const prefix = ID_PREFIXES[entityType]
+        const num = idField ? e[idField] : null
+        if (prefix && num != null) {
+          const idLabel = `${prefix}-${String(num).padStart(3, "0")}`.toLowerCase()
+          if (idLabel.includes(q) || String(num).includes(q)) return true
+        }
+        return false
+      })
     : entities
 
   const showAdd =
@@ -61,7 +86,7 @@ export default function SearchableEntityDropdown({
 
   const handleSelect = (entity) => {
     onChange(entity.id)
-    setQuery(entity.name)
+    setQuery(labelFor(entity))
     setIsOpen(false)
     setHighlighted(0)
   }
@@ -122,7 +147,7 @@ export default function SearchableEntityDropdown({
     } else if (e.key === "Escape") {
       setIsOpen(false)
       const match = entities.find((en) => en.id === value)
-      setQuery(match ? match.name : "")
+      setQuery(match ? labelFor(match) : "")
     }
   }
 
@@ -168,7 +193,7 @@ export default function SearchableEntityDropdown({
                       : "text-gray-700 hover:bg-gray-50"
                   }`}
                 >
-                  {entity.name}
+                  {labelFor(entity)}
                 </li>
               )
             })}

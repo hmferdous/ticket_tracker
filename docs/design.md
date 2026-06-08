@@ -68,26 +68,22 @@ On save:
 
 ## Ticket List
 - Single flat list — no separate tabs for reissues, voids, refunds
-- payment_status badge: unpaid (red), partial (yellow), paid (green)
+- Computed sentence-case chip badges per ticket (small pills, not bracketed tags), multiple can show at once:
+  - Payment: Unpaid (red), Partial (yellow), Paid (green)
+  - Flight: Upcoming (blue), Flying today (purple), Return pending (orange), Flown (gray)
+  - Lifecycle: Void (gray), Reissued (orange, on parent), Reissue (blue, on child), Refund (yellow, refund initiated), Refunded (red, refund closed)
 - Outstanding amount shown per ticket row
-- Tags per ticket:
-  - Normal ticket — no tag
-  - Reissued parent — REISSUED tag in orange, clickable to child ticket
-  - Reissue child — REISSUE OF #ID tag in blue, clickable to parent ticket
-  - Void — VOID tag in gray
-  - Refund initiated — REFUND tag in yellow
-  - Fully refunded — REFUNDED tag in red
 
 ## Row Level Actions on Ticket List
-- Actions shown per row based on ticket status
-- booked: Edit, Reissue, Void, Record Payment, View
-- collected: Edit, Reissue, Void, View
-- supplier_paid: Reissue, Void, View
-- flown: View only
-- refund_initiated: Record Refund Received, Record Refund Paid, View
-- void: View only
-- reissued: View, link to child ticket
-- Actions that are not available for current status are hidden not grayed out
+- Actions are grouped behind a hamburger-menu button per row (not inline buttons) — opens a dropdown, closes on outside click
+- Edit, Delete, and View are always present in the menu
+- Contextual actions are shown/hidden per-action based on ticket state, not a fixed per-status table:
+  - Void: status not void, not reissued, refund_status not closed
+  - Refund: status not void, not reissued, refund_status is null
+  - Reissue: status not void, not reissued, refund_status not initiated
+  - Record Payment: payment_status not paid and status not void
+  - Record Supplier Refund / Record Client Refund: shown once a refund is initiated, independently per side (whichever of refund_received / refund_paid is still null)
+- Actions that aren't applicable are omitted from the menu entirely, never shown disabled
 
 ## Reissue Modal
 - Opens from row level action on ticket list
@@ -99,9 +95,9 @@ On save:
 
 ## Refund Flow UI
 - Initiated from row level action on ticket list
-- Step 1 modal: enter refund_receivable and refund_payable
-- Step 2: when supplier sends — Record Refund Received button updates refund_received
-- Step 3: when paying client — Record Refund Paid button updates refund_paid
+- Step 1 modal: enter refund_receivable, refund_payable, and an optional Notes field (saved to its own refund_notes column)
+- Step 2: when supplier sends — Record Supplier Refund action updates refund_received
+- Step 3: when paying client — Record Client Refund action updates refund_paid
 - Refund margin shown at all times: refund_received - refund_payable
 
 ## Payment Allocation UX

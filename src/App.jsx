@@ -4,6 +4,7 @@ import Login from "./pages/Login"
 import Signup from "./pages/Signup"
 import Dashboard from "./pages/agent/Dashboard"
 import Clients from "./pages/agent/Clients"
+import ClientDetail from "./pages/agent/ClientDetail"
 import Suppliers from "./pages/agent/Suppliers"
 import Tickets from "./pages/agent/Tickets"
 
@@ -26,6 +27,7 @@ export default function App() {
       <Route path="/signup" element={<PublicRoute><Signup /></PublicRoute>} />
       <Route path="/dashboard" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
       <Route path="/clients" element={<PrivateRoute><Clients /></PrivateRoute>} />
+      <Route path="/clients/:id" element={<PrivateRoute><ClientDetail /></PrivateRoute>} />
       <Route path="/suppliers" element={<PrivateRoute><Suppliers /></PrivateRoute>} />
       <Route path="/tickets" element={<PrivateRoute><Tickets /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/login" replace />} />

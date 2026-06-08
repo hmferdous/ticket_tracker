@@ -4,6 +4,11 @@ import { useAuth } from "../../context/AuthContext"
 import { useNavigate } from "react-router-dom"
 import ClientModal from "../../components/clients/ClientModal"
 
+function clientIdLabel(num) {
+  if (num == null) return "—"
+  return `C-${String(num).padStart(3, "0")}`
+}
+
 export default function Clients() {
   const { agent, user, signOut } = useAuth()
   const navigate = useNavigate()
@@ -25,7 +30,7 @@ export default function Clients() {
     setError("")
     const { data, error } = await supabase
       .from("clients")
-      .select("id, name, phone, email, notes, created_at")
+      .select("id, name, phone, email, notes, client_id_number, created_at")
       .eq("agent_id", agent.id)
       .order("created_at", { ascending: false })
 
@@ -128,6 +133,7 @@ export default function Clients() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50 text-left">
+                  <th className="px-5 py-3 font-medium text-gray-500">Client ID</th>
                   <th className="px-5 py-3 font-medium text-gray-500">Name</th>
                   <th className="px-5 py-3 font-medium text-gray-500">Phone</th>
                   <th className="px-5 py-3 font-medium text-gray-500">Email</th>
@@ -137,6 +143,11 @@ export default function Clients() {
               <tbody className="divide-y divide-gray-100">
                 {clients.map((client) => (
                   <tr key={client.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold tracking-wide">
+                        {clientIdLabel(client.client_id_number)}
+                      </span>
+                    </td>
                     <td className="px-5 py-3.5 font-medium text-gray-900">{client.name}</td>
                     <td className="px-5 py-3.5 text-gray-600">{client.phone || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600">{client.email || <span className="text-gray-300">—</span>}</td>
@@ -160,6 +171,12 @@ export default function Clients() {
                         </div>
                       ) : (
                         <div className="flex items-center justify-end gap-3">
+                          <button
+                            onClick={() => navigate(`/clients/${client.id}`)}
+                            className="text-gray-600 hover:text-gray-800 font-medium transition-colors"
+                          >
+                            View
+                          </button>
                           <button
                             onClick={() => openEdit(client)}
                             className="text-blue-600 hover:text-blue-700 font-medium transition-colors"

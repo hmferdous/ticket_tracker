@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
+import { createClient } from "../tickets/TicketModal"
 
 const EMPTY = { name: "", phone: "", email: "", notes: "" }
 
@@ -31,21 +32,32 @@ export default function ClientModal({ isOpen, onClose, onSaved, client }) {
       notes: form.notes.trim() || null,
     }
 
-    let result
+    let saved
     if (client?.id) {
-      result = await supabase.from("clients").update(payload).eq("id", client.id).select().single()
+      const result = await supabase.from("clients").update(payload).eq("id", client.id).select().single()
+      if (result.error) {
+        setError(result.error.message)
+        setLoading(false)
+        return
+      }
+      saved = result.data
     } else {
-      result = await supabase.from("clients").insert({ ...payload, agent_id: agent.id }).select().single()
+      try {
+        const created = await createClient(supabase, agent.id, payload.name, {
+          phone: payload.phone,
+          email: payload.email,
+          notes: payload.notes,
+        })
+        saved = { ...created, ...payload }
+      } catch (err) {
+        setError(err.message)
+        setLoading(false)
+        return
+      }
     }
 
     setLoading(false)
-
-    if (result.error) {
-      setError(result.error.message)
-      return
-    }
-
-    onSaved(result.data)
+    onSaved(saved)
     onClose()
   }
 

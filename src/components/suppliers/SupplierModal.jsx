@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
+import { createSupplier } from "../tickets/TicketModal"
 
 const EMPTY = { name: "", phone: "", email: "", notes: "" }
 
@@ -31,21 +32,32 @@ export default function SupplierModal({ isOpen, onClose, onSaved, supplier }) {
       notes: form.notes.trim() || null,
     }
 
-    let result
+    let saved
     if (supplier?.id) {
-      result = await supabase.from("suppliers").update(payload).eq("id", supplier.id).select().single()
+      const result = await supabase.from("suppliers").update(payload).eq("id", supplier.id).select().single()
+      if (result.error) {
+        setError(result.error.message)
+        setLoading(false)
+        return
+      }
+      saved = result.data
     } else {
-      result = await supabase.from("suppliers").insert({ ...payload, agent_id: agent.id }).select().single()
+      try {
+        const created = await createSupplier(supabase, agent.id, payload.name, {
+          phone: payload.phone,
+          email: payload.email,
+          notes: payload.notes,
+        })
+        saved = { ...created, ...payload }
+      } catch (err) {
+        setError(err.message)
+        setLoading(false)
+        return
+      }
     }
 
     setLoading(false)
-
-    if (result.error) {
-      setError(result.error.message)
-      return
-    }
-
-    onSaved(result.data)
+    onSaved(saved)
     onClose()
   }
 

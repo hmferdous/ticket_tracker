@@ -4,6 +4,11 @@ import { useAuth } from "../../context/AuthContext"
 import { useNavigate } from "react-router-dom"
 import SupplierModal from "../../components/suppliers/SupplierModal"
 
+function supplierIdLabel(num) {
+  if (num == null) return "—"
+  return `S-${String(num).padStart(3, "0")}`
+}
+
 export default function Suppliers() {
   const { agent, user, signOut } = useAuth()
   const navigate = useNavigate()
@@ -25,7 +30,7 @@ export default function Suppliers() {
     setError("")
     const { data, error } = await supabase
       .from("suppliers")
-      .select("id, name, phone, email, notes, created_at")
+      .select("id, name, phone, email, notes, supplier_id_number, created_at")
       .eq("agent_id", agent.id)
       .order("created_at", { ascending: false })
 
@@ -124,6 +129,7 @@ export default function Suppliers() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50 text-left">
+                  <th className="px-5 py-3 font-medium text-gray-500">Supplier ID</th>
                   <th className="px-5 py-3 font-medium text-gray-500">Name</th>
                   <th className="px-5 py-3 font-medium text-gray-500">Phone</th>
                   <th className="px-5 py-3 font-medium text-gray-500">Email</th>
@@ -133,6 +139,11 @@ export default function Suppliers() {
               <tbody className="divide-y divide-gray-100">
                 {suppliers.map((supplier) => (
                   <tr key={supplier.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-semibold tracking-wide">
+                        {supplierIdLabel(supplier.supplier_id_number)}
+                      </span>
+                    </td>
                     <td className="px-5 py-3.5 font-medium text-gray-900">{supplier.name}</td>
                     <td className="px-5 py-3.5 text-gray-600">{supplier.phone || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600">{supplier.email || <span className="text-gray-300">—</span>}</td>

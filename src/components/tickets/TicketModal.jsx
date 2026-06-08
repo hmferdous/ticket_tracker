@@ -7,6 +7,28 @@ import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
 
 const CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
 
+export async function createClient(supabase, agentId, name, extra = {}) {
+  const { data, error } = await supabase
+    .from("clients")
+    .insert({ agent_id: agentId, name, ...extra })
+    .select("id, name, client_id_number")
+    .single()
+
+  if (error) throw error
+  return data
+}
+
+export async function createSupplier(supabase, agentId, name, extra = {}) {
+  const { data, error } = await supabase
+    .from("suppliers")
+    .insert({ agent_id: agentId, name, ...extra })
+    .select("id, name, supplier_id_number")
+    .single()
+
+  if (error) throw error
+  return data
+}
+
 const AIRLINE_OPTIONS = AIRLINES.map((a) => ({
   value: a.code,
   label: `${a.code} — ${a.name}`,
@@ -77,8 +99,8 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
 
   const fetchDropdowns = async () => {
     const [{ data: c }, { data: s }] = await Promise.all([
-      supabase.from("clients").select("id, name").eq("agent_id", agent.id).order("name"),
-      supabase.from("suppliers").select("id, name").eq("agent_id", agent.id).order("name"),
+      supabase.from("clients").select("id, name, client_id_number").eq("agent_id", agent.id).order("name"),
+      supabase.from("suppliers").select("id, name, supplier_id_number").eq("agent_id", agent.id).order("name"),
     ])
     setClients(c ?? [])
     setSuppliers(s ?? [])
@@ -105,15 +127,9 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
   }
 
   const handleAddNewClient = async (name) => {
-    const { data } = await supabase
-      .from("clients")
-      .insert({ name, agent_id: agent.id })
-      .select("id, name")
-      .single()
-    if (data) {
-      setClients((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
-      setForm((f) => ({ ...f, client_id: data.id }))
-    }
+    const data = await createClient(supabase, agent.id, name)
+    setClients((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+    setForm((f) => ({ ...f, client_id: data.id }))
   }
 
   const handleSameAsPassenger = async () => {
@@ -124,27 +140,15 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
       setForm((f) => ({ ...f, client_id: existing.id }))
       return
     }
-    const { data } = await supabase
-      .from("clients")
-      .insert({ name, agent_id: agent.id })
-      .select("id, name")
-      .single()
-    if (data) {
-      setClients((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
-      setForm((f) => ({ ...f, client_id: data.id }))
-    }
+    const data = await createClient(supabase, agent.id, name)
+    setClients((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+    setForm((f) => ({ ...f, client_id: data.id }))
   }
 
   const handleAddNewSupplier = async (name) => {
-    const { data } = await supabase
-      .from("suppliers")
-      .insert({ name, agent_id: agent.id })
-      .select("id, name")
-      .single()
-    if (data) {
-      setSuppliers((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
-      setForm((f) => ({ ...f, supplier_id: data.id }))
-    }
+    const data = await createSupplier(supabase, agent.id, name)
+    setSuppliers((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
+    setForm((f) => ({ ...f, supplier_id: data.id }))
   }
 
   const handleSubmit = async (e) => {
@@ -419,6 +423,8 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                     onChange={(id) => setForm((f) => ({ ...f, client_id: id }))}
                     placeholder="Search client…"
                     onAddNew={handleAddNewClient}
+                    entityType="client"
+                    idField="client_id_number"
                     extraOption={{
                       label: "Same as passenger",
                       onSelect: handleSameAsPassenger,
@@ -433,6 +439,8 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                     onChange={(id) => setForm((f) => ({ ...f, supplier_id: id }))}
                     placeholder="Search supplier…"
                     onAddNew={handleAddNewSupplier}
+                    entityType="supplier"
+                    idField="supplier_id_number"
                   />
                 </div>
               </div>

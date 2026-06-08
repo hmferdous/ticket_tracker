@@ -7,8 +7,8 @@ Never disable RLS on any table
 
 ## Tables
 - `agents` — one row per user. Links to auth.users via user_id. Contains plan, trial_ends_at, is_admin
-- `clients` — belongs to agent via agent_id. Covers both trade clients (bulk buyers, ongoing relationship) and retail/walk-in passengers (one-off buyers). No toggle to distinguish — behaviour is determined by usage pattern.
-- `suppliers` — belongs to agent via agent_id
+- `clients` — belongs to agent via agent_id. Covers both trade clients (bulk buyers, ongoing relationship) and retail/walk-in passengers (one-off buyers). No toggle to distinguish — behaviour is determined by usage pattern. Has `client_id_number` — agent-scoped sequential integer (1, 2, 3…) assigned on insert as `COALESCE(MAX(client_id_number), 0) + 1` for that agent, displayed as `C-001`.
+- `suppliers` — belongs to agent via agent_id. Has `supplier_id_number` — agent-scoped sequential integer assigned on insert the same way as clients, displayed as `S-001`.
 - `tickets` — core table. belongs to agent. links to client and supplier. supports parent/child relationship for reissues.
 - `payments` — one row per payment event. Linked to client or supplier. Never linked directly to tickets.
 - `ticket_payments` — junction table. Links payments to tickets with allocated amounts. One row per ticket per payment. Standard relational many-to-many pattern.
@@ -34,6 +34,7 @@ Never disable RLS on any table
 - refund_received — actual refund received from supplier
 - refund_payable — agreed refund amount to pay client
 - refund_paid — actual refund paid to client
+- refund_notes — free-text note entered when initiating a refund (own column, not appended to narration)
 
 ## Margin Calculations
 
@@ -180,22 +181,23 @@ A reissue creates a new child ticket linked to the original parent ticket via pa
 
 ## Row Level Actions on Ticket List
 
-### Available actions per status
-- booked: Edit, Reissue, Void, Record Payment, View
-- collected: Edit, Reissue, Void, View
-- supplier_paid: Reissue, Void, View
-- flown: View only
-- refund_initiated: Record Refund Received, Record Refund Paid, View
-- void: View only
-- reissued: View, link to child ticket
+### Visibility rules (evaluated independently per action, not per status)
+- Void: status is not void, not reissued, refund_status is not closed
+- Refund: status is not void, not reissued, refund_status is null
+- Reissue: status is not void, not reissued, refund_status is not initiated
+- Record Payment: payment_status is not paid and status is not void
+- Record Supplier Refund: refund_status is set and not closed, refund_received is null
+- Record Client Refund: refund_status is set and not closed, refund_paid is null
+- View: always shown
+- Edit and Delete remain available on every row alongside the contextual actions above
+- Actions are grouped behind a row-level hamburger menu (not inline buttons)
 
-### Ticket Tags on List
-- Normal ticket — no tag
-- Reissued parent — [REISSUED] orange tag, clickable to child
-- Reissue child — [REISSUE OF #ID] blue tag, clickable to parent
-- Void — [VOID] gray tag
-- Refund initiated — [REFUND] yellow tag
-- Fully refunded — [REFUNDED] red tag
+### Ticket Chips on List
+- Chips are computed, sentence-case badges (not bracketed status tags), shown via small pills:
+  - Payment: Unpaid (red), Partial (yellow), Paid (green)
+  - Flight: Upcoming (blue), Flying today (purple), Return pending (orange), Flown (gray)
+  - Lifecycle: Void (gray), Reissued (orange, on the parent), Reissue (blue, on the child), Refund (yellow, refund_status = initiated), Refunded (red, refund_status = closed)
+- A ticket can show multiple chips at once (e.g. Partial + Upcoming + Reissue)
 
 ## Rules
 - Always filter by agent_id when querying any table

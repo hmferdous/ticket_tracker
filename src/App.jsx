@@ -7,6 +7,8 @@ import Clients from "./pages/agent/Clients"
 import ClientDetail from "./pages/agent/ClientDetail"
 import Suppliers from "./pages/agent/Suppliers"
 import Tickets from "./pages/agent/Tickets"
+import Payments from "./pages/agent/Payments"
+import Settings from "./pages/agent/Settings"
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -30,6 +32,8 @@ export default function App() {
       <Route path="/clients/:id" element={<PrivateRoute><ClientDetail /></PrivateRoute>} />
       <Route path="/suppliers" element={<PrivateRoute><Suppliers /></PrivateRoute>} />
       <Route path="/tickets" element={<PrivateRoute><Tickets /></PrivateRoute>} />
+      <Route path="/payments" element={<PrivateRoute><Payments /></PrivateRoute>} />
+      <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
       <Route path="*" element={<Navigate to="/login" replace />} />
     </Routes>
   )

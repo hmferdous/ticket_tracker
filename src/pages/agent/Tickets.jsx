@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
-import { useNavigate } from "react-router-dom"
 import TicketModal from "../../components/tickets/TicketModal"
 import VoidConfirmModal from "../../components/tickets/VoidConfirmModal"
 import RefundModal from "../../components/tickets/RefundModal"
@@ -9,6 +8,7 @@ import ReissueModal from "../../components/tickets/ReissueModal"
 import RecordPaymentModal from "../../components/tickets/RecordPaymentModal"
 import TicketDetailModal from "../../components/tickets/TicketDetailModal"
 import SearchableDropdown from "../../components/ui/SearchableDropdown"
+import AppLayout from "../../components/layout/AppLayout"
 import { AIRLINES } from "../../lib/airlines"
 
 // Row-level actions available for a ticket, based on its current state
@@ -176,8 +176,7 @@ function computeNetMargin(ticket) {
 }
 
 export default function Tickets() {
-  const { agent, user, signOut } = useAuth()
-  const navigate = useNavigate()
+  const { agent } = useAuth()
 
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
@@ -301,11 +300,6 @@ export default function Tickets() {
   const pagedTickets = filteredTickets.slice(startIdx, startIdx + pageSize)
   const showingFrom = filteredTickets.length === 0 ? 0 : startIdx + 1
   const showingTo = Math.min(startIdx + pageSize, filteredTickets.length)
-
-  const handleLogout = async () => {
-    await signOut()
-    navigate("/login")
-  }
 
   // TEMPORARY — seeds 15 varied dummy tickets (covering every chip combination) for filter/pagination testing.
   // Remove this function and its button once testing is done.
@@ -535,47 +529,31 @@ export default function Tickets() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-gray-900">Tickets</h1>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500">{user?.email}</span>
+    <AppLayout
+      title="Tickets"
+      actions={
+        <>
           <button
-            onClick={handleLogout}
-            className="text-sm text-red-600 hover:text-red-700 font-medium transition-colors"
+            onClick={seedTestData}
+            disabled={seeding}
+            title="Temporary — inserts 15 dummy tickets covering every chip combination for testing"
+            className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-600 text-sm font-medium px-4 py-2 rounded-lg border border-gray-200 transition-colors disabled:opacity-60"
           >
-            Logout
+            {seeding ? "Seeding…" : "Seed test data"}
           </button>
-        </div>
-      </header>
-
-      <main className="max-w-screen-xl mx-auto px-6 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900">All tickets</h2>
-            <p className="text-sm text-gray-500 mt-0.5">Track and manage your travel tickets</p>
-          </div>
-          <div className="flex items-center gap-3">
-            <button
-              onClick={seedTestData}
-              disabled={seeding}
-              title="Temporary — inserts 15 dummy tickets covering every chip combination for testing"
-              className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-600 text-sm font-medium px-4 py-2 rounded-lg border border-gray-200 transition-colors disabled:opacity-60"
-            >
-              {seeding ? "Seeding…" : "Seed test data"}
-            </button>
-            <button
-              onClick={openAdd}
-              className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-              Add ticket
-            </button>
-          </div>
-        </div>
-
+          <button
+            onClick={openAdd}
+            className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Add ticket
+          </button>
+        </>
+      }
+    >
+      <div className="max-w-screen-xl mx-auto px-6 py-8">
         {error && (
           <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
             {error}
@@ -868,7 +846,7 @@ export default function Tickets() {
             </div>
           </div>
         )}
-      </main>
+      </div>
 
       <TicketModal
         isOpen={modalOpen}
@@ -913,6 +891,6 @@ export default function Tickets() {
         tickets={tickets}
         onNavigate={handleNavigate}
       />
-    </div>
+    </AppLayout>
   )
 }

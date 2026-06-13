@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react"
-import { useParams, useNavigate } from "react-router-dom"
+import { useParams } from "react-router-dom"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import ClientModal from "../../components/clients/ClientModal"
 import LogPaymentModal from "../../components/clients/LogPaymentModal"
 import AllocationModal from "../../components/clients/AllocationModal"
 import TicketDetailModal from "../../components/tickets/TicketDetailModal"
+import AppLayout from "../../components/layout/AppLayout"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -113,8 +114,7 @@ function StatCard({ label, value, accent, action }) {
 
 export default function ClientDetail() {
   const { id } = useParams()
-  const navigate = useNavigate()
-  const { agent, user, signOut } = useAuth()
+  const { agent } = useAuth()
 
   const [client, setClient] = useState(null)
   const [tickets, setTickets] = useState([])
@@ -183,11 +183,6 @@ export default function ClientDetail() {
     setSuppliers(supplierData ?? [])
   }
 
-  const handleLogout = async () => {
-    await signOut()
-    navigate("/login")
-  }
-
   const totalBilled = useMemo(() => tickets.reduce((sum, t) => sum + (t.sell_price ?? 0), 0), [tickets])
   const totalReceived = useMemo(() => payments.reduce((sum, p) => sum + (p.amount ?? 0), 0), [payments])
   const outstandingBalance = totalBilled - totalReceived
@@ -218,29 +213,28 @@ export default function ClientDetail() {
     "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={() => navigate("/clients")}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
-            aria-label="Back to clients"
-          >
-            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-            </svg>
-          </button>
-          <h1 className="text-lg font-semibold text-gray-900">Client Details</h1>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="text-sm text-gray-500">{user?.email}</span>
-          <button onClick={handleLogout} className="text-sm text-red-600 hover:text-red-700 font-medium transition-colors">
-            Logout
-          </button>
-        </div>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-6 py-8">
+    <AppLayout
+      title="Client Details"
+      actions={
+        client && (
+          <>
+            <button
+              onClick={() => setEditModalOpen(true)}
+              className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => setLogPaymentOpen(true)}
+              className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+            >
+              Log Payment
+            </button>
+          </>
+        )
+      }
+    >
+      <div className="max-w-5xl mx-auto px-6 py-8">
         {error && (
           <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
         )}
@@ -252,42 +246,26 @@ export default function ClientDetail() {
         ) : (
           <>
             {/* Client details card */}
-            <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6 flex items-start justify-between gap-4">
-              <div className="flex items-start gap-4">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold tracking-wide mt-1.5">
-                  {clientIdLabel(client.client_id_number)}
-                </span>
-                <div>
-                  <h2 className="text-2xl font-semibold text-gray-900">{client.name}</h2>
-                  <div className="mt-2 flex flex-wrap gap-x-8 gap-y-1 text-sm">
-                    <p>
-                      <span className="text-gray-400">Phone:</span>{" "}
-                      <span className="text-gray-700">{client.phone || "—"}</span>
-                    </p>
-                    <p>
-                      <span className="text-gray-400">Email:</span>{" "}
-                      <span className="text-gray-700">{client.email || "—"}</span>
-                    </p>
-                    <p>
-                      <span className="text-gray-400">Notes:</span>{" "}
-                      <span className="text-gray-700">{client.notes || "—"}</span>
-                    </p>
-                  </div>
+            <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6 flex items-start gap-4">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold tracking-wide mt-1.5">
+                {clientIdLabel(client.client_id_number)}
+              </span>
+              <div>
+                <h2 className="text-2xl font-semibold text-gray-900">{client.name}</h2>
+                <div className="mt-2 flex flex-wrap gap-x-8 gap-y-1 text-sm">
+                  <p>
+                    <span className="text-gray-400">Phone:</span>{" "}
+                    <span className="text-gray-700">{client.phone || "—"}</span>
+                  </p>
+                  <p>
+                    <span className="text-gray-400">Email:</span>{" "}
+                    <span className="text-gray-700">{client.email || "—"}</span>
+                  </p>
+                  <p>
+                    <span className="text-gray-400">Notes:</span>{" "}
+                    <span className="text-gray-700">{client.notes || "—"}</span>
+                  </p>
                 </div>
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                <button
-                  onClick={() => setEditModalOpen(true)}
-                  className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => setLogPaymentOpen(true)}
-                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-                >
-                  Log Payment
-                </button>
               </div>
             </div>
 
@@ -449,7 +427,7 @@ export default function ClientDetail() {
 
           </>
         )}
-      </main>
+      </div>
 
       <ClientModal
         isOpen={editModalOpen}
@@ -482,6 +460,6 @@ export default function ClientDetail() {
         tickets={tickets}
         onAllocated={fetchAll}
       />
-    </div>
+    </AppLayout>
   )
 }

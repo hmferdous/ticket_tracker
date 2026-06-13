@@ -17,6 +17,11 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
 }
 
+function clientIdLabel(num) {
+  if (num == null) return "—"
+  return `C-${String(num).padStart(3, "0")}`
+}
+
 function Badge({ label, className }) {
   return (
     <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${className}`}>
@@ -56,11 +61,52 @@ function computeTicketChips(ticket) {
   return chips
 }
 
-function StatCard({ label, value, accent }) {
+function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
+  if (items.length === 0) return <span className="text-gray-300 text-xs">—</span>
   return (
-    <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-3">
+    <div className="relative inline-block text-left">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        aria-label="Row actions"
+      >
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="5" r="1.5" />
+          <circle cx="12" cy="12" r="1.5" />
+          <circle cx="12" cy="19" r="1.5" />
+        </svg>
+      </button>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={onClose} />
+          <div className="absolute right-0 top-full z-20 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-100 py-1">
+            {items.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => {
+                  onClose()
+                  item.onClick()
+                }}
+                className={`block w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 transition-colors ${item.cls}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function StatCard({ label, value, accent, action }) {
+  return (
+    <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-3">
       <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
       <p className={`text-lg font-semibold mt-1 tabular-nums ${accent ?? "text-gray-900"}`}>{fmt(value)}</p>
+      {action}
     </div>
   )
 }
@@ -82,6 +128,7 @@ export default function ClientDetail() {
   const [viewingTicket, setViewingTicket] = useState(null)
   const [logPaymentOpen, setLogPaymentOpen] = useState(false)
   const [allocationTarget, setAllocationTarget] = useState(null)
+  const [openActionMenuId, setOpenActionMenuId] = useState(null)
 
   useEffect(() => {
     if (agent?.id && id) fetchAll()
@@ -93,7 +140,12 @@ export default function ClientDetail() {
 
     const [{ data: clientData, error: clientErr }, { data: ticketData }, { data: paymentData }, { data: supplierData }] =
       await Promise.all([
-        supabase.from("clients").select("id, name, phone, email, notes").eq("id", id).eq("agent_id", agent.id).single(),
+        supabase
+          .from("clients")
+          .select("id, name, phone, email, notes, client_id_number")
+          .eq("id", id)
+          .eq("agent_id", agent.id)
+          .single(),
         supabase
           .from("tickets")
           .select(`
@@ -150,6 +202,11 @@ export default function ClientDetail() {
     setAllocationTarget(payment)
   }
 
+  const handleAllocationClose = () => {
+    setAllocationTarget(null)
+    fetchAll()
+  }
+
   const handleSettle = () => {
     const oldest = [...payments]
       .filter((p) => (p.unallocated_amount ?? 0) > 0)
@@ -173,7 +230,7 @@ export default function ClientDetail() {
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
             </svg>
           </button>
-          <h1 className="text-lg font-semibold text-gray-900">{client?.name ?? "Client"}</h1>
+          <h1 className="text-lg font-semibold text-gray-900">Client Details</h1>
         </div>
         <div className="flex items-center gap-4">
           <span className="text-sm text-gray-500">{user?.email}</span>
@@ -194,36 +251,70 @@ export default function ClientDetail() {
           <div className="py-20 text-center text-sm text-gray-400">Client not found.</div>
         ) : (
           <>
-            {/* Summary card */}
-            <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6">
-              <div className="flex items-start justify-between gap-4">
+            {/* Client details card */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6 flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold tracking-wide mt-1.5">
+                  {clientIdLabel(client.client_id_number)}
+                </span>
                 <div>
-                  <h2 className="text-xl font-semibold text-gray-900">{client.name}</h2>
-                  <p className="text-sm text-gray-500 mt-1">
-                    {client.phone || <span className="text-gray-300">No phone</span>}
-                    {" · "}
-                    {client.email || <span className="text-gray-300">No email</span>}
-                  </p>
-                  {client.notes && <p className="text-sm text-gray-600 mt-2 max-w-2xl">{client.notes}</p>}
+                  <h2 className="text-2xl font-semibold text-gray-900">{client.name}</h2>
+                  <div className="mt-2 flex flex-wrap gap-x-8 gap-y-1 text-sm">
+                    <p>
+                      <span className="text-gray-400">Phone:</span>{" "}
+                      <span className="text-gray-700">{client.phone || "—"}</span>
+                    </p>
+                    <p>
+                      <span className="text-gray-400">Email:</span>{" "}
+                      <span className="text-gray-700">{client.email || "—"}</span>
+                    </p>
+                    <p>
+                      <span className="text-gray-400">Notes:</span>{" "}
+                      <span className="text-gray-700">{client.notes || "—"}</span>
+                    </p>
+                  </div>
                 </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   onClick={() => setEditModalOpen(true)}
-                  className="shrink-0 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
                 >
-                  Edit client
+                  Edit
+                </button>
+                <button
+                  onClick={() => setLogPaymentOpen(true)}
+                  className="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+                >
+                  Log Payment
                 </button>
               </div>
+            </div>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6">
-                <StatCard label="Total Billed" value={totalBilled} />
-                <StatCard label="Total Received" value={totalReceived} accent="text-green-600" />
-                <StatCard
-                  label="Outstanding Balance"
-                  value={outstandingBalance}
-                  accent={outstandingBalance > 0 ? "text-red-600" : "text-gray-900"}
-                />
-                <StatCard label="Unallocated Credit" value={unallocatedCredit} accent="text-blue-600" />
-              </div>
+            {/* Summary cards */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+              <StatCard label="Total Billed" value={totalBilled} />
+              <StatCard label="Total Received" value={totalReceived} accent="text-green-600" />
+              <StatCard
+                label="Outstanding Balance"
+                value={outstandingBalance}
+                accent={outstandingBalance > 0 ? "text-red-600" : "text-gray-900"}
+              />
+              <StatCard
+                label="Unallocated Credit"
+                value={unallocatedCredit}
+                accent={unallocatedCredit > 0 ? "text-blue-600" : "text-gray-900"}
+                action={
+                  unallocatedCredit > 0 && (
+                    <button
+                      onClick={handleSettle}
+                      className="mt-2 px-2.5 py-1 bg-white border border-gray-300 text-gray-700 rounded-md text-xs font-medium hover:bg-gray-50 transition-colors"
+                    >
+                      Settle
+                    </button>
+                  )
+                }
+              />
             </div>
 
             {/* Tabs */}
@@ -337,14 +428,16 @@ export default function ClientDetail() {
                             {payment.notes ?? <span className="text-gray-200">—</span>}
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {(payment.unallocated_amount ?? 0) > 0 && (
-                              <button
-                                onClick={() => setAllocationTarget(payment)}
-                                className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                              >
-                                Allocate
-                              </button>
-                            )}
+                            <RowActionsMenu
+                              isOpen={openActionMenuId === payment.id}
+                              onToggle={() => setOpenActionMenuId((prev) => (prev === payment.id ? null : payment.id))}
+                              onClose={() => setOpenActionMenuId(null)}
+                              items={[
+                                ...((payment.unallocated_amount ?? 0) > 0
+                                  ? [{ key: "allocate", label: "Allocate", cls: "text-blue-600", onClick: () => setAllocationTarget(payment) }]
+                                  : []),
+                              ]}
+                            />
                           </td>
                         </tr>
                       ))}
@@ -354,23 +447,6 @@ export default function ClientDetail() {
               </div>
             )}
 
-            {/* Action buttons */}
-            <div className="flex items-center gap-3 mt-6">
-              <button
-                onClick={() => setLogPaymentOpen(true)}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                Log Payment
-              </button>
-              {unallocatedCredit > 0 && (
-                <button
-                  onClick={handleSettle}
-                  className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
-                >
-                  Settle
-                </button>
-              )}
-            </div>
           </>
         )}
       </main>
@@ -400,8 +476,9 @@ export default function ClientDetail() {
 
       <AllocationModal
         isOpen={!!allocationTarget}
-        onClose={() => setAllocationTarget(null)}
+        onClose={handleAllocationClose}
         payment={allocationTarget}
+        clientName={client?.name}
         tickets={tickets}
         onAllocated={fetchAll}
       />

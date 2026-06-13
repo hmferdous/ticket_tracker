@@ -49,7 +49,7 @@ function buildAllocations(eligibleTickets, available, mode, selectedIds) {
   return []
 }
 
-export default function AllocationModal({ isOpen, onClose, payment, tickets, onAllocated }) {
+export default function AllocationModal({ isOpen, onClose, payment, clientName, tickets, onAllocated }) {
   const [mode, setMode] = useState(null) // null | 'distribute' | 'select'
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [loading, setLoading] = useState(false)
@@ -145,7 +145,9 @@ export default function AllocationModal({ isOpen, onClose, payment, tickets, onA
     >
       <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">Allocate Payment — {fmt(available)} BDT</h2>
+          <h2 className="text-lg font-semibold text-gray-900">
+            Allocate {fmt(available)} BDT{clientName ? ` — ${clientName}` : ""}
+          </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

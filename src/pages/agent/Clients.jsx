@@ -9,6 +9,50 @@ function clientIdLabel(num) {
   return `C-${String(num).padStart(3, "0")}`
 }
 
+function fmt(n) {
+  return Number(n ?? 0).toLocaleString("en-BD")
+}
+
+function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
+  if (items.length === 0) return <span className="text-gray-300 text-xs">—</span>
+  return (
+    <div className="relative inline-block text-left">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        aria-label="Row actions"
+      >
+        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="5" r="1.5" />
+          <circle cx="12" cy="12" r="1.5" />
+          <circle cx="12" cy="19" r="1.5" />
+        </svg>
+      </button>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={onClose} />
+          <div className="absolute right-0 top-full z-20 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-100 py-1">
+            {items.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={() => {
+                  onClose()
+                  item.onClick()
+                }}
+                className={`block w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 transition-colors ${item.cls}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function Clients() {
   const { agent, user, signOut } = useAuth()
   const navigate = useNavigate()
@@ -20,6 +64,7 @@ export default function Clients() {
   const [editingClient, setEditingClient] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  const [openActionMenuId, setOpenActionMenuId] = useState(null)
 
   useEffect(() => {
     if (agent?.id) fetchClients()
@@ -28,15 +73,57 @@ export default function Clients() {
   const fetchClients = async () => {
     setLoading(true)
     setError("")
-    const { data, error } = await supabase
-      .from("clients")
-      .select("id, name, phone, email, notes, client_id_number, created_at")
-      .eq("agent_id", agent.id)
-      .order("created_at", { ascending: false })
+
+    const [{ data: clientRows, error }, { data: ticketRows }, { data: paymentRows }] = await Promise.all([
+      supabase
+        .from("clients")
+        .select("id, name, phone, email, notes, client_id_number, created_at")
+        .eq("agent_id", agent.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("tickets")
+        .select("client_id, sell_price")
+        .eq("agent_id", agent.id)
+        .not("client_id", "is", null),
+      supabase
+        .from("payments")
+        .select("client_id, amount, unallocated_amount")
+        .eq("agent_id", agent.id)
+        .eq("type", "client_payment")
+        .not("client_id", "is", null),
+    ])
 
     setLoading(false)
-    if (error) setError(error.message)
-    else setClients(data)
+    if (error) {
+      setError(error.message)
+      return
+    }
+
+    // Single pass over each table — grouped by client_id — instead of querying per client
+    const billed = new Map()
+    for (const t of ticketRows ?? []) {
+      billed.set(t.client_id, (billed.get(t.client_id) ?? 0) + (t.sell_price ?? 0))
+    }
+    const received = new Map()
+    const unallocated = new Map()
+    for (const p of paymentRows ?? []) {
+      received.set(p.client_id, (received.get(p.client_id) ?? 0) + (p.amount ?? 0))
+      unallocated.set(p.client_id, (unallocated.get(p.client_id) ?? 0) + (p.unallocated_amount ?? 0))
+    }
+
+    setClients(
+      (clientRows ?? []).map((c) => {
+        const totalBilled = billed.get(c.id) ?? 0
+        const totalReceived = received.get(c.id) ?? 0
+        return {
+          ...c,
+          totalBilled,
+          totalReceived,
+          outstanding: totalBilled - totalReceived,
+          unallocatedCredit: unallocated.get(c.id) ?? 0,
+        }
+      })
+    )
   }
 
   const handleLogout = async () => {
@@ -57,8 +144,8 @@ export default function Clients() {
   const handleSaved = (saved) => {
     setClients((prev) => {
       const exists = prev.find((c) => c.id === saved.id)
-      if (exists) return prev.map((c) => (c.id === saved.id ? saved : c))
-      return [saved, ...prev]
+      if (exists) return prev.map((c) => (c.id === saved.id ? { ...c, ...saved } : c))
+      return [{ ...saved, totalBilled: 0, totalReceived: 0, outstanding: 0, unallocatedCredit: 0 }, ...prev]
     })
   }
 
@@ -90,7 +177,7 @@ export default function Clients() {
         </div>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-6 py-8">
         {/* Page title + action */}
         <div className="flex items-center justify-between mb-6">
           <div>
@@ -130,6 +217,7 @@ export default function Clients() {
               </button>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-gray-100 bg-gray-50 text-left">
@@ -137,6 +225,10 @@ export default function Clients() {
                   <th className="px-5 py-3 font-medium text-gray-500">Name</th>
                   <th className="px-5 py-3 font-medium text-gray-500">Phone</th>
                   <th className="px-5 py-3 font-medium text-gray-500">Email</th>
+                  <th className="px-5 py-3 font-medium text-gray-500 text-right">Total Billed</th>
+                  <th className="px-5 py-3 font-medium text-gray-500 text-right">Total Received</th>
+                  <th className="px-5 py-3 font-medium text-gray-500 text-right">Outstanding</th>
+                  <th className="px-5 py-3 font-medium text-gray-500 text-right">Unallocated Credit</th>
                   <th className="px-5 py-3 font-medium text-gray-500 text-right">Actions</th>
                 </tr>
               </thead>
@@ -151,6 +243,12 @@ export default function Clients() {
                     <td className="px-5 py-3.5 font-medium text-gray-900">{client.name}</td>
                     <td className="px-5 py-3.5 text-gray-600">{client.phone || <span className="text-gray-300">—</span>}</td>
                     <td className="px-5 py-3.5 text-gray-600">{client.email || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-5 py-3.5 text-right tabular-nums text-gray-700">{fmt(client.totalBilled)}</td>
+                    <td className="px-5 py-3.5 text-right tabular-nums text-gray-700">{fmt(client.totalReceived)}</td>
+                    <td className={`px-5 py-3.5 text-right tabular-nums font-medium ${client.outstanding > 0 ? "text-red-600" : "text-green-600"}`}>
+                      {fmt(client.outstanding)}
+                    </td>
+                    <td className="px-5 py-3.5 text-right tabular-nums text-gray-700">{fmt(client.unallocatedCredit)}</td>
                     <td className="px-5 py-3.5 text-right">
                       {confirmDeleteId === client.id ? (
                         <div className="flex items-center justify-end gap-2">
@@ -170,32 +268,23 @@ export default function Clients() {
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center justify-end gap-3">
-                          <button
-                            onClick={() => navigate(`/clients/${client.id}`)}
-                            className="text-gray-600 hover:text-gray-800 font-medium transition-colors"
-                          >
-                            View
-                          </button>
-                          <button
-                            onClick={() => openEdit(client)}
-                            className="text-blue-600 hover:text-blue-700 font-medium transition-colors"
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteId(client.id)}
-                            className="text-red-500 hover:text-red-600 font-medium transition-colors"
-                          >
-                            Delete
-                          </button>
-                        </div>
+                        <RowActionsMenu
+                          isOpen={openActionMenuId === client.id}
+                          onToggle={() => setOpenActionMenuId((prev) => (prev === client.id ? null : client.id))}
+                          onClose={() => setOpenActionMenuId(null)}
+                          items={[
+                            { key: "view", label: "View", cls: "text-gray-700", onClick: () => navigate(`/clients/${client.id}`) },
+                            { key: "edit", label: "Edit", cls: "text-blue-600", onClick: () => openEdit(client) },
+                            { key: "delete", label: "Delete", cls: "text-red-500", onClick: () => setConfirmDeleteId(client.id) },
+                          ]}
+                        />
                       )}
                     </td>
                   </tr>
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 

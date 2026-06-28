@@ -2,9 +2,9 @@ import { useEffect, useMemo, useState } from "react"
 import { useNavigate, useParams } from "react-router-dom"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
-import ClientModal from "../../components/clients/ClientModal"
-import LogPaymentModal from "../../components/clients/LogPaymentModal"
-import AllocationModal from "../../components/clients/AllocationModal"
+import SupplierModal from "../../components/suppliers/SupplierModal"
+import SupplierLogPaymentModal from "../../components/suppliers/SupplierLogPaymentModal"
+import SupplierAllocationModal from "../../components/suppliers/SupplierAllocationModal"
 import TicketDetailModal from "../../components/tickets/TicketDetailModal"
 import DocumentsTab from "../../components/ui/DocumentsTab"
 import AppLayout from "../../components/layout/AppLayout"
@@ -19,9 +19,9 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
 }
 
-function clientIdLabel(num) {
+function supplierIdLabel(num) {
   if (num == null) return "—"
-  return `C-${String(num).padStart(3, "0")}`
+  return `S-${String(num).padStart(3, "0")}`
 }
 
 function Badge({ label, className }) {
@@ -39,28 +39,10 @@ function paymentStatusBadge(status) {
   return null
 }
 
-function computeTicketChips(ticket) {
-  const today = new Date().toISOString().split("T")[0]
-  const chips = []
-
-  if (ticket.travel_date) {
-    if (ticket.travel_date > today) {
-      chips.push({ label: "Upcoming", cls: "bg-blue-100 text-blue-700" })
-    } else if (ticket.travel_date === today) {
-      chips.push({ label: "Flying today", cls: "bg-purple-100 text-purple-700" })
-    } else if (ticket.return_date && ticket.return_date >= today) {
-      chips.push({ label: "Return pending", cls: "bg-orange-100 text-orange-700" })
-    } else {
-      chips.push({ label: "Flown", cls: "bg-gray-100 text-gray-500" })
-    }
-  }
-  if (ticket.is_void) chips.push({ label: "Void", cls: "bg-gray-100 text-gray-500" })
-  if (ticket.status === "reissued") chips.push({ label: "Reissued", cls: "bg-orange-100 text-orange-700" })
-  if (ticket.is_reissue) chips.push({ label: "Reissue", cls: "bg-blue-100 text-blue-700" })
-  if (ticket.refund_status === "initiated") chips.push({ label: "Refund", cls: "bg-yellow-100 text-yellow-700" })
-  if (ticket.refund_status === "closed") chips.push({ label: "Refunded", cls: "bg-red-100 text-red-700" })
-
-  return chips
+function derivePaymentStatus(amountPaid, total) {
+  if (amountPaid <= 0) return "unpaid"
+  if (amountPaid >= total) return "paid"
+  return "partial"
 }
 
 function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
@@ -113,15 +95,14 @@ function StatCard({ label, value, accent, action }) {
   )
 }
 
-export default function ClientDetail() {
+export default function SupplierDetail() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { agent } = useAuth()
 
-  const [client, setClient] = useState(null)
+  const [supplier, setSupplier] = useState(null)
   const [tickets, setTickets] = useState([])
   const [payments, setPayments] = useState([])
-  const [suppliers, setSuppliers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -140,11 +121,11 @@ export default function ClientDetail() {
     setLoading(true)
     setError("")
 
-    const [{ data: clientData, error: clientErr }, { data: ticketData }, { data: paymentData }, { data: supplierData }] =
+    const [{ data: supplierData, error: supplierErr }, { data: ticketData }, { data: paymentData }] =
       await Promise.all([
         supabase
-          .from("clients")
-          .select("id, name, phone, email, notes, client_id_number")
+          .from("suppliers")
+          .select("id, name, phone, email, notes, supplier_id_number")
           .eq("id", id)
           .eq("agent_id", agent.id)
           .single(),
@@ -159,36 +140,42 @@ export default function ClientDetail() {
             reissue_fee_collected, reissue_fee_paid, fare_difference,
             client_id, supplier_id,
             clients(name), suppliers(name),
+            ticket_payments(allocated_amount, type),
             created_at
           `)
-          .eq("client_id", id)
+          .eq("supplier_id", id)
           .eq("agent_id", agent.id)
           .order("created_at", { ascending: false }),
         supabase
           .from("payments")
           .select("id, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at")
-          .eq("client_id", id)
+          .eq("supplier_id", id)
           .eq("agent_id", agent.id)
-          .eq("type", "client_payment")
+          .eq("type", "supplier_payment")
           .order("payment_date", { ascending: false }),
-        supabase.from("suppliers").select("id, name").eq("agent_id", agent.id).order("name"),
       ])
 
     setLoading(false)
-    if (clientErr) {
-      setError(clientErr.message)
+    if (supplierErr) {
+      setError(supplierErr.message)
       return
     }
-    setClient(clientData)
-    setTickets(ticketData ?? [])
+    setSupplier(supplierData)
+    setTickets(
+      (ticketData ?? []).map((t) => {
+        const supplierAmountPaid = (t.ticket_payments ?? [])
+          .filter((tp) => tp.type === "supplier")
+          .reduce((sum, tp) => sum + (tp.allocated_amount ?? 0), 0)
+        return { ...t, supplierAmountPaid }
+      })
+    )
     setPayments(paymentData ?? [])
-    setSuppliers(supplierData ?? [])
   }
 
-  const totalBilled = useMemo(() => tickets.reduce((sum, t) => sum + (t.sell_price ?? 0), 0), [tickets])
-  const totalReceived = useMemo(() => payments.reduce((sum, p) => sum + (p.amount ?? 0), 0), [payments])
-  const outstandingBalance = totalBilled - totalReceived
-  const unallocatedCredit = useMemo(() => payments.reduce((sum, p) => sum + (p.unallocated_amount ?? 0), 0), [payments])
+  const totalPurchased = useMemo(() => tickets.reduce((sum, t) => sum + (t.purchase_price ?? 0), 0), [tickets])
+  const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + (p.amount ?? 0), 0), [payments])
+  const outstandingPayable = totalPurchased - totalPaid
+  const unallocated = useMemo(() => payments.reduce((sum, p) => sum + (p.unallocated_amount ?? 0), 0), [payments])
 
   const handleNavigateTicket = (ticketId) => {
     const target = tickets.find((t) => t.id === ticketId)
@@ -211,14 +198,11 @@ export default function ClientDetail() {
     if (oldest) setAllocationTarget(oldest)
   }
 
-  const inputCls =
-    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-
   return (
     <AppLayout
-      title="Client Details"
+      title="Supplier Details"
       actions={
-        client && (
+        supplier && (
           <>
             <button
               onClick={() => setEditModalOpen(true)}
@@ -227,7 +211,7 @@ export default function ClientDetail() {
               Edit
             </button>
             <button
-              onClick={() => navigate(`/reports/client-ledger?clientId=${id}`)}
+              onClick={() => navigate(`/reports/supplier-ledger?supplierId=${id}`)}
               className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
             >
               View Ledger
@@ -248,50 +232,58 @@ export default function ClientDetail() {
         )}
 
         {loading ? (
-          <div className="py-20 text-center text-sm text-gray-400">Loading client…</div>
-        ) : !client ? (
-          <div className="py-20 text-center text-sm text-gray-400">Client not found.</div>
+          <div className="py-20 text-center text-sm text-gray-400">Loading supplier…</div>
+        ) : !supplier ? (
+          <div className="py-20 text-center text-sm text-gray-400">Supplier not found.</div>
         ) : (
           <>
-            {/* Client details card */}
-            <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6 flex items-start gap-4">
-              <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold tracking-wide mt-1.5">
-                {clientIdLabel(client.client_id_number)}
-              </span>
-              <div>
-                <h2 className="text-2xl font-semibold text-gray-900">{client.name}</h2>
-                <div className="mt-2 flex flex-wrap gap-x-8 gap-y-1 text-sm">
-                  <p>
-                    <span className="text-gray-400">Phone:</span>{" "}
-                    <span className="text-gray-700">{client.phone || "—"}</span>
-                  </p>
-                  <p>
-                    <span className="text-gray-400">Email:</span>{" "}
-                    <span className="text-gray-700">{client.email || "—"}</span>
-                  </p>
-                  <p>
-                    <span className="text-gray-400">Notes:</span>{" "}
-                    <span className="text-gray-700">{client.notes || "—"}</span>
-                  </p>
+            {/* Supplier details card */}
+            <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6 flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-semibold tracking-wide mt-1.5">
+                  {supplierIdLabel(supplier.supplier_id_number)}
+                </span>
+                <div>
+                  <h2 className="text-2xl font-semibold text-gray-900">{supplier.name}</h2>
+                  <div className="mt-2 flex flex-wrap gap-x-8 gap-y-1 text-sm">
+                    <p>
+                      <span className="text-gray-400">Phone:</span>{" "}
+                      <span className="text-gray-700">{supplier.phone || "—"}</span>
+                    </p>
+                    <p>
+                      <span className="text-gray-400">Email:</span>{" "}
+                      <span className="text-gray-700">{supplier.email || "—"}</span>
+                    </p>
+                    <p>
+                      <span className="text-gray-400">Notes:</span>{" "}
+                      <span className="text-gray-700">{supplier.notes || "—"}</span>
+                    </p>
+                  </div>
                 </div>
               </div>
+              <button
+                onClick={() => setEditModalOpen(true)}
+                className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors shrink-0"
+              >
+                Edit
+              </button>
             </div>
 
             {/* Summary cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-              <StatCard label="Total Billed" value={totalBilled} />
-              <StatCard label="Total Received" value={totalReceived} accent="text-green-600" />
+              <StatCard label="Total Purchased" value={totalPurchased} />
+              <StatCard label="Total Paid" value={totalPaid} accent="text-green-600" />
               <StatCard
-                label="Outstanding Balance"
-                value={outstandingBalance}
-                accent={outstandingBalance > 0 ? "text-red-600" : "text-gray-900"}
+                label="Outstanding Payable"
+                value={outstandingPayable}
+                accent={outstandingPayable > 0 ? "text-red-600" : "text-gray-900"}
               />
               <StatCard
-                label="Unallocated Credit"
-                value={unallocatedCredit}
-                accent={unallocatedCredit > 0 ? "text-blue-600" : "text-gray-900"}
+                label="Unallocated"
+                value={unallocated}
+                accent={unallocated > 0 ? "text-blue-600" : "text-gray-900"}
                 action={
-                  unallocatedCredit > 0 && (
+                  unallocated > 0 && (
                     <button
                       onClick={handleSettle}
                       className="mt-2 px-2.5 py-1 bg-white border border-gray-300 text-gray-700 rounded-md text-xs font-medium hover:bg-gray-50 transition-colors"
@@ -328,7 +320,7 @@ export default function ClientDetail() {
             {activeTab === "tickets" && (
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                 {tickets.length === 0 ? (
-                  <div className="py-16 text-center text-sm text-gray-400">No tickets for this client yet.</div>
+                  <div className="py-16 text-center text-sm text-gray-400">No tickets for this supplier yet.</div>
                 ) : (
                   <table className="w-full text-sm">
                     <thead>
@@ -337,18 +329,17 @@ export default function ClientDetail() {
                         <th className="px-4 py-3 font-medium text-gray-500">Route</th>
                         <th className="px-4 py-3 font-medium text-gray-500">Travel Date</th>
                         <th className="px-4 py-3 font-medium text-gray-500">Carrier</th>
-                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Sell Price</th>
-                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Amount Paid</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Purchase Price</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Amount Paid to Supplier</th>
                         <th className="px-4 py-3 font-medium text-gray-500 text-right">Outstanding</th>
                         <th className="px-4 py-3 font-medium text-gray-500">Status</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Chips</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {tickets.map((ticket) => {
-                        const outstanding = (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
-                        const statusBadge = paymentStatusBadge(ticket.payment_status)
-                        const chips = computeTicketChips(ticket)
+                        const outstanding = (ticket.purchase_price ?? 0) - (ticket.supplierAmountPaid ?? 0)
+                        const status = derivePaymentStatus(ticket.supplierAmountPaid ?? 0, ticket.purchase_price ?? 0)
+                        const statusBadge = paymentStatusBadge(status)
                         return (
                           <tr
                             key={ticket.id}
@@ -359,22 +350,11 @@ export default function ClientDetail() {
                             <td className="px-4 py-3 text-gray-600">{ticket.route ?? "—"}</td>
                             <td className="px-4 py-3 text-gray-600">{fmtDate(ticket.travel_date)}</td>
                             <td className="px-4 py-3 text-gray-600">{ticket.carrier ?? "—"}</td>
-                            <td className="px-4 py-3 text-right tabular-nums text-gray-700">{fmt(ticket.sell_price)}</td>
-                            <td className="px-4 py-3 text-right tabular-nums text-gray-600">{fmt(ticket.amount_paid)}</td>
+                            <td className="px-4 py-3 text-right tabular-nums text-gray-700">{fmt(ticket.purchase_price)}</td>
+                            <td className="px-4 py-3 text-right tabular-nums text-gray-600">{fmt(ticket.supplierAmountPaid)}</td>
                             <td className="px-4 py-3 text-right tabular-nums text-gray-600">{fmt(outstanding)}</td>
                             <td className="px-4 py-3">
                               {statusBadge ? <Badge label={statusBadge.label} className={statusBadge.cls} /> : "—"}
-                            </td>
-                            <td className="px-4 py-3 whitespace-normal min-w-[140px]">
-                              {chips.length === 0 ? (
-                                <span className="text-gray-300 text-xs">—</span>
-                              ) : (
-                                <div className="flex flex-wrap gap-1">
-                                  {chips.map((chip, i) => (
-                                    <Badge key={i} label={chip.label} className={chip.cls} />
-                                  ))}
-                                </div>
-                              )}
                             </td>
                           </tr>
                         )
@@ -389,7 +369,7 @@ export default function ClientDetail() {
             {activeTab === "payments" && (
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                 {payments.length === 0 ? (
-                  <div className="py-16 text-center text-sm text-gray-400">No payments logged for this client yet.</div>
+                  <div className="py-16 text-center text-sm text-gray-400">No payments logged for this supplier yet.</div>
                 ) : (
                   <table className="w-full text-sm">
                     <thead>
@@ -436,18 +416,17 @@ export default function ClientDetail() {
 
             {/* Documents tab */}
             {activeTab === "documents" && (
-              <DocumentsTab entityType="client" entityId={id} agentId={agent?.id} />
+              <DocumentsTab entityType="supplier" entityId={id} agentId={agent?.id} />
             )}
-
           </>
         )}
       </div>
 
-      <ClientModal
+      <SupplierModal
         isOpen={editModalOpen}
         onClose={() => setEditModalOpen(false)}
-        onSaved={(saved) => setClient(saved)}
-        client={client}
+        onSaved={(saved) => setSupplier(saved)}
+        supplier={supplier}
       />
 
       <TicketDetailModal
@@ -458,19 +437,18 @@ export default function ClientDetail() {
         onNavigate={handleNavigateTicket}
       />
 
-      <LogPaymentModal
+      <SupplierLogPaymentModal
         isOpen={logPaymentOpen}
         onClose={() => setLogPaymentOpen(false)}
-        client={client}
-        suppliers={suppliers}
+        supplier={supplier}
         onLogged={handleLogged}
       />
 
-      <AllocationModal
+      <SupplierAllocationModal
         isOpen={!!allocationTarget}
         onClose={handleAllocationClose}
         payment={allocationTarget}
-        clientName={client?.name}
+        supplierName={supplier?.name}
         tickets={tickets}
         onAllocated={fetchAll}
       />

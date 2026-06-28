@@ -26,9 +26,9 @@ function buildForm(ticket) {
     return_date: ticket?.return_date ?? "",
     client_id: ticket?.client_id ?? "",
     supplier_id: ticket?.supplier_id ?? "",
-    purchase_price: ticket?.purchase_price ?? "",
+    orig_sell_price: ticket?.sell_price ?? 0,
+    orig_purchase_price: ticket?.purchase_price ?? 0,
     gds_price: ticket?.gds_price ?? "",
-    sell_price: ticket?.sell_price ?? "",
     narration: "",
     reissue_fee_collected: "",
     reissue_fee_paid: "",
@@ -70,11 +70,7 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
   const setC = (field) => (e) => setClientPay((p) => ({ ...p, [field]: e.target.value }))
 
   const handlePaidInFull = (e) => {
-    if (e.target.checked) {
-      setClientPay((p) => ({ ...p, paid_in_full: true, amount: String(form.sell_price) }))
-    } else {
-      setClientPay((p) => ({ ...p, paid_in_full: false, amount: "" }))
-    }
+    setClientPay((p) => ({ ...p, paid_in_full: e.target.checked, amount: e.target.checked ? "" : p.amount }))
   }
 
   const handleAddNewClient = async (name) => {
@@ -101,10 +97,14 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
     }
   }
 
-  const reissueMargin =
-    (parseFloat(form.reissue_fee_collected) || 0) -
-    (parseFloat(form.reissue_fee_paid) || 0) +
-    (parseFloat(form.fare_difference) || 0)
+  const fareDiff      = parseFloat(form.fare_difference)      || 0
+  const feeCollected  = parseFloat(form.reissue_fee_collected) || 0
+  const feePaid       = parseFloat(form.reissue_fee_paid)      || 0
+
+  const computedSellPrice     = (form.orig_sell_price     || 0) + fareDiff + feeCollected
+  const computedPurchasePrice = (form.orig_purchase_price || 0) + fareDiff + feePaid
+
+  const reissueProfit = feeCollected - feePaid
 
   const handleBackdrop = (e) => {
     if (e.target === e.currentTarget) onClose()
@@ -115,7 +115,6 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
     setError("")
     setLoading(true)
 
-    const purchasePrice = parseFloat(form.purchase_price)
     const gdsPrice = form.gds_price !== "" ? parseFloat(form.gds_price) : null
 
     const childPayload = {
@@ -130,10 +129,10 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
       return_date: form.return_date || null,
       client_id: form.client_id || null,
       supplier_id: form.supplier_id || null,
-      purchase_price: purchasePrice,
+      purchase_price: computedPurchasePrice,
       gds_price: gdsPrice,
-      office_markup: gdsPrice !== null ? purchasePrice - gdsPrice : null,
-      sell_price: parseFloat(form.sell_price),
+      office_markup: gdsPrice !== null ? computedPurchasePrice - gdsPrice : null,
+      sell_price: computedSellPrice,
       status: "booked",
       narration: form.narration.trim() || null,
       parent_ticket_id: ticket.id,
@@ -169,7 +168,7 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
     }
 
     // Optional client payment on the new ticket — same as ticket form
-    const clientAmount = parseFloat(clientPay.amount)
+    const clientAmount = clientPay.paid_in_full ? computedSellPrice : parseFloat(clientPay.amount)
     if (clientAmount > 0) {
       const today = new Date().toISOString().split("T")[0]
       const { data: payRow, error: payErr } = await supabase
@@ -324,22 +323,24 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Purchase Price <span className="text-red-500">*</span>
-                    </label>
-                    <input type="number" required min="0" step="0.01" value={form.purchase_price} onChange={set("purchase_price")} placeholder="0.00" className={inputCls} />
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Price</label>
+                    <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 tabular-nums">
+                      {computedPurchasePrice.toLocaleString("en-BD")}
+                    </div>
+                    <p className="mt-1 text-xs text-gray-400">Auto-computed from original + fare diff + reissue fee paid</p>
                   </div>
                   <div className="pl-3 border-l-2 border-gray-100">
                     <label className="block text-sm font-medium text-gray-600 mb-1">Supplier Purchase Price</label>
                     <input type="number" min="0" step="0.01" value={form.gds_price} onChange={set("gds_price")} placeholder="0.00" className={inputCls} />
-                    <p className="mt-1 text-xs text-gray-400">Informational only — no effect on calculations</p>
+                    <p className="mt-1 text-xs text-gray-400">Informational only</p>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Sell Price <span className="text-red-500">*</span>
-                  </label>
-                  <input type="number" required min="0" step="0.01" value={form.sell_price} onChange={set("sell_price")} placeholder="0.00" className={inputCls} />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Sell Price</label>
+                  <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 tabular-nums">
+                    {computedSellPrice.toLocaleString("en-BD")}
+                  </div>
+                  <p className="mt-1 text-xs text-gray-400">Auto-computed from original + fare diff + reissue fee collected</p>
                 </div>
               </div>
             </fieldset>
@@ -362,9 +363,9 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                 </div>
               </div>
               <p className="mt-3 text-sm text-gray-600">
-                Reissue Margin:{" "}
-                <span className={`font-medium ${reissueMargin >= 0 ? "text-green-600" : "text-red-600"}`}>
-                  {reissueMargin.toLocaleString("en-BD")}
+                Profit From Reissue:{" "}
+                <span className={`font-medium ${reissueProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                  {reissueProfit.toLocaleString("en-BD")}
                 </span>
               </p>
             </fieldset>
@@ -392,7 +393,16 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Amount Received</label>
-                      <input type="number" min="0" step="0.01" value={clientPay.amount} onChange={setC("amount")} placeholder="0.00" className={inputCls} />
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={clientPay.paid_in_full ? computedSellPrice : clientPay.amount}
+                        onChange={setC("amount")}
+                        disabled={clientPay.paid_in_full}
+                        placeholder="0.00"
+                        className={`${inputCls} ${clientPay.paid_in_full ? "bg-gray-50 text-gray-500" : ""}`}
+                      />
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>

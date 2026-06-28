@@ -168,11 +168,7 @@ function fmtMargin(n) {
 function computeNetMargin(ticket) {
   const ticketMargin = (ticket.sell_price ?? 0) - (ticket.purchase_price ?? 0)
   const refundMargin = (ticket.refund_received ?? 0) - (ticket.refund_payable ?? 0)
-  const reissueMargin =
-    (ticket.reissue_fee_collected ?? 0) -
-    (ticket.reissue_fee_paid ?? 0) +
-    (ticket.fare_difference ?? 0)
-  return ticketMargin + refundMargin + reissueMargin
+  return ticketMargin + refundMargin
 }
 
 export default function Tickets() {
@@ -231,7 +227,7 @@ export default function Tickets() {
       .from("tickets")
       .select(`
         id, passenger_name, route, pnr, travel_date, return_date, issue_date, carrier, narration,
-        purchase_price, sell_price,
+        purchase_price, gds_price, sell_price,
         amount_paid, payment_status, status, refund_status,
         is_reissue, is_void, parent_ticket_id,
         refund_received, refund_payable,
@@ -242,7 +238,7 @@ export default function Tickets() {
         created_at
       `)
       .eq("agent_id", agent.id)
-      .order("created_at", { ascending: false })
+      .order("issue_date", { ascending: false, nullsFirst: false })
 
     setLoading(false)
     if (error) setError(error.message)
@@ -681,9 +677,10 @@ export default function Tickets() {
               <table className="w-full text-sm whitespace-nowrap">
                 <thead>
                   <tr className="border-b border-gray-100 bg-gray-50 text-left">
+                    <th className="px-4 py-3 font-medium text-gray-500">Issue Date</th>
+                    <th className="px-4 py-3 font-medium text-gray-500">Travel Date</th>
                     <th className="px-4 py-3 font-medium text-gray-500">Passenger</th>
                     <th className="px-4 py-3 font-medium text-gray-500">Route</th>
-                    <th className="px-4 py-3 font-medium text-gray-500">Date</th>
                     <th className="px-4 py-3 font-medium text-gray-500">Carrier</th>
                     <th className="px-4 py-3 font-medium text-gray-500">Client</th>
                     <th className="px-4 py-3 font-medium text-gray-500">Supplier</th>
@@ -708,17 +705,18 @@ export default function Tickets() {
                       : null
                     return (
                       <tr key={ticket.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 font-medium text-gray-900">{ticket.passenger_name}</td>
-                        <td className="px-4 py-3 text-gray-600 font-mono text-xs">{ticket.route}</td>
+                        <td className="px-4 py-3 text-gray-600">
+                          {ticket.issue_date
+                            ? new Date(ticket.issue_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                            : <span className="text-gray-300">—</span>}
+                        </td>
                         <td className="px-4 py-3 text-gray-600">
                           {ticket.travel_date
-                            ? new Date(ticket.travel_date).toLocaleDateString("en-GB", {
-                                day: "2-digit",
-                                month: "short",
-                                year: "numeric",
-                              })
+                            ? new Date(ticket.travel_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                             : "—"}
                         </td>
+                        <td className="px-4 py-3 font-medium text-gray-900">{ticket.passenger_name}</td>
+                        <td className="px-4 py-3 text-gray-600 font-mono text-xs">{ticket.route}</td>
                         <td className="px-4 py-3 text-gray-600">{ticket.carrier}</td>
                         <td className="px-4 py-3 text-gray-600">
                           {ticket.clients?.name ?? <span className="text-gray-300">—</span>}

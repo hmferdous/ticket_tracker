@@ -13,10 +13,15 @@ export default function SearchableDropdown({
   const containerRef = useRef(null)
   const listRef = useRef(null)
 
+  const labelForValue = (v) => {
+    if (!v) return ""
+    const match = options.find((o) => o.value === v)
+    return match ? match.label : v
+  }
+
   // Sync input display when external value changes
   useEffect(() => {
-    const match = options.find((o) => o.value === value)
-    setQuery(match ? match.label : value || "")
+    setQuery(labelForValue(value))
   }, [value, options])
 
   // Close on outside click and reset display
@@ -24,8 +29,7 @@ export default function SearchableDropdown({
     const handler = (e) => {
       if (containerRef.current && !containerRef.current.contains(e.target)) {
         setIsOpen(false)
-        const match = options.find((o) => o.value === value)
-        setQuery(match ? match.label : value || "")
+        setQuery(labelForValue(value))
       }
     }
     document.addEventListener("mousedown", handler)
@@ -109,8 +113,7 @@ export default function SearchableDropdown({
       }
     } else if (e.key === "Escape") {
       setIsOpen(false)
-      const match = options.find((o) => o.value === value)
-      setQuery(match ? match.label : value || "")
+      setQuery(labelForValue(value))
     }
   }
 

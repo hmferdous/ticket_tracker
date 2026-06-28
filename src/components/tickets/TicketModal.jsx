@@ -111,19 +111,11 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
   const setS = (field) => (e) => setSupplierPay((p) => ({ ...p, [field]: e.target.value }))
 
   const handleClientPaidInFull = (e) => {
-    if (e.target.checked) {
-      setClientPay((p) => ({ ...p, paid_in_full: true, amount: String(form.sell_price) }))
-    } else {
-      setClientPay((p) => ({ ...p, paid_in_full: false, amount: "" }))
-    }
+    setClientPay((p) => ({ ...p, paid_in_full: e.target.checked, amount: e.target.checked ? "" : p.amount }))
   }
 
   const handleSupplierPaidInFull = (e) => {
-    if (e.target.checked) {
-      setSupplierPay((p) => ({ ...p, paid_in_full: true, amount: String(form.purchase_price) }))
-    } else {
-      setSupplierPay((p) => ({ ...p, paid_in_full: false, amount: "" }))
-    }
+    setSupplierPay((p) => ({ ...p, paid_in_full: e.target.checked, amount: e.target.checked ? "" : p.amount }))
   }
 
   const handleAddNewClient = async (name) => {
@@ -204,7 +196,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
     const today = new Date().toISOString().split("T")[0]
 
     // Client payment — independent transaction
-    const clientAmount = parseFloat(clientPay.amount)
+    const clientAmount = clientPay.paid_in_full ? parseFloat(form.sell_price) : parseFloat(clientPay.amount)
     if (clientAmount > 0) {
       const { data: payRow, error: payErr } = await supabase
         .from("payments")
@@ -233,7 +225,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
     }
 
     // Supplier payment — independent transaction
-    const supplierAmount = parseFloat(supplierPay.amount)
+    const supplierAmount = supplierPay.paid_in_full ? parseFloat(form.purchase_price) : parseFloat(supplierPay.amount)
     if (supplierAmount > 0) {
       const { data: payRow, error: payErr } = await supabase
         .from("payments")
@@ -539,10 +531,11 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                         type="number"
                         min="0"
                         step="0.01"
-                        value={clientPay.amount}
+                        value={clientPay.paid_in_full ? (form.sell_price || "") : clientPay.amount}
                         onChange={setC("amount")}
+                        disabled={clientPay.paid_in_full}
                         placeholder="0.00"
-                        className={inputCls}
+                        className={`${inputCls} ${clientPay.paid_in_full ? "bg-gray-50 text-gray-500" : ""}`}
                       />
                     </div>
                     <div>
@@ -614,10 +607,11 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                         type="number"
                         min="0"
                         step="0.01"
-                        value={supplierPay.amount}
+                        value={supplierPay.paid_in_full ? (form.purchase_price || "") : supplierPay.amount}
                         onChange={setS("amount")}
+                        disabled={supplierPay.paid_in_full}
                         placeholder="0.00"
-                        className={inputCls}
+                        className={`${inputCls} ${supplierPay.paid_in_full ? "bg-gray-50 text-gray-500" : ""}`}
                       />
                     </div>
                     <div>

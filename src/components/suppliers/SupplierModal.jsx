@@ -2,18 +2,21 @@ import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { createSupplier } from "../tickets/TicketModal"
+import DocUploadSection, { uploadStagedDocuments } from "../ui/DocUploadSection"
 
 const EMPTY = { name: "", phone: "", email: "", notes: "" }
 
 export default function SupplierModal({ isOpen, onClose, onSaved, supplier }) {
   const { agent } = useAuth()
   const [form, setForm] = useState(EMPTY)
+  const [staged, setStaged] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
     if (isOpen) {
       setForm(supplier ? { name: supplier.name, phone: supplier.phone ?? "", email: supplier.email ?? "", notes: supplier.notes ?? "" } : EMPTY)
+      setStaged([])
       setError("")
     }
   }, [isOpen, supplier])
@@ -52,6 +55,17 @@ export default function SupplierModal({ isOpen, onClose, onSaved, supplier }) {
       } catch (err) {
         setError(err.message)
         setLoading(false)
+        return
+      }
+    }
+
+    if (staged.length > 0) {
+      try {
+        await uploadStagedDocuments(supabase, agent.id, "supplier", saved.id, staged)
+      } catch (err) {
+        setError(`Saved, but document upload failed: ${err.message}`)
+        setLoading(false)
+        onSaved(saved)
         return
       }
     }
@@ -141,6 +155,8 @@ export default function SupplierModal({ isOpen, onClose, onSaved, supplier }) {
               className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
             />
           </div>
+
+          <DocUploadSection staged={staged} onChange={setStaged} />
 
           <div className="flex gap-3 pt-1">
             <button

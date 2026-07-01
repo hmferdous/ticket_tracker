@@ -99,8 +99,8 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
 
   const fetchDropdowns = async () => {
     const [{ data: c }, { data: s }] = await Promise.all([
-      supabase.from("clients").select("id, name, client_id_number").eq("agent_id", agent.id).order("name"),
-      supabase.from("suppliers").select("id, name, supplier_id_number").eq("agent_id", agent.id).order("name"),
+      supabase.from("clients").select("id, name, client_id_number").eq("agent_id", agent.id).order("client_id_number", { ascending: true }),
+      supabase.from("suppliers").select("id, name, supplier_id_number").eq("agent_id", agent.id).order("supplier_id_number", { ascending: true }),
     ])
     setClients(c ?? [])
     setSuppliers(s ?? [])

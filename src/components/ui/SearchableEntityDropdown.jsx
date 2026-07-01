@@ -71,8 +71,10 @@ export default function SearchableEntityDropdown({
   const showAdd =
     !!onAddNew &&
     query.trim().length > 0 &&
-    !filtered.some(
-      (e) => e.name.toLowerCase() === query.trim().toLowerCase()
+    !entities.some(
+      (e) =>
+        e.name.toLowerCase() === query.trim().toLowerCase() ||
+        labelFor(e).toLowerCase() === query.trim().toLowerCase()
     )
 
   const extraCount = extraOption ? 1 : 0

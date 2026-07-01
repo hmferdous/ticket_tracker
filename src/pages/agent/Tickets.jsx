@@ -383,8 +383,16 @@ export default function Tickets() {
         if (!haystack.includes(search)) return false
       }
       if (airlineFilters.length > 0 && !airlineFilters.includes(ticket.carrier)) return false
-      if (clientFilters.length > 0 && !clientFilters.includes(ticket.client_id)) return false
-      if (supplierFilters.length > 0 && !supplierFilters.includes(ticket.supplier_id)) return false
+      if (clientFilters.length > 0) {
+        const match = (clientFilters.includes("__blank__") && !ticket.client_id) ||
+                      (ticket.client_id && clientFilters.includes(ticket.client_id))
+        if (!match) return false
+      }
+      if (supplierFilters.length > 0) {
+        const match = (supplierFilters.includes("__blank__") && !ticket.supplier_id) ||
+                      (ticket.supplier_id && supplierFilters.includes(ticket.supplier_id))
+        if (!match) return false
+      }
       if (dateFrom && (!ticket.issue_date || ticket.issue_date < dateFrom)) return false
       if (dateTo && (!ticket.issue_date || ticket.issue_date > dateTo)) return false
       if (selectedChips.length > 0) {
@@ -410,26 +418,30 @@ export default function Tickets() {
 
   const clientOptions = useMemo(() => {
     const seen = new Map()
+    let hasBlank = false
     for (const t of tickets) {
-      if (t.client_id && t.clients?.name && !seen.has(t.client_id)) {
-        seen.set(t.client_id, t.clients.name)
-      }
+      if (!t.client_id) hasBlank = true
+      else if (t.clients?.name && !seen.has(t.client_id)) seen.set(t.client_id, t.clients.name)
     }
-    return [...seen.entries()]
+    const opts = [...seen.entries()]
       .map(([id, name]) => ({ value: id, label: name }))
       .sort((a, b) => a.label.localeCompare(b.label))
+    if (hasBlank) opts.unshift({ value: "__blank__", label: "Blank" })
+    return opts
   }, [tickets])
 
   const supplierOptions = useMemo(() => {
     const seen = new Map()
+    let hasBlank = false
     for (const t of tickets) {
-      if (t.supplier_id && t.suppliers?.name && !seen.has(t.supplier_id)) {
-        seen.set(t.supplier_id, t.suppliers.name)
-      }
+      if (!t.supplier_id) hasBlank = true
+      else if (t.suppliers?.name && !seen.has(t.supplier_id)) seen.set(t.supplier_id, t.suppliers.name)
     }
-    return [...seen.entries()]
+    const opts = [...seen.entries()]
       .map(([id, name]) => ({ value: id, label: name }))
       .sort((a, b) => a.label.localeCompare(b.label))
+    if (hasBlank) opts.unshift({ value: "__blank__", label: "Blank" })
+    return opts
   }, [tickets])
 
   const totalPages = Math.max(1, Math.ceil(filteredTickets.length / pageSize))

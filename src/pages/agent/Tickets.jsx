@@ -8,7 +8,6 @@ import RefundModal from "../../components/tickets/RefundModal"
 import ReissueModal from "../../components/tickets/ReissueModal"
 import RecordPaymentModal from "../../components/tickets/RecordPaymentModal"
 import TicketDetailModal from "../../components/tickets/TicketDetailModal"
-import SearchableDropdown from "../../components/ui/SearchableDropdown"
 import AppLayout from "../../components/layout/AppLayout"
 import { AIRLINES } from "../../lib/airlines"
 
@@ -32,10 +31,7 @@ function getRowActions(ticket) {
   return actions
 }
 
-const AIRLINE_FILTER_OPTIONS = [
-  { value: "", label: "All Airlines" },
-  ...AIRLINES.map((a) => ({ value: a.code, label: `${a.code} — ${a.name}` })),
-]
+const AIRLINE_FILTER_OPTIONS = AIRLINES.map((a) => ({ value: a.code, label: `${a.code} — ${a.name}` }))
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 200]
 
@@ -119,6 +115,96 @@ function TicketChips({ ticket }) {
   )
 }
 
+function MultiSelectDropdown({ options, selected, onChange, placeholder }) {
+  const btnRef = useRef(null)
+  const [open, setOpen] = useState(false)
+  const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 0 })
+
+  const handleToggle = () => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      setMenuPos({ top: rect.bottom + 4, left: rect.left, width: Math.max(rect.width, 220) })
+    }
+    setOpen((v) => !v)
+  }
+
+  useEffect(() => {
+    if (!open) return
+    const close = () => setOpen(false)
+    window.addEventListener("scroll", close, true)
+    window.addEventListener("resize", close)
+    return () => {
+      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("resize", close)
+    }
+  }, [open])
+
+  const toggle = (value) => {
+    onChange(selected.includes(value) ? selected.filter((v) => v !== value) : [...selected, value])
+  }
+
+  const label =
+    selected.length === 0
+      ? placeholder
+      : selected.length === 1
+      ? (options.find((o) => o.value === selected[0])?.label ?? selected[0])
+      : `${selected.length} selected`
+
+  return (
+    <div className="relative">
+      <button
+        ref={btnRef}
+        type="button"
+        onClick={handleToggle}
+        className={`w-full flex items-center justify-between px-3 py-2 border rounded-lg text-sm text-left transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
+          selected.length > 0
+            ? "border-blue-400 bg-blue-50 text-blue-700"
+            : "border-gray-300 bg-white text-gray-500 hover:border-gray-400"
+        }`}
+      >
+        <span className="truncate">{label}</span>
+        <svg className="w-3.5 h-3.5 ml-2 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+      {open && createPortal(
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div
+            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-auto max-h-64"
+            style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}
+          >
+            {selected.length > 0 && (
+              <button
+                type="button"
+                onClick={() => { onChange([]); setOpen(false) }}
+                className="flex w-full items-center px-4 py-2 text-xs text-red-500 hover:bg-gray-50 transition-colors border-b border-gray-100"
+              >
+                Clear selection
+              </button>
+            )}
+            {options.map((opt) => (
+              <label
+                key={opt.value}
+                className="flex items-center gap-2.5 px-4 py-2 text-sm hover:bg-gray-50 cursor-pointer"
+              >
+                <input
+                  type="checkbox"
+                  checked={selected.includes(opt.value)}
+                  onChange={() => toggle(opt.value)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+                <span className="text-gray-700">{opt.label}</span>
+              </label>
+            ))}
+          </div>
+        </>,
+        document.body
+      )}
+    </div>
+  )
+}
+
 function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
   const btnRef = useRef(null)
   const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
@@ -195,16 +281,6 @@ function fmtMargin(n) {
   return Number(n).toLocaleString("en-BD")
 }
 
-function getLatestPayDate(ticket) {
-  return (
-    ticket.ticket_payments
-      ?.filter((tp) => tp.type === "client")
-      ?.map((tp) => tp.payments?.payment_date)
-      ?.filter(Boolean)
-      ?.sort()
-      ?.at(-1) ?? ""
-  )
-}
 
 function computeNetMargin(ticket) {
   const ticketMargin = (ticket.sell_price ?? 0) - (ticket.purchase_price ?? 0)
@@ -238,9 +314,9 @@ export default function Tickets() {
 
   // Filter state
   const [searchText, setSearchText] = useState("")
-  const [airlineFilter, setAirlineFilter] = useState("")
-  const [clientFilter, setClientFilter] = useState("")
-  const [supplierFilter, setSupplierFilter] = useState("")
+  const [airlineFilters, setAirlineFilters] = useState([])
+  const [clientFilters, setClientFilters] = useState([])
+  const [supplierFilters, setSupplierFilters] = useState([])
   const [selectedChips, setSelectedChips] = useState([])
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
@@ -259,7 +335,7 @@ export default function Tickets() {
   // Reset to page 1 whenever any filter changes
   useEffect(() => {
     setPage(1)
-  }, [searchText, airlineFilter, clientFilter, supplierFilter, selectedChips, dateFrom, dateTo])
+  }, [searchText, airlineFilters, clientFilters, supplierFilters, selectedChips, dateFrom, dateTo])
 
   const fetchTickets = async () => {
     setLoading(true)
@@ -276,7 +352,6 @@ export default function Tickets() {
         client_id, supplier_id,
         clients(name),
         suppliers(name),
-        ticket_payments(type, payments(payment_date)),
         created_at
       `)
       .eq("agent_id", agent.id)
@@ -304,9 +379,9 @@ export default function Tickets() {
 
   const clearFilters = () => {
     setSearchText("")
-    setAirlineFilter("")
-    setClientFilter("")
-    setSupplierFilter("")
+    setAirlineFilters([])
+    setClientFilters([])
+    setSupplierFilters([])
     setSelectedChips([])
     setDateFrom("")
     setDateTo("")
@@ -319,9 +394,9 @@ export default function Tickets() {
         const haystack = `${ticket.passenger_name ?? ""} ${ticket.pnr ?? ""} ${ticket.route ?? ""}`.toLowerCase()
         if (!haystack.includes(search)) return false
       }
-      if (airlineFilter && ticket.carrier !== airlineFilter) return false
-      if (clientFilter && ticket.client_id !== clientFilter) return false
-      if (supplierFilter && ticket.supplier_id !== supplierFilter) return false
+      if (airlineFilters.length > 0 && !airlineFilters.includes(ticket.carrier)) return false
+      if (clientFilters.length > 0 && !clientFilters.includes(ticket.client_id)) return false
+      if (supplierFilters.length > 0 && !supplierFilters.includes(ticket.supplier_id)) return false
       if (dateFrom && (!ticket.issue_date || ticket.issue_date < dateFrom)) return false
       if (dateTo && (!ticket.issue_date || ticket.issue_date > dateTo)) return false
       if (selectedChips.length > 0) {
@@ -330,23 +405,12 @@ export default function Tickets() {
       }
       return true
     })
-  }, [tickets, searchText, airlineFilter, clientFilter, supplierFilter, dateFrom, dateTo, selectedChips])
-
-  const sortedTickets = useMemo(() => {
-    return [...filteredTickets].sort((a, b) => {
-      const aDate = getLatestPayDate(a)
-      const bDate = getLatestPayDate(b)
-      if (!aDate && !bDate) return 0
-      if (!aDate) return 1
-      if (!bDate) return -1
-      return bDate.localeCompare(aDate)
-    })
-  }, [filteredTickets])
+  }, [tickets, searchText, airlineFilters, clientFilters, supplierFilters, dateFrom, dateTo, selectedChips])
 
   const totalPages = Math.max(1, Math.ceil(filteredTickets.length / pageSize))
   const safePage = Math.min(page, totalPages)
   const startIdx = (safePage - 1) * pageSize
-  const pagedTickets = sortedTickets.slice(startIdx, startIdx + pageSize)
+  const pagedTickets = filteredTickets.slice(startIdx, startIdx + pageSize)
   const showingFrom = filteredTickets.length === 0 ? 0 : startIdx + 1
   const showingTo = Math.min(startIdx + pageSize, filteredTickets.length)
 
@@ -478,38 +542,30 @@ export default function Tickets() {
             </div>
             <div className="w-52">
               <label className="block text-xs font-medium text-gray-500 mb-1">Airline</label>
-              <SearchableDropdown
+              <MultiSelectDropdown
                 options={AIRLINE_FILTER_OPTIONS}
-                value={airlineFilter}
-                onChange={setAirlineFilter}
+                selected={airlineFilters}
+                onChange={setAirlineFilters}
                 placeholder="All Airlines"
               />
             </div>
             <div className="w-44">
               <label className="block text-xs font-medium text-gray-500 mb-1">Client</label>
-              <select
-                value={clientFilter}
-                onChange={(e) => setClientFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">All Clients</option>
-                {clients.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
+              <MultiSelectDropdown
+                options={clients.map((c) => ({ value: c.id, label: c.name }))}
+                selected={clientFilters}
+                onChange={setClientFilters}
+                placeholder="All Clients"
+              />
             </div>
             <div className="w-44">
               <label className="block text-xs font-medium text-gray-500 mb-1">Supplier</label>
-              <select
-                value={supplierFilter}
-                onChange={(e) => setSupplierFilter(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="">All Suppliers</option>
-                {suppliers.map((s) => (
-                  <option key={s.id} value={s.id}>{s.name}</option>
-                ))}
-              </select>
+              <MultiSelectDropdown
+                options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                selected={supplierFilters}
+                onChange={setSupplierFilters}
+                placeholder="All Suppliers"
+              />
             </div>
             <div className="w-36">
               <label className="block text-xs font-medium text-gray-500 mb-1">Issue date from</label>
@@ -587,7 +643,6 @@ export default function Tickets() {
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50 text-left">
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Issue Date</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Pay Date</th>
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Flight Date</th>
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">PNR</th>
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Ticket No.</th>
@@ -601,19 +656,12 @@ export default function Tickets() {
                 <tbody className="divide-y divide-gray-100">
                   {pagedTickets.map((ticket) => {
                     const outstanding = (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
-                    const latestPayDate = ticket.ticket_payments
-                      ?.filter((tp) => tp.type === "client")
-                      ?.map((tp) => tp.payments?.payment_date)
-                      ?.filter(Boolean)
-                      ?.sort()
-                      ?.at(-1)
                     const fmtDate = (d) => d
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                       : <span className="text-gray-300">—</span>
                     return (
                       <tr key={ticket.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(ticket.issue_date)}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(latestPayDate)}</td>
                         <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(ticket.travel_date)}</td>
                         <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.pnr || "—"}</span></td>
                         <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.ticket_number || "—"}</span></td>
@@ -664,7 +712,6 @@ export default function Tickets() {
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50 text-left">
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Issue Date</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Pay Date</th>
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Travel Date</th>
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">PNR</th>
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Ticket No.</th>
@@ -693,7 +740,6 @@ export default function Tickets() {
                         ? ticket.narration.slice(0, 30) + "…"
                         : ticket.narration
                       : null
-                    const detailPayDate = getLatestPayDate(ticket)
                     const fmtD = (d) => d
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                       : <span className="text-gray-300">—</span>
@@ -701,7 +747,6 @@ export default function Tickets() {
                     return (
                       <tr key={ticket.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3 text-xs text-gray-500">{fmtD(ticket.issue_date)}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500">{fmtD(detailPayDate)}</td>
                         <td className="px-4 py-3 text-xs text-gray-500">{fmtD(ticket.travel_date)}</td>
                         <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.pnr || "—"}</span></td>
                         <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.ticket_number || "—"}</span></td>

@@ -31,8 +31,6 @@ function getRowActions(ticket) {
   return actions
 }
 
-const AIRLINE_FILTER_OPTIONS = AIRLINES.map((a) => ({ value: a.code, label: `${a.code} — ${a.name}` }))
-
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 200]
 
 const STATUS_CHIP_OPTIONS = [
@@ -117,6 +115,7 @@ function TicketChips({ ticket }) {
 
 function MultiSelectDropdown({ options, selected, onChange, placeholder }) {
   const btnRef = useRef(null)
+  const menuRef = useRef(null)
   const [open, setOpen] = useState(false)
   const [menuPos, setMenuPos] = useState({ top: 0, left: 0, width: 0 })
 
@@ -130,12 +129,16 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder }) {
 
   useEffect(() => {
     if (!open) return
-    const close = () => setOpen(false)
-    window.addEventListener("scroll", close, true)
-    window.addEventListener("resize", close)
+    const onScroll = (e) => {
+      if (menuRef.current && menuRef.current.contains(e.target)) return
+      setOpen(false)
+    }
+    const onResize = () => setOpen(false)
+    window.addEventListener("scroll", onScroll, true)
+    window.addEventListener("resize", onResize)
     return () => {
-      window.removeEventListener("scroll", close, true)
-      window.removeEventListener("resize", close)
+      window.removeEventListener("scroll", onScroll, true)
+      window.removeEventListener("resize", onResize)
     }
   }, [open])
 
@@ -171,6 +174,7 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder }) {
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
+            ref={menuRef}
             className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-auto max-h-64"
             style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}
           >
@@ -308,10 +312,6 @@ export default function Tickets() {
   const [viewingTicket, setViewingTicket] = useState(null)
   const [openActionMenuId, setOpenActionMenuId] = useState(null)
 
-  // Filter dropdown data
-  const [clients, setClients] = useState([])
-  const [suppliers, setSuppliers] = useState([])
-
   // Filter state
   const [searchText, setSearchText] = useState("")
   const [airlineFilters, setAirlineFilters] = useState([])
@@ -326,10 +326,7 @@ export default function Tickets() {
   const [pageSize, setPageSize] = useState(20)
 
   useEffect(() => {
-    if (agent?.id) {
-      fetchTickets()
-      fetchFilterOptions()
-    }
+    if (agent?.id) fetchTickets()
   }, [agent])
 
   // Reset to page 1 whenever any filter changes
@@ -360,15 +357,6 @@ export default function Tickets() {
     setLoading(false)
     if (error) setError(error.message)
     else setTickets(data)
-  }
-
-  const fetchFilterOptions = async () => {
-    const [{ data: c }, { data: s }] = await Promise.all([
-      supabase.from("clients").select("id, name").eq("agent_id", agent.id).order("name"),
-      supabase.from("suppliers").select("id, name").eq("agent_id", agent.id).order("name"),
-    ])
-    setClients(c ?? [])
-    setSuppliers(s ?? [])
   }
 
   const toggleChip = (chip) => {
@@ -406,6 +394,43 @@ export default function Tickets() {
       return true
     })
   }, [tickets, searchText, airlineFilters, clientFilters, supplierFilters, dateFrom, dateTo, selectedChips])
+
+  const airlineOptions = useMemo(() => {
+    const seen = new Set()
+    const opts = []
+    for (const t of tickets) {
+      if (t.carrier && !seen.has(t.carrier)) {
+        seen.add(t.carrier)
+        const name = AIRLINES.find((a) => a.code === t.carrier)?.name
+        opts.push({ value: t.carrier, label: name ? `${t.carrier} — ${name}` : t.carrier })
+      }
+    }
+    return opts.sort((a, b) => a.value.localeCompare(b.value))
+  }, [tickets])
+
+  const clientOptions = useMemo(() => {
+    const seen = new Map()
+    for (const t of tickets) {
+      if (t.client_id && t.clients?.name && !seen.has(t.client_id)) {
+        seen.set(t.client_id, t.clients.name)
+      }
+    }
+    return [...seen.entries()]
+      .map(([id, name]) => ({ value: id, label: name }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [tickets])
+
+  const supplierOptions = useMemo(() => {
+    const seen = new Map()
+    for (const t of tickets) {
+      if (t.supplier_id && t.suppliers?.name && !seen.has(t.supplier_id)) {
+        seen.set(t.supplier_id, t.suppliers.name)
+      }
+    }
+    return [...seen.entries()]
+      .map(([id, name]) => ({ value: id, label: name }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+  }, [tickets])
 
   const totalPages = Math.max(1, Math.ceil(filteredTickets.length / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -543,7 +568,7 @@ export default function Tickets() {
             <div className="w-52">
               <label className="block text-xs font-medium text-gray-500 mb-1">Airline</label>
               <MultiSelectDropdown
-                options={AIRLINE_FILTER_OPTIONS}
+                options={airlineOptions}
                 selected={airlineFilters}
                 onChange={setAirlineFilters}
                 placeholder="All Airlines"
@@ -552,7 +577,7 @@ export default function Tickets() {
             <div className="w-44">
               <label className="block text-xs font-medium text-gray-500 mb-1">Client</label>
               <MultiSelectDropdown
-                options={clients.map((c) => ({ value: c.id, label: c.name }))}
+                options={clientOptions}
                 selected={clientFilters}
                 onChange={setClientFilters}
                 placeholder="All Clients"
@@ -561,7 +586,7 @@ export default function Tickets() {
             <div className="w-44">
               <label className="block text-xs font-medium text-gray-500 mb-1">Supplier</label>
               <MultiSelectDropdown
-                options={suppliers.map((s) => ({ value: s.id, label: s.name }))}
+                options={supplierOptions}
                 selected={supplierFilters}
                 onChange={setSupplierFilters}
                 placeholder="All Suppliers"

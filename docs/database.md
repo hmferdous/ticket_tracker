@@ -12,13 +12,14 @@ Never disable RLS on any table
 - `tickets` — core table. belongs to agent. links to client and supplier. supports parent/child relationship for reissues.
 - `payments` — one row per payment event. Linked to client or supplier. Never linked directly to tickets.
 - `ticket_payments` — junction table. Links payments to tickets with allocated amounts. One row per ticket per payment. Standard relational many-to-many pattern.
+- `entity_documents` — stores document metadata for clients and suppliers. Actual files live in Supabase Storage.
 - `reminders` — email reminder rules per ticket
 
 ## Key Fields on Tickets
-- purchase_price — total cost to agent. Mandatory. Used for all calculations (margin, payments, refunds).
+- purchase_price — total cost to agent. Mandatory. Used for all calculations (margin, payments, refunds). On reissue child tickets this is original_purchase + fare_difference + reissue_fee_paid.
 - gds_price — optional. Raw airline/GDS cost before company markup. Label in form: Supplier Purchase Price. Informational only — no effect on any calculation. Pro plan feature (gated later).
 - office_markup — auto-calculated on save as purchase_price - gds_price. Never entered in form. Stored silently. Used only for dashboard reporting of company contribution. Null if gds_price not entered.
-- sell_price — actual price charged to client (real number, private)
+- sell_price — actual price charged to client (real number, private). On reissue child tickets this is original_sell + fare_difference + reissue_fee_collected.
 - issue_date — optional. Date the ticket was issued.
 - amount_paid — derived from SUM(ticket_payments.allocated_amount) for this ticket
 - payment_status — unpaid, partial, paid (derived from amount_paid vs sell_price)
@@ -27,9 +28,9 @@ Never disable RLS on any table
 - parent_ticket_id — nullable FK to tickets.id. Set when this ticket is a reissue of another.
 - is_reissue — boolean. true if this ticket was created as a reissue of another ticket.
 - is_void — boolean. true if ticket was voided.
-- reissue_fee_collected — amount collected from client for reissue
-- reissue_fee_paid — amount paid to supplier for reissue
-- fare_difference — price difference between old and new ticket on reissue (can be negative)
+- reissue_fee_collected — amount collected from client for reissue (stored for reference; already baked into sell_price)
+- reissue_fee_paid — amount paid to supplier for reissue (stored for reference; already baked into purchase_price)
+- fare_difference — price difference between old and new ticket on reissue (can be negative; already baked into sell_price and purchase_price)
 - refund_receivable — expected refund amount from supplier
 - refund_received — actual refund received from supplier
 - refund_payable — agreed refund amount to pay client
@@ -41,15 +42,20 @@ Never disable RLS on any table
 ### Per Ticket
 - ticket_margin = sell_price - purchase_price
 - refund_margin = refund_received - refund_payable
-- reissue_margin = reissue_fee_collected - reissue_fee_paid + fare_difference
-- net_margin = ticket_margin + refund_margin + reissue_margin
+- net_margin = ticket_margin + refund_margin
+
+Note: reissue fees and fare_difference are NOT separately added to net_margin. They are already embedded in sell_price and purchase_price on the child reissue ticket. Adding them again would double-count.
+
+### Reissue Profit (display only, not added to net_margin)
+- profit_from_reissue = reissue_fee_collected - reissue_fee_paid
+- Shown in the reissue modal as a quick reference for the agent — the margin earned purely from the reissue transaction
 
 ### Chain Margin (parent + all reissued children)
 - chain_net_margin = SUM(net_margin) across parent ticket and all tickets where parent_ticket_id = parent.id
 
 ### Dashboard Reporting
-- Total actual margin = SUM(net_margin) across all tickets in period
-- Total office markup contributed = SUM(office_markup) across all tickets in period
+- Total Profit = SUM(net_margin) across all tickets in period
+- Office Margin = SUM(office_markup) across all tickets in period
 
 ### Removed Fields
 - reported_price — REMOVED. Do not use or reference anywhere.
@@ -69,17 +75,17 @@ payments:
   type: client_payment | supplier_payment | client_refund | supplier_refund
   amount — total payment amount
   unallocated_amount — starts equal to amount, reduces as allocations are made, never goes below 0
-  channel — cash, bkash, bank, office, ebl, dbbl, ibbl, city, brac, ucb
+  channel — Cash, bKash, Bank, Office, EBL, DBBL, IBBL, City, BRAC, UCB
   trx_id, notes, payment_date, created_at
 
 ticket_payments:
   id, payment_id, ticket_id
   allocated_amount — amount from this payment applied to this ticket
-  type: client | supplier (to distinguish which side is being allocated)
+  type: client | supplier | client_refund (client_refund used when linking a client_refund payment to a ticket — allocated_amount is negative, reducing the ticket's amount_paid)
   created_at
 
 ### Balance Calculations
-- Client total billed = SUM(tickets.sell_price) for all tickets belonging to that client
+- Client total billed = SUM(tickets.sell_price) for all non-void tickets belonging to that client
 - Client total received = SUM(payments.amount) for all client_payments for that client
 - Client balance outstanding = total billed - total received
 - Ticket amount paid = SUM(ticket_payments.allocated_amount) for that ticket where type = client
@@ -102,7 +108,14 @@ ticket_payments:
 - Works for all ticket types — walk-in passenger or trade client
 - If filled: creates payment row + ticket_payments allocation row on ticket save
 - If left empty: ticket saves with payment_status = unpaid
-- Paid in full checkbox auto-fills amount = sell_price
+- Paid in full checkbox disables the amount field and live-reflects the current sell_price; on save, uses the actual sell_price value
+
+### Log Transaction Modal (Payments Page)
+- 2-step modal: type selector → type-specific form
+- Types: Client Payment (IN), Supplier Payment (OUT), Client Refund (OUT), Supplier Refund (IN)
+- After logging a client_payment or supplier_payment, the AllocationModal is triggered automatically
+- client_refund: unallocated_amount = 0; if linked to a ticket, inserts a ticket_payments row with type=client_refund and negative allocated_amount, then updates ticket.amount_paid and payment_status
+- supplier_refund: unallocated_amount = 0; if linked to a ticket, updates ticket.refund_received and refund_status
 
 ### Forward to Supplier (Passthrough Payment)
 - When logging a client payment, agent can optionally forward all or part to a supplier in the same action
@@ -111,7 +124,6 @@ ticket_payments:
 - Client payment allocated to tickets via ticket_payments as normal
 - Supplier payment allocated to same or different tickets via ticket_payments
 - If forward amount differs from client payment — agent enters custom supplier amount
-- Difference surfaces naturally in margin calculations
 
 payments rows created on forward:
   Row 1: type=client_payment, client_id=X, amount=300,000
@@ -157,27 +169,56 @@ payments rows created on forward:
 ### Core Concept
 A reissue creates a new child ticket linked to the original parent ticket via parent_ticket_id. The original ticket stays intact with its original values and status changes to reissued.
 
+### Reissue Pricing Model
+The child ticket's sell_price and purchase_price represent the FULL new prices, not incremental amounts:
+- child.sell_price = original_sell_price + fare_difference + reissue_fee_collected
+- child.purchase_price = original_purchase_price + fare_difference + reissue_fee_paid
+
+The ReissueModal auto-computes these values as the agent types the reissue fee and fare difference fields. sell_price and purchase_price on the child are read-only computed displays — not manually editable.
+
 ### Reissue Fields on Child Ticket
 - parent_ticket_id — FK to original ticket
 - is_reissue = true
-- reissue_fee_collected — fee collected from client
-- reissue_fee_paid — fee paid to supplier
-- fare_difference — price difference (positive or negative)
-- reissue_margin = reissue_fee_collected - reissue_fee_paid + fare_difference
+- reissue_fee_collected — fee collected from client (stored for reference; baked into sell_price)
+- reissue_fee_paid — fee paid to supplier (stored for reference; baked into purchase_price)
+- fare_difference — price difference (positive or negative; baked into both prices)
 
 ### Reissue Flow
 1. Agent clicks Reissue on original ticket row
 2. Modal opens pre-filled with original ticket data
-3. Agent updates new ticket details — carrier, PNR, ticket number, dates, prices
-4. Agent enters reissue fees and fare difference
-5. On save — original ticket status → reissued, new child ticket created
-6. Payment on original ticket carries forward — child ticket starts with payment inherited from parent
-7. Any additional payment for fare difference logged separately
+3. Agent updates ticket details — carrier, PNR, ticket number, dates
+4. Agent enters fare_difference, reissue_fee_collected, reissue_fee_paid
+5. sell_price and purchase_price auto-compute live from original prices + entered values
+6. "Profit From Reissue" (= reissue_fee_collected - reissue_fee_paid) shown as a live display
+7. On save — original ticket status → reissued, new child ticket created with computed prices
 
 ### Chain Margin
 - Displayed on ticket detail view — not list view
 - Shows original ticket margin + all child reissue margins
 - chain_net_margin = SUM(net_margin) across parent and all children
+
+## Document Storage
+
+### entity_documents Table
+Stores metadata for documents uploaded against clients and suppliers.
+
+entity_documents:
+  id (uuid, PK)
+  agent_id (uuid, FK to agents)
+  entity_type: 'client' | 'supplier'
+  entity_id (uuid — references clients.id or suppliers.id)
+  doc_type: 'Business Card' | 'NID' | 'Passport' | 'Photo' | 'Others'
+  file_name (text — original filename)
+  storage_path (text — path in Supabase Storage bucket)
+  created_at
+
+RLS policy: agent can only access rows where agent_id matches their own agents.id.
+
+### Supabase Storage
+- Bucket: `documents` (private)
+- Path format: `{agent_id}/{entity_type}/{entity_id}/{uuid}.{ext}`
+- Access via signed URLs (1-hour expiry) — generated on demand when agent opens a file
+- Maximum 5 documents per entity (enforced in UI, not DB)
 
 ## Row Level Actions on Ticket List
 
@@ -214,3 +255,4 @@ A reissue creates a new child ticket linked to the original parent ticket via pa
 - office_markup is never factored into payment, refund, or balance calculations
 - Void tickets are never deleted — always kept for audit
 - Reissued parent tickets are never deleted or modified — child ticket carries forward
+- reissue_fee fields are stored on child tickets for reference but are already baked into sell_price/purchase_price — never add them separately to margin calculations

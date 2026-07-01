@@ -4,6 +4,7 @@
 React + Vite
 Tailwind CSS via @tailwindcss/vite plugin
 No component library — build clean custom components
+jsPDF + jspdf-autotable for PDF generation (ledger reports)
 
 ## Style Guidelines
 - Clean, professional, minimal
@@ -15,14 +16,22 @@ No component library — build clean custom components
 
 ## Layout
 - Authenticated pages: sidebar on left, content on right
-- Sidebar links: Dashboard, Tickets, Clients, Suppliers, Payments, Settings
+- Sidebar links: Dashboard, Tickets, Clients, Suppliers, Payments, Reports (collapsible group), Settings
+- Reports group expands/collapses on click; auto-expands when any /reports/* route is active
+- Reports sub-links: Client Ledger, Supplier Ledger
 - Admin pages: separate layout with admin sidebar
+
+## AppLayout Actions Slot
+- AppLayout accepts an `actions` prop rendered as a flex row in the page header (top right)
+- Used for page-level primary actions: "+ Add ticket", "+ Log Transaction", "View Ledger", "Hide/Show amounts", etc.
+- Pattern: `<AppLayout title="Page Title" actions={<button>...</button>}>`
 
 ## Components
 - Reusable UI components go in src/components/ui/
 - Feature components go in their respective folder (tickets, clients, suppliers, payments)
 - Pages go in src/pages/agent/ for agent facing
 - Pages go in src/pages/admin/ for admin facing
+- Report pages go in src/pages/agent/reports/
 
 ## Forms
 - Always show validation errors inline
@@ -35,25 +44,23 @@ No component library — build clean custom components
 - Office Markup — never shown in form. Auto-calculated on save: purchase_price - gds_price. Only calculated if gds_price is entered.
 - Sell Price — mandatory. Label: Sell Price.
 - Issue Date — optional date field. Label: Issue Date. Maps to issue_date.
-- Remove dynamic margin calculation display from the form entirely.
-- Remove reported_price from the ticket form entirely.
 
 ## Ticket Form — Payment Sections
 Two separate collapsible sections, both collapsed by default, both optional:
 
 Section 1 — Client Payment:
-  - Amount Received (numeric)
+  - Amount Received (numeric) — disabled and live-reflects sell_price when Paid in full is checked
   - Payment Channel (dropdown: Cash, bKash, Bank, Office, EBL, DBBL, IBBL, City, BRAC, UCB)
   - Transaction ID (text)
   - Notes (text)
-  - Paid in full checkbox — auto-fills amount = sell_price
+  - Paid in full checkbox — disables Amount field and uses sell_price on save (dynamic, not a one-time copy)
 
 Section 2 — Supplier Payment:
-  - Amount Paid (numeric)
+  - Amount Paid (numeric) — disabled and live-reflects purchase_price when Paid in full is checked
   - Payment Channel (same dropdown)
   - Transaction ID (text)
   - Notes (text)
-  - Paid in full checkbox — auto-fills amount = purchase_price (not sell_price)
+  - Paid in full checkbox — disables Amount field and uses purchase_price on save
 
 On save:
   - If Client Payment amount > 0: create payment row (type: client_payment) + ticket_payments allocation row
@@ -68,6 +75,8 @@ On save:
 
 ## Ticket List
 - Single flat list — no separate tabs for reissues, voids, refunds
+- Sorted by issue_date descending (latest first); tickets without issue_date fall to the bottom
+- Issue Date is the first column, followed by Travel Date, then Passenger, Route, etc.
 - Computed sentence-case chip badges per ticket (small pills, not bracketed tags), multiple can show at once:
   - Payment: Unpaid (red), Partial (yellow), Paid (green)
   - Flight: Upcoming (blue), Flying today (purple), Return pending (orange), Flown (gray)
@@ -84,14 +93,19 @@ On save:
   - Record Payment: payment_status not paid and status not void
   - Record Supplier Refund / Record Client Refund: shown once a refund is initiated, independently per side (whichever of refund_received / refund_paid is still null)
 - Actions that aren't applicable are omitted from the menu entirely, never shown disabled
+- Suppliers list also uses the same hamburger-menu pattern for row actions
 
 ## Reissue Modal
 - Opens from row level action on ticket list
-- Pre-filled with original ticket data — all fields editable
-- Additional fields: Reissue Fee Collected, Reissue Fee Paid, Fare Difference
-- Reissue Margin shown as read-only auto-calculated
-- Collapsible Record Payment section at bottom same as ticket form
-- On save: original ticket marked reissued, new child ticket created
+- Pre-filled with original ticket data — passenger, carrier, PNR, route, dates, client, supplier all editable
+- sell_price and purchase_price are READ-ONLY auto-computed displays — not editable inputs:
+  - sell_price = original_sell_price + fare_difference + reissue_fee_collected
+  - purchase_price = original_purchase_price + fare_difference + reissue_fee_paid
+  - Both update live as the agent types the reissue fields
+- Reissue Details section (editable): Reissue Fee Collected, Reissue Fee Paid, Fare Difference
+- "Profit From Reissue" shown as a live read-only display: reissue_fee_collected - reissue_fee_paid
+- Collapsible Record Payment section at bottom (same pattern as ticket form, uses computed sell_price)
+- On save: original ticket marked reissued, new child ticket created with computed prices
 
 ## Refund Flow UI
 - Initiated from row level action on ticket list
@@ -101,26 +115,101 @@ On save:
 - Refund margin shown at all times: refund_received - refund_payable
 
 ## Payment Allocation UX
-- Triggered immediately after logging a bulk payment from client page
+- Triggered immediately after logging a client_payment or supplier_payment (from Payments page or client/supplier detail)
 - Three options presented:
-  1. Distribute evenly — splits payment equally across all pending tickets for that client
+  1. Distribute evenly — splits payment equally across all pending tickets for that client/supplier
   2. Select tickets — agent picks specific tickets, system fills oldest first until money runs out, last ticket may be partial
-  3. Skip — full amount sits as unallocated credit on client account
-- Unallocated credit shown clearly on client profile
+  3. Skip — full amount sits as unallocated credit on client/supplier account
+- Unallocated credit shown clearly on client/supplier profile
 - Settle button on client page allows agent to allocate remaining credit at any time
 
+## Log Transaction Modal (Payments Page)
+- Accessed via "+ Log Transaction" button in the Payments page header
+- Step 1: Type selector — four full-width cards:
+  - Client Payment (Money In — green IN badge)
+  - Supplier Payment (Money Out — red OUT badge)
+  - Client Refund (Money Out — red OUT badge)
+  - Supplier Refund (Money In — green IN badge)
+- Step 2: Type-specific form. Common fields across all types: entity dropdown, Amount, Payment Channel, Transaction ID, Payment Date (default today), Notes. Back button returns to Step 1.
+- Client Payment extras: collapsible "Forward to supplier" section — supplier dropdown, amount (auto-fills from payment amount), channel, trx_id, "Different amount to supplier" toggle
+- Client/Supplier Refund extras: optional "Link to Ticket" searchable dropdown filtered by selected entity
+- On save for client_payment/supplier_payment: AllocationModal triggered immediately
+- On save for refunds: refreshes payments list
+
 ## Forward to Supplier UX
-- Optional section inside the client payment form
+- Optional section inside the client payment form (in Log Transaction Modal)
 - Checkbox: Forward to supplier
 - When checked reveals:
-  - Supplier dropdown filtered by agent suppliers
+  - Supplier dropdown
   - Amount field auto-fills with client payment amount, editable
   - Channel dropdown
   - Transaction ID field
-  - Different amount to supplier checkbox
-    - When checked reveals: Supplier Amount field + optional Reason field
-- On save: creates two payment rows and handles allocation for both
-- Supplier amount field never goes below 0
+  - "Different amount to supplier" checkbox — reveals a custom Supplier Amount field
+- On save: creates two independent payment rows
+
+## Dashboard
+- Period filter bar at top: This Month | Last Month | This Quarter | Last Quarter | This Year | All Time | Custom
+  - Custom shows two date inputs (From / To)
+  - Default: This Month
+  - Tickets filtered by issue_date; payments filtered by payment_date
+- Hide/Show Amounts toggle button in page header — masks all financial values with ••••• when hidden
+- Row 1 — Period-sensitive cards (5, change with date filter):
+  - Total Tickets (count)
+  - Total Sales (sum of sell_price for period tickets)
+  - Total Collected (sum of client_payment amounts in period)
+  - Total Profit (sum of net_margin for period tickets)
+  - Office Margin (sum of office_markup for period tickets)
+- Row 2 — All-time cumulative cards (3, never filtered, each has "All time" tag at bottom-left):
+  - Collection Pending (net outstanding receivable across all tickets)
+  - Total Payable to Suppliers (net outstanding payable across all tickets)
+  - Unallocated Client Credit (sum of unallocated client_payment amounts, all time)
+- Row 3 — Needs Attention table: upcoming unpaid tickets, sorted by travel_date ascending, unaffected by period filter
+  - Row highlighted red if ≤ 3 days until flight, yellow if ≤ 7 days
+- Row 4 — Side by side: Recent Tickets + Recent Payments, both follow the period filter
+  - Recent Tickets empty state: "No tickets in this period"
+  - Recent Payments empty state: "No payments in this period"
+
+## Client / Supplier Detail Pages
+- Header actions: Edit | View Ledger | Log Payment
+- "View Ledger" navigates to /reports/client-ledger?clientId=<uuid> (or supplier equivalent) and auto-generates the statement
+- Three tabs: Tickets | Payment History | Documents
+- Documents tab: shows uploaded document cards (type badge, filename, date); Open button generates a 1-hour signed URL; Delete removes from storage and DB; Upload button with type selector at the bottom; maximum 5 documents per entity
+
+## Document Upload System
+- Available in: Add/Edit Client modal, Add/Edit Supplier modal (staged upload before save), and Documents tab on detail pages (direct upload after save)
+- Document types: Business Card, NID, Passport, Photo, Others
+- Maximum 5 documents per entity (enforced in UI)
+- In modals (DocUploadSection): files are staged in state with a type selector; uploaded to Supabase Storage after the entity is saved and the entity ID is known
+- In detail pages (DocumentsTab): direct upload; type selector shown next to the upload button
+- Files are stored in the `documents` Supabase Storage bucket (private); accessed via signed URLs
+
+## Reports — Client Ledger (/reports/client-ledger)
+- Client dropdown + date range (From / To) + Generate button
+- Date range is optional — omit both for all-time view
+- When navigated from a client detail page (via "View Ledger"), the client is pre-selected and statement auto-generates
+- Opening Balance row: net amount the client owed before the period start (Dr = client owes us, Cr = we owe client)
+- Ledger entry types (portal — descending by date):
+  - Invoice (blue badge): one row per non-void ticket with issue_date in period; Debit = sell_price
+  - Payment (green badge): one row per client_payment with payment_date in period; Credit = amount; description = "Unallocated Payment" or "Payment — [TrxID]"
+  - Refund (red badge): one row per client_refund; Debit = amount
+- Summary cards (period): Total Invoiced, Total Received, Total Refunded, Net Due, Unallocated Credit (all-time)
+- "↓ Download PDF" button generates a PDF in ascending date order with running balance column
+
+## Reports — Supplier Ledger (/reports/supplier-ledger)
+- Same structure as Client Ledger but supplier-side
+- Invoice Debit = purchase_price; supplier_payment and supplier_refund are both Credit entries (both reduce payable)
+- Summary cards: Total Invoiced, Total Paid, Total Refunded, Net Payable, Unallocated
+
+## Ledger PDF Format
+- Generated via jsPDF + jspdf-autotable; downloaded directly in browser
+- Blue header bar: "TICKET TRACKER" + agent email left, "Statement of Account" + period + generated date right
+- Entity name + ID block below header
+- Summary section: Opening Balance, Total Invoiced, Total Received/Paid, Total Refunded, Net Due/Payable, Unallocated (2-column layout)
+- Transaction table in ascending date order (oldest first) with columns: Date, Type, Description, Ref. Issue Date, Trx ID, Debit, Credit, Balance
+- Balance column = running balance; positive = Dr (owed), negative = Cr; starts from opening balance
+- Debit values shown in red, Credit in green, Balance red/green per sign
+- Auto-pagination with page numbers in footer
+- File named: ClientLedger_[Name]_[dateFrom].pdf or SupplierLedger_[Name]_[dateFrom].pdf
 
 ## Client Page
 - Shows per-client summary: total billed, total received, unallocated credit, outstanding balance
@@ -128,6 +217,7 @@ On save:
 - Pending payment amount shown per ticket
 - Settle button triggers allocation flow for unallocated credit
 - Payment history tab shows all payment events with date, amount, channel, trx_id
+- Documents tab shows uploaded files
 
 ## Ticket Detail View
 - Shows full ticket information

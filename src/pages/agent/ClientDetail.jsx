@@ -162,43 +162,48 @@ export default function ClientDetail() {
     setLoading(true)
     setError("")
 
-    const [{ data: clientData, error: clientErr }, { data: ticketData }, { data: paymentData }, { data: supplierData }] =
-      await Promise.all([
-        supabase
-          .from("clients")
-          .select("id, name, phone, email, notes, client_id_number")
-          .eq("id", id)
-          .eq("agent_id", agent.id)
-          .single(),
-        supabase
-          .from("tickets")
-          .select(`
-            id, passenger_name, route, pnr, travel_date, return_date, issue_date, carrier, narration,
-            purchase_price, sell_price, gds_price,
-            amount_paid, payment_status, status, refund_status,
-            is_reissue, is_void, parent_ticket_id,
-            refund_receivable, refund_received, refund_payable, refund_paid, refund_notes,
-            reissue_fee_collected, reissue_fee_paid, fare_difference,
-            client_id, supplier_id,
-            clients(name), suppliers(name),
-            created_at
-          `)
-          .eq("client_id", id)
-          .eq("agent_id", agent.id)
-          .order("created_at", { ascending: false }),
-        supabase
-          .from("payments")
-          .select("id, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at, ticket_payments(type, tickets(pnr, passenger_name))")
-          .eq("client_id", id)
-          .eq("agent_id", agent.id)
-          .eq("type", "client_payment")
-          .order("payment_date", { ascending: false }),
-        supabase.from("suppliers").select("id, name").eq("agent_id", agent.id).order("name"),
-      ])
+    const [
+      { data: clientData, error: clientErr },
+      { data: ticketData, error: ticketErr },
+      { data: paymentData, error: paymentErr },
+      { data: supplierData },
+    ] = await Promise.all([
+      supabase
+        .from("clients")
+        .select("id, name, phone, email, notes, client_id_number")
+        .eq("id", id)
+        .eq("agent_id", agent.id)
+        .single(),
+      supabase
+        .from("tickets")
+        .select(`
+          id, passenger_name, route, pnr, travel_date, return_date, issue_date, carrier, narration,
+          purchase_price, sell_price, gds_price,
+          amount_paid, payment_status, status, refund_status,
+          is_reissue, is_void, parent_ticket_id,
+          refund_receivable, refund_received, refund_payable, refund_paid, refund_notes,
+          reissue_fee_collected, reissue_fee_paid, fare_difference,
+          client_id, supplier_id,
+          clients(name), suppliers(name),
+          created_at
+        `)
+        .eq("client_id", id)
+        .eq("agent_id", agent.id)
+        .order("created_at", { ascending: false }),
+      supabase
+        .from("payments")
+        .select("id, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at, ticket_payments(type, tickets(pnr, passenger_name))")
+        .eq("client_id", id)
+        .eq("agent_id", agent.id)
+        .eq("type", "client_payment")
+        .order("payment_date", { ascending: false }),
+      supabase.from("suppliers").select("id, name").eq("agent_id", agent.id).order("name"),
+    ])
 
     setLoading(false)
-    if (clientErr) {
-      setError(clientErr.message)
+    const firstErr = clientErr || ticketErr || paymentErr
+    if (firstErr) {
+      setError(firstErr.message)
       return
     }
     setClient(clientData)
@@ -371,7 +376,9 @@ export default function ClientDetail() {
             {activeTab === "tickets" && (
               <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
                 {tickets.length === 0 ? (
-                  <div className="py-16 text-center text-sm text-gray-400">No tickets for this client yet.</div>
+                  <div className="py-16 text-center text-sm text-gray-400">
+                    No tickets assigned to this client. If you added tickets from the Tickets page, make sure the Client field was set to this client when creating them.
+                  </div>
                 ) : (
                   <table className="w-full text-sm">
                     <thead>

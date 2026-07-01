@@ -4,7 +4,7 @@ import { useAuth } from "../../context/AuthContext"
 
 const CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
 
-const EMPTY = { amount: "", channel: "", trx_id: "", notes: "", paid_in_full: false }
+const EMPTY = { amount: "", channel: "", trx_id: "", notes: "", paid_in_full: false, payment_date: "" }
 
 function derivePaymentStatus(amountPaid, sellPrice) {
   if (amountPaid <= 0) return "unpaid"
@@ -20,7 +20,7 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
 
   useEffect(() => {
     if (isOpen) {
-      setForm(EMPTY)
+      setForm({ ...EMPTY, payment_date: new Date().toISOString().split("T")[0] })
       setError("")
     }
   }, [isOpen, ticket])
@@ -53,8 +53,6 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
     }
     setLoading(true)
 
-    const today = new Date().toISOString().split("T")[0]
-
     const { data: payRow, error: payErr } = await supabase
       .from("payments")
       .insert({
@@ -66,7 +64,7 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
         channel: form.channel || null,
         trx_id: form.trx_id.trim() || null,
         notes: form.notes.trim() || null,
-        payment_date: today,
+        payment_date: form.payment_date || new Date().toISOString().split("T")[0],
       })
       .select("id")
       .single()
@@ -139,6 +137,18 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
           )}
 
           <form id="record-payment-form" onSubmit={handleSubmit} className="space-y-3">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Payment Date <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="date"
+                required
+                value={form.payment_date}
+                onChange={(e) => setForm((f) => ({ ...f, payment_date: e.target.value }))}
+                className={inputCls}
+              />
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Amount <span className="text-red-500">*</span>

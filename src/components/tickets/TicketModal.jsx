@@ -92,7 +92,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
             status: ticket.status ?? "booked",
             narration: ticket.narration ?? "",
           }
-        : EMPTY
+        : { ...EMPTY, issue_date: new Date().toISOString().split("T")[0] }
     )
     fetchDropdowns()
   }, [isOpen, ticket])

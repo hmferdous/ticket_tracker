@@ -188,7 +188,6 @@ export default function Dashboard() {
   const [payments, setPayments] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
-  const [seeding, setSeeding] = useState(false)
   const [amountsVisible, setAmountsVisible] = useState(true)
 
   const [filterPreset, setFilterPreset] = useState("this_month")
@@ -311,169 +310,6 @@ export default function Dashboard() {
 
   const recentPayments = useMemo(() => filteredPayments.slice(0, 5), [filteredPayments])
 
-  const seedDashboardData = async () => {
-    setSeeding(true)
-    setError("")
-
-    try {
-      const addDays = (n) => {
-        const d = new Date()
-        d.setDate(d.getDate() + n)
-        return d.toISOString().slice(0, 10)
-      }
-
-      const clientNames = [
-        "[DEMO] Karim Traders",
-        "[DEMO] Nasrin Akter",
-        "[DEMO] Bashati Tours",
-        "[DEMO] Rafiq Hossain",
-        "[DEMO] Green Valley Travels",
-      ]
-      const supplierNames = ["[DEMO] Galileo GDS", "[DEMO] Air Connect BD", "[DEMO] Sky Bridge Travels"]
-
-      const { data: existingClients } = await supabase
-        .from("clients")
-        .select("id, name")
-        .eq("agent_id", agent.id)
-        .in("name", clientNames)
-
-      const missingClientNames = clientNames.filter(
-        (n) => !(existingClients ?? []).some((c) => c.name === n)
-      )
-      if (missingClientNames.length) {
-        await supabase.from("clients").insert(missingClientNames.map((name) => ({ agent_id: agent.id, name })))
-      }
-
-      const { data: allClients } = await supabase
-        .from("clients")
-        .select("id, name")
-        .eq("agent_id", agent.id)
-        .in("name", clientNames)
-
-      const clientIdByName = {}
-      for (const c of allClients ?? []) clientIdByName[c.name] = c.id
-
-      const { data: existingSuppliers } = await supabase
-        .from("suppliers")
-        .select("id, name")
-        .eq("agent_id", agent.id)
-        .in("name", supplierNames)
-
-      const missingSupplierNames = supplierNames.filter(
-        (n) => !(existingSuppliers ?? []).some((s) => s.name === n)
-      )
-      if (missingSupplierNames.length) {
-        await supabase
-          .from("suppliers")
-          .insert(missingSupplierNames.map((name) => ({ agent_id: agent.id, name })))
-      }
-
-      const { data: allSuppliers } = await supabase
-        .from("suppliers")
-        .select("id, name")
-        .eq("agent_id", agent.id)
-        .in("name", supplierNames)
-
-      const supplierIdByName = {}
-      for (const s of allSuppliers ?? []) supplierIdByName[s.name] = s.id
-
-      const c1 = clientIdByName["[DEMO] Karim Traders"]
-      const c2 = clientIdByName["[DEMO] Nasrin Akter"]
-      const c3 = clientIdByName["[DEMO] Bashati Tours"]
-      const c4 = clientIdByName["[DEMO] Rafiq Hossain"]
-      const c5 = clientIdByName["[DEMO] Green Valley Travels"]
-
-      const s1 = supplierIdByName["[DEMO] Galileo GDS"]
-      const s2 = supplierIdByName["[DEMO] Air Connect BD"]
-      const s3 = supplierIdByName["[DEMO] Sky Bridge Travels"]
-
-      const base = (overrides) => ({
-        agent_id: agent.id,
-        ticket_number: null,
-        issue_date: addDays(-5),
-        return_date: null,
-        gds_price: null,
-        office_markup: null,
-        status: "booked",
-        refund_status: null,
-        is_reissue: false,
-        is_void: false,
-        parent_ticket_id: null,
-        refund_receivable: null,
-        refund_received: null,
-        refund_payable: null,
-        refund_paid: null,
-        reissue_fee_collected: null,
-        reissue_fee_paid: null,
-        fare_difference: null,
-        amount_paid: 0,
-        payment_status: "unpaid",
-        narration: "Dashboard demo data — safe to delete",
-        ...overrides,
-      })
-
-      const ticketSpecs = [
-        base({ passenger_name: "Demo Passenger 01", route: "DAC-DXB", carrier: "BG", travel_date: addDays(2), client_id: c1, supplier_id: s1, purchase_price: 42000, sell_price: 50000 }),
-        base({ passenger_name: "Demo Passenger 02", route: "DAC-JFK", carrier: "EK", travel_date: addDays(5), client_id: c2, supplier_id: s2, purchase_price: 95000, sell_price: 115000, gds_price: 90000, office_markup: 5000, amount_paid: 50000, payment_status: "partial", status: "collected" }),
-        base({ passenger_name: "Demo Passenger 03", route: "DAC-LHR", carrier: "QR", travel_date: addDays(1), client_id: c3, supplier_id: s3, purchase_price: 88000, sell_price: 102000, gds_price: 85000, office_markup: 3000, amount_paid: 102000, payment_status: "paid", status: "collected" }),
-        base({ passenger_name: "Demo Passenger 04", route: "DAC-BKK", carrier: "TG", travel_date: addDays(10), client_id: c4, supplier_id: s1, purchase_price: 32000, sell_price: 39000 }),
-        base({ passenger_name: "Demo Passenger 05", route: "DAC-SIN", carrier: "SQ", travel_date: addDays(20), client_id: c5, supplier_id: s2, purchase_price: 70000, sell_price: 85000, amount_paid: 40000, payment_status: "partial" }),
-        base({ passenger_name: "Demo Passenger 06", route: "DAC-KUL", carrier: "MH", travel_date: addDays(-3), return_date: addDays(7), client_id: c1, supplier_id: s3, purchase_price: 58000, sell_price: 70000, amount_paid: 70000, payment_status: "paid", status: "supplier_paid" }),
-        base({ passenger_name: "Demo Passenger 07", route: "DAC-CXB", carrier: "BG", travel_date: addDays(-10), client_id: c2, supplier_id: s1, purchase_price: 8000, sell_price: 11000, amount_paid: 11000, payment_status: "paid", status: "flown" }),
-        base({ passenger_name: "Demo Passenger 08", route: "DAC-DEL", carrier: "AI", travel_date: addDays(-20), return_date: addDays(-15), client_id: c3, supplier_id: s2, purchase_price: 26000, sell_price: 33000, amount_paid: 15000, payment_status: "partial", status: "flown" }),
-        base({ passenger_name: "Demo Passenger 09", route: "DAC-AUH", carrier: "EK", travel_date: addDays(-60), client_id: c4, supplier_id: s3, purchase_price: 64000, sell_price: 78000, gds_price: 60000, office_markup: 4000, amount_paid: 78000, payment_status: "paid", status: "flown" }),
-        base({ passenger_name: "Demo Passenger 10", route: "DAC-CCU", carrier: "BG", travel_date: addDays(-15), client_id: c5, supplier_id: s1, purchase_price: 9000, sell_price: 13000, status: "void", is_void: true }),
-        base({ passenger_name: "Demo Passenger 11", route: "DAC-DOH", carrier: "QR", travel_date: addDays(-30), client_id: c1, supplier_id: s2, purchase_price: 75000, sell_price: 90000, amount_paid: 90000, payment_status: "paid", status: "flown", refund_status: "initiated", refund_receivable: 70000, refund_payable: 65000 }),
-        base({ passenger_name: "Demo Passenger 12", route: "DAC-JED", carrier: "SV", travel_date: addDays(-45), client_id: c2, supplier_id: s3, purchase_price: 53000, sell_price: 64000, amount_paid: 64000, payment_status: "paid", status: "closed", refund_status: "closed", refund_receivable: 50000, refund_received: 48000, refund_payable: 44000, refund_paid: 44000 }),
-        base({ passenger_name: "Demo Passenger 13", route: "DAC-IST", carrier: "TK", travel_date: addDays(30), client_id: c3, supplier_id: s1, purchase_price: 82000, sell_price: 99000, amount_paid: 99000, payment_status: "paid" }),
-        base({ passenger_name: "Demo Passenger 14", route: "DAC-COX", carrier: "BS", travel_date: addDays(3), client_id: c4, supplier_id: s2, purchase_price: 6000, sell_price: 9000 }),
-        base({ passenger_name: "Demo Passenger 15", route: "DAC-MCT", carrier: "WY", travel_date: addDays(7), client_id: c5, supplier_id: s3, purchase_price: 45000, sell_price: 55000 }),
-      ]
-
-      const { data: insertedTickets, error: ticketsError } = await supabase
-        .from("tickets")
-        .insert(ticketSpecs)
-        .select("id, passenger_name, client_id, supplier_id")
-
-      if (ticketsError) throw ticketsError
-
-      const paymentSpecs = [
-        { agent_id: agent.id, client_id: c2, type: "client_payment", amount: 50000, unallocated_amount: 0, channel: "bKash", trx_id: "DEMOTRX01", notes: "Demo dashboard data", payment_date: addDays(0) },
-        { agent_id: agent.id, client_id: c3, type: "client_payment", amount: 102000, unallocated_amount: 0, channel: "Bank", trx_id: "DEMOTRX02", notes: "Demo dashboard data", payment_date: addDays(-1) },
-        { agent_id: agent.id, client_id: c5, type: "client_payment", amount: 40000, unallocated_amount: 0, channel: "bKash", trx_id: "DEMOTRX03", notes: "Demo dashboard data", payment_date: addDays(-2) },
-        { agent_id: agent.id, supplier_id: s1, type: "supplier_payment", amount: 42000, unallocated_amount: 0, channel: "Bank", trx_id: "DEMOTRX04", notes: "Demo dashboard data", payment_date: addDays(-3) },
-        { agent_id: agent.id, supplier_id: s2, type: "supplier_payment", amount: 60000, unallocated_amount: 0, channel: "Bank", trx_id: "DEMOTRX05", notes: "Demo dashboard data", payment_date: addDays(-4) },
-        { agent_id: agent.id, client_id: c4, type: "client_payment", amount: 5000, unallocated_amount: 5000, channel: "Cash", trx_id: null, notes: "Unallocated credit", payment_date: addDays(-5) },
-        { agent_id: agent.id, client_id: c2, type: "client_refund", amount: 44000, unallocated_amount: 0, channel: "Bank", trx_id: "DEMOTRX06", notes: "Demo dashboard data", payment_date: addDays(-6) },
-        { agent_id: agent.id, supplier_id: s3, type: "supplier_refund", amount: 48000, unallocated_amount: 0, channel: "Bank", trx_id: "DEMOTRX07", notes: "Demo dashboard data", payment_date: addDays(-7) },
-      ]
-
-      const { data: insertedPayments, error: paymentsError } = await supabase
-        .from("payments")
-        .insert(paymentSpecs)
-        .select("id")
-
-      if (paymentsError) throw paymentsError
-
-      const ticketPaymentRows = [
-        { payment_id: insertedPayments[0].id, ticket_id: insertedTickets[1].id, allocated_amount: 50000, type: "client" },
-        { payment_id: insertedPayments[1].id, ticket_id: insertedTickets[2].id, allocated_amount: 102000, type: "client" },
-        { payment_id: insertedPayments[2].id, ticket_id: insertedTickets[4].id, allocated_amount: 40000, type: "client" },
-        { payment_id: insertedPayments[3].id, ticket_id: insertedTickets[0].id, allocated_amount: 42000, type: "supplier" },
-        { payment_id: insertedPayments[4].id, ticket_id: insertedTickets[1].id, allocated_amount: 60000, type: "supplier" },
-      ]
-
-      const { error: tpError } = await supabase.from("ticket_payments").insert(ticketPaymentRows)
-      if (tpError) throw tpError
-
-      await fetchDashboardData()
-    } catch (err) {
-      setError(err.message ?? "Seeding failed.")
-    } finally {
-      setSeeding(false)
-    }
-  }
-
   const headerActions = (
     <div className="flex items-center gap-2">
       <button
@@ -484,16 +320,6 @@ export default function Dashboard() {
         {amountsVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
         {amountsVisible ? "Hide amounts" : "Show amounts"}
       </button>
-      {import.meta.env.DEV && (
-        <button
-          type="button"
-          onClick={seedDashboardData}
-          disabled={seeding}
-          className="px-3 py-1.5 bg-gray-900 hover:bg-gray-700 disabled:opacity-60 text-white rounded-lg text-xs font-medium transition-colors"
-        >
-          {seeding ? "Seeding…" : "Seed Demo Data"}
-        </button>
-      )}
     </div>
   )
 

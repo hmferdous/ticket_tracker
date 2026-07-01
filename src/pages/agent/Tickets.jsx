@@ -165,6 +165,17 @@ function fmtMargin(n) {
   return Number(n).toLocaleString("en-BD")
 }
 
+function getLatestPayDate(ticket) {
+  return (
+    ticket.ticket_payments
+      ?.filter((tp) => tp.type === "client")
+      ?.map((tp) => tp.payments?.payment_date)
+      ?.filter(Boolean)
+      ?.sort()
+      ?.at(-1) ?? ""
+  )
+}
+
 function computeNetMargin(ticket) {
   const ticketMargin = (ticket.sell_price ?? 0) - (ticket.purchase_price ?? 0)
   const refundMargin = (ticket.refund_received ?? 0) - (ticket.refund_payable ?? 0)
@@ -181,7 +192,7 @@ export default function Tickets() {
   const [editingTicket, setEditingTicket] = useState(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [deleting, setDeleting] = useState(false)
-  const [seeding, setSeeding] = useState(false)
+  const [compact, setCompact] = useState(true)
 
   // Row-level action modals
   const [voidingTicket, setVoidingTicket] = useState(null)
@@ -226,7 +237,7 @@ export default function Tickets() {
     const { data, error } = await supabase
       .from("tickets")
       .select(`
-        id, passenger_name, route, pnr, travel_date, return_date, issue_date, carrier, narration,
+        id, passenger_name, route, pnr, ticket_number, travel_date, return_date, issue_date, carrier, narration,
         purchase_price, gds_price, sell_price,
         amount_paid, payment_status, status, refund_status,
         is_reissue, is_void, parent_ticket_id,
@@ -235,6 +246,7 @@ export default function Tickets() {
         client_id, supplier_id,
         clients(name),
         suppliers(name),
+        ticket_payments(type, payments(payment_date)),
         created_at
       `)
       .eq("agent_id", agent.id)
@@ -290,170 +302,24 @@ export default function Tickets() {
     })
   }, [tickets, searchText, airlineFilter, clientFilter, supplierFilter, dateFrom, dateTo, selectedChips])
 
+  const sortedTickets = useMemo(() => {
+    if (!compact) return filteredTickets
+    return [...filteredTickets].sort((a, b) => {
+      const aDate = getLatestPayDate(a)
+      const bDate = getLatestPayDate(b)
+      if (!aDate && !bDate) return 0
+      if (!aDate) return 1
+      if (!bDate) return -1
+      return bDate.localeCompare(aDate)
+    })
+  }, [filteredTickets, compact])
+
   const totalPages = Math.max(1, Math.ceil(filteredTickets.length / pageSize))
   const safePage = Math.min(page, totalPages)
   const startIdx = (safePage - 1) * pageSize
-  const pagedTickets = filteredTickets.slice(startIdx, startIdx + pageSize)
+  const pagedTickets = sortedTickets.slice(startIdx, startIdx + pageSize)
   const showingFrom = filteredTickets.length === 0 ? 0 : startIdx + 1
   const showingTo = Math.min(startIdx + pageSize, filteredTickets.length)
-
-  // TEMPORARY — seeds 15 varied dummy tickets (covering every chip combination) for filter/pagination testing.
-  // Remove this function and its button once testing is done.
-  const seedTestData = async () => {
-    if (!agent?.id) return
-    setSeeding(true)
-    setError("")
-    try {
-      const today = new Date()
-      const addDays = (n) => {
-        const d = new Date(today)
-        d.setDate(d.getDate() + n)
-        return d.toISOString().split("T")[0]
-      }
-      const todayStr = addDays(0)
-
-      const testClientNames = ["[TEST] Karim Traders", "[TEST] Walk-in Passenger", "[TEST] Bashati Tours"]
-      const testSupplierNames = ["[TEST] Galileo GDS", "[TEST] Air Connect BD"]
-
-      const existingClientNames = new Set(clients.map((c) => c.name))
-      const missingClients = testClientNames.filter((n) => !existingClientNames.has(n))
-      if (missingClients.length) {
-        await supabase.from("clients").insert(missingClients.map((name) => ({ name, agent_id: agent.id })))
-      }
-      const existingSupplierNames = new Set(suppliers.map((s) => s.name))
-      const missingSuppliers = testSupplierNames.filter((n) => !existingSupplierNames.has(n))
-      if (missingSuppliers.length) {
-        await supabase.from("suppliers").insert(missingSuppliers.map((name) => ({ name, agent_id: agent.id })))
-      }
-
-      const [{ data: clientRows }, { data: supplierRows }] = await Promise.all([
-        supabase.from("clients").select("id, name").eq("agent_id", agent.id).in("name", testClientNames),
-        supabase.from("suppliers").select("id, name").eq("agent_id", agent.id).in("name", testSupplierNames),
-      ])
-      const clientIdByName = Object.fromEntries((clientRows ?? []).map((c) => [c.name, c.id]))
-      const supplierIdByName = Object.fromEntries((supplierRows ?? []).map((s) => [s.name, s.id]))
-      const [c1, c2, c3] = testClientNames.map((n) => clientIdByName[n])
-      const [s1, s2] = testSupplierNames.map((n) => supplierIdByName[n])
-
-      const base = (overrides) => ({
-        agent_id: agent.id,
-        ticket_number: null,
-        issue_date: addDays(-3),
-        return_date: null,
-        gds_price: null,
-        office_markup: null,
-        status: "booked",
-        refund_status: null,
-        is_reissue: false,
-        is_void: false,
-        parent_ticket_id: null,
-        refund_receivable: null,
-        refund_received: null,
-        refund_payable: null,
-        refund_paid: null,
-        reissue_fee_collected: null,
-        reissue_fee_paid: null,
-        fare_difference: null,
-        narration: "Seed test ticket — safe to delete",
-        ...overrides,
-      })
-
-      // First batch — last entry (#13) becomes the reissue parent so #14 can reference its id
-      const firstBatchSpecs = [
-        { ticket: base({ passenger_name: "Test Passenger 01", carrier: "BG", pnr: "TSTPNR01", route: "DAC-DXB", travel_date: addDays(45), client_id: c1, supplier_id: s1, purchase_price: 42000, sell_price: 50000 }), payment: null },
-        { ticket: base({ passenger_name: "Test Passenger 02", carrier: "EK", pnr: "TSTPNR02", route: "DAC-JFK", travel_date: addDays(30), client_id: c2, supplier_id: s2, purchase_price: 95000, sell_price: 115000, status: "collected" }), payment: 50000 },
-        { ticket: base({ passenger_name: "Test Passenger 03", carrier: "QR", pnr: "TSTPNR03", route: "DAC-LHR", travel_date: addDays(20), client_id: c1, supplier_id: s1, purchase_price: 88000, sell_price: 102000, status: "collected" }), payment: 102000 },
-        { ticket: base({ passenger_name: "Test Passenger 04", carrier: "TG", pnr: "TSTPNR04", route: "DAC-BKK", travel_date: todayStr, client_id: c3, supplier_id: s2, purchase_price: 32000, sell_price: 39000 }), payment: null },
-        { ticket: base({ passenger_name: "Test Passenger 05", carrier: "SQ", pnr: "TSTPNR05", route: "DAC-SIN", travel_date: addDays(-5), return_date: addDays(10), client_id: c2, supplier_id: s1, purchase_price: 70000, sell_price: 85000, status: "supplier_paid" }), payment: 30000 },
-        { ticket: base({ passenger_name: "Test Passenger 06", carrier: "MH", pnr: "TSTPNR06", route: "DAC-KUL", travel_date: addDays(-3), return_date: addDays(7), client_id: c1, supplier_id: s2, purchase_price: 58000, sell_price: 70000, status: "supplier_paid" }), payment: 70000 },
-        { ticket: base({ passenger_name: "Test Passenger 07", carrier: "BG", pnr: "TSTPNR07", route: "DAC-CXB", travel_date: addDays(-30), client_id: c3, supplier_id: s1, purchase_price: 8000, sell_price: 11000, status: "flown" }), payment: null },
-        { ticket: base({ passenger_name: "Test Passenger 08", carrier: "AI", pnr: "TSTPNR08", route: "DAC-DEL", travel_date: addDays(-20), return_date: addDays(-15), client_id: c2, supplier_id: s1, purchase_price: 26000, sell_price: 33000, status: "flown" }), payment: 15000 },
-        { ticket: base({ passenger_name: "Test Passenger 09", carrier: "EK", pnr: "TSTPNR09", route: "DAC-AUH", travel_date: addDays(-60), client_id: c1, supplier_id: s2, purchase_price: 64000, sell_price: 78000, status: "flown" }), payment: 78000 },
-        { ticket: base({ passenger_name: "Test Passenger 10", carrier: "BG", pnr: "TSTPNR10", route: "DAC-CCU", travel_date: addDays(-10), client_id: c3, supplier_id: s1, purchase_price: 9000, sell_price: 13000, status: "void", is_void: true }), payment: 13000 },
-        { ticket: base({ passenger_name: "Test Passenger 11", carrier: "QR", pnr: "TSTPNR11", route: "DAC-DOH", travel_date: addDays(-15), client_id: c2, supplier_id: s2, purchase_price: 75000, sell_price: 90000, status: "flown", refund_status: "initiated", refund_receivable: 70000, refund_payable: 65000 }), payment: 90000 },
-        { ticket: base({ passenger_name: "Test Passenger 12", carrier: "SV", pnr: "TSTPNR12", route: "DAC-JED", travel_date: addDays(-40), client_id: c1, supplier_id: s1, purchase_price: 53000, sell_price: 64000, status: "closed", refund_status: "closed", refund_receivable: 50000, refund_received: 48000, refund_payable: 44000, refund_paid: 44000 }), payment: 64000 },
-        { ticket: base({ passenger_name: "Test Passenger 13", carrier: "TK", pnr: "TSTPNR13", route: "DAC-IST", travel_date: addDays(-25), client_id: c2, supplier_id: s2, purchase_price: 82000, sell_price: 99000, status: "reissued" }), payment: 99000 },
-      ]
-
-      const { data: firstInserted, error: firstErr } = await supabase
-        .from("tickets")
-        .insert(firstBatchSpecs.map((s) => s.ticket))
-        .select("id, client_id")
-      if (firstErr) throw firstErr
-
-      const parentTicket = firstInserted[firstInserted.length - 1]
-
-      const secondBatchSpecs = [
-        {
-          ticket: base({
-            passenger_name: "Test Passenger 14",
-            carrier: "TK",
-            pnr: "TSTPNR14",
-            route: "DAC-IST",
-            travel_date: addDays(25),
-            client_id: parentTicket.client_id,
-            supplier_id: s2,
-            purchase_price: 86000,
-            sell_price: 104000,
-            parent_ticket_id: parentTicket.id,
-            is_reissue: true,
-            reissue_fee_collected: 6000,
-            reissue_fee_paid: 4000,
-            fare_difference: 3000,
-          }),
-          payment: 40000,
-        },
-        {
-          ticket: base({ passenger_name: "Test Passenger 15", carrier: "BS", pnr: "TSTPNR15", route: "DAC-COX", travel_date: addDays(60), client_id: c3, supplier_id: s1, purchase_price: 6000, sell_price: 9000 }),
-          payment: null,
-        },
-      ]
-
-      const { data: secondInserted, error: secondErr } = await supabase
-        .from("tickets")
-        .insert(secondBatchSpecs.map((s) => s.ticket))
-        .select("id, client_id")
-      if (secondErr) throw secondErr
-
-      const allInserted = [...firstInserted, ...secondInserted]
-      const allSpecs = [...firstBatchSpecs, ...secondBatchSpecs]
-
-      for (let i = 0; i < allInserted.length; i++) {
-        const amount = allSpecs[i].payment
-        if (!amount) continue
-        const row = allInserted[i]
-        const { data: payRow } = await supabase
-          .from("payments")
-          .insert({
-            agent_id: agent.id,
-            client_id: row.client_id,
-            type: "client_payment",
-            amount,
-            unallocated_amount: amount,
-            channel: "bKash",
-            trx_id: null,
-            notes: "Seed test payment",
-            payment_date: todayStr,
-          })
-          .select("id")
-          .single()
-        if (payRow) {
-          await supabase.from("ticket_payments").insert({
-            payment_id: payRow.id,
-            ticket_id: row.id,
-            allocated_amount: amount,
-            type: "client",
-          })
-        }
-      }
-
-      await Promise.all([fetchTickets(), fetchFilterOptions()])
-    } catch (err) {
-      setError(err.message ?? "Failed to seed test data")
-    } finally {
-      setSeeding(false)
-    }
-  }
 
   const openAdd = () => {
     setEditingTicket(null)
@@ -530,12 +396,25 @@ export default function Tickets() {
       actions={
         <>
           <button
-            onClick={seedTestData}
-            disabled={seeding}
-            title="Temporary — inserts 15 dummy tickets covering every chip combination for testing"
-            className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-600 text-sm font-medium px-4 py-2 rounded-lg border border-gray-200 transition-colors disabled:opacity-60"
+            onClick={() => setCompact((v) => !v)}
+            className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-600 text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 transition-colors"
+            title={compact ? "Switch to detailed view" : "Switch to compact view"}
           >
-            {seeding ? "Seeding…" : "Seed test data"}
+            {compact ? (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
+                </svg>
+                Detailed
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h7" />
+                </svg>
+                Compact
+              </>
+            )}
           </button>
           <button
             onClick={openAdd}
@@ -672,7 +551,85 @@ export default function Tickets() {
                 Clear filters
               </button>
             </div>
+          ) : compact ? (
+            /* ── Compact table ── */
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm whitespace-nowrap">
+                <thead>
+                  <tr className="border-b border-gray-100 bg-gray-50 text-left">
+                    <th className="px-3 py-2.5 font-medium text-gray-500">Issue Date</th>
+                    <th className="px-3 py-2.5 font-medium text-gray-500">Pay Date</th>
+                    <th className="px-3 py-2.5 font-medium text-gray-500">Flight Date</th>
+                    <th className="px-3 py-2.5 font-medium text-gray-500">PNR</th>
+                    <th className="px-3 py-2.5 font-medium text-gray-500">Ticket No.</th>
+                    <th className="px-3 py-2.5 font-medium text-gray-500">Passenger</th>
+                    <th className="px-3 py-2.5 font-medium text-gray-500 text-right">Sell</th>
+                    <th className="px-3 py-2.5 font-medium text-gray-500 text-right">Outstanding</th>
+                    <th className="px-3 py-2.5 font-medium text-gray-500">Status</th>
+                    <th className="px-3 py-2.5 font-medium text-gray-500 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {pagedTickets.map((ticket) => {
+                    const outstanding = (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
+                    const latestPayDate = ticket.ticket_payments
+                      ?.filter((tp) => tp.type === "client")
+                      ?.map((tp) => tp.payments?.payment_date)
+                      ?.filter(Boolean)
+                      ?.sort()
+                      ?.at(-1)
+                    const fmtDate = (d) => d
+                      ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                      : <span className="text-gray-300">—</span>
+                    return (
+                      <tr key={ticket.id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-3 py-2.5 text-gray-600 text-xs">{fmtDate(ticket.issue_date)}</td>
+                        <td className="px-3 py-2.5 text-gray-600 text-xs">{fmtDate(latestPayDate)}</td>
+                        <td className="px-3 py-2.5 text-gray-600 text-xs">{fmtDate(ticket.travel_date)}</td>
+                        <td className="px-3 py-2.5 text-gray-600 font-mono text-xs">{ticket.pnr || <span className="text-gray-300">—</span>}</td>
+                        <td className="px-3 py-2.5 text-gray-600 font-mono text-xs">{ticket.ticket_number || <span className="text-gray-300">—</span>}</td>
+                        <td className="px-3 py-2.5 font-medium text-gray-900">{ticket.passenger_name}</td>
+                        <td className="px-3 py-2.5 text-gray-600 text-right tabular-nums">{fmt(ticket.sell_price)}</td>
+                        <td className={`px-3 py-2.5 text-right tabular-nums font-medium ${outstanding > 0 ? "text-red-600" : "text-green-600"}`}>
+                          {outstanding > 0 ? fmt(outstanding) : <span className="text-green-600">—</span>}
+                        </td>
+                        <td className="px-3 py-2.5 whitespace-normal min-w-[100px]">
+                          <TicketChips ticket={ticket} />
+                        </td>
+                        <td className="px-3 py-2.5 text-right">
+                          {confirmDeleteId === ticket.id ? (
+                            <div className="flex items-center justify-end gap-2">
+                              <span className="text-gray-500 text-xs">Delete?</span>
+                              <button onClick={() => handleDelete(ticket.id)} disabled={deleting} className="text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 px-2.5 py-1 rounded-md transition-colors">
+                                {deleting ? "…" : "Yes"}
+                              </button>
+                              <button onClick={() => setConfirmDeleteId(null)} className="text-xs font-medium text-gray-600 hover:text-gray-800 px-2.5 py-1 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
+                                No
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex justify-end">
+                              <RowActionsMenu
+                                isOpen={openActionMenuId === ticket.id}
+                                onToggle={() => setOpenActionMenuId((id) => (id === ticket.id ? null : ticket.id))}
+                                onClose={() => setOpenActionMenuId(null)}
+                                items={[
+                                  { key: "edit", label: "Edit", cls: "text-blue-600", onClick: () => openEdit(ticket) },
+                                  ...getRowActions(ticket).map((action) => { const config = actionConfig(action, ticket); return config ? { key: action, ...config } : null }).filter(Boolean),
+                                  { key: "delete", label: "Delete", cls: "text-red-600", onClick: () => setConfirmDeleteId(ticket.id) },
+                                ]}
+                              />
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
           ) : (
+            /* ── Detailed table ── */
             <div className="overflow-x-auto">
               <table className="w-full text-sm whitespace-nowrap">
                 <thead>
@@ -730,18 +687,10 @@ export default function Tickets() {
                         <td className="px-4 py-3 text-gray-600 text-right tabular-nums">
                           {fmt(ticket.purchase_price)}
                         </td>
-                        <td
-                          className={`px-4 py-3 text-right tabular-nums font-medium ${
-                            ticketMargin >= 0 ? "text-green-600" : "text-red-600"
-                          }`}
-                        >
+                        <td className={`px-4 py-3 text-right tabular-nums font-medium ${ticketMargin >= 0 ? "text-green-600" : "text-red-600"}`}>
                           {fmtMargin(ticketMargin)}
                         </td>
-                        <td
-                          className={`px-4 py-3 text-right tabular-nums font-medium ${
-                            netMargin >= 0 ? "text-green-600" : "text-red-600"
-                          }`}
-                        >
+                        <td className={`px-4 py-3 text-right tabular-nums font-medium ${netMargin >= 0 ? "text-green-600" : "text-red-600"}`}>
                           {fmtMargin(netMargin)}
                         </td>
                         <td className="px-4 py-3 text-right tabular-nums text-gray-600">
@@ -750,7 +699,6 @@ export default function Tickets() {
                         <td className="px-4 py-3 text-gray-400 text-xs max-w-[140px] truncate">
                           {narration ?? <span className="text-gray-200">—</span>}
                         </td>
-                        {/* All chips in one cell; allow wrapping */}
                         <td className="px-4 py-3 whitespace-normal min-w-[120px]">
                           <TicketChips ticket={ticket} />
                         </td>

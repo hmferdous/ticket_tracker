@@ -52,7 +52,7 @@ const EMPTY = {
   narration: "",
 }
 
-const EMPTY_PAYMENT = { amount: "", channel: "", trx_id: "", notes: "", paid_in_full: false }
+const EMPTY_PAYMENT = { amount: "", channel: "", trx_id: "", notes: "", paid_in_full: false, payment_date: "" }
 
 export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
   const { agent } = useAuth()
@@ -109,6 +109,12 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
   const setC = (field) => (e) => setClientPay((p) => ({ ...p, [field]: e.target.value }))
   const setS = (field) => (e) => setSupplierPay((p) => ({ ...p, [field]: e.target.value }))
+
+  useEffect(() => {
+    if (clientPayOpen && form.issue_date && !clientPay.payment_date) {
+      setClientPay((p) => ({ ...p, payment_date: form.issue_date }))
+    }
+  }, [clientPayOpen, form.issue_date])
 
   const handleClientPaidInFull = (e) => {
     setClientPay((p) => ({ ...p, paid_in_full: e.target.checked, amount: e.target.checked ? "" : p.amount }))
@@ -205,11 +211,11 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
           client_id: savedTicket.client_id,
           type: "client_payment",
           amount: clientAmount,
-          unallocated_amount: clientAmount,
+          unallocated_amount: 0,
           channel: clientPay.channel || null,
           trx_id: clientPay.trx_id.trim() || null,
           notes: clientPay.notes.trim() || null,
-          payment_date: today,
+          payment_date: clientPay.payment_date || form.issue_date || today,
         })
         .select("id")
         .single()
@@ -234,7 +240,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
           supplier_id: savedTicket.supplier_id,
           type: "supplier_payment",
           amount: supplierAmount,
-          unallocated_amount: supplierAmount,
+          unallocated_amount: 0,
           channel: supplierPay.channel || null,
           trx_id: supplierPay.trx_id.trim() || null,
           notes: supplierPay.notes.trim() || null,
@@ -371,9 +377,12 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Issue Date <span className="text-red-500">*</span>
+                  </label>
                   <input
                     type="date"
+                    required
                     value={form.issue_date}
                     onChange={set("issue_date")}
                     className={inputCls}
@@ -524,6 +533,21 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
               </button>
               {clientPayOpen && (
                 <div className="px-4 py-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        Payment Date <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={clientPay.payment_date || form.issue_date}
+                        onChange={setC("payment_date")}
+                        className={inputCls}
+                      />
+                    </div>
+                    <div />
+                  </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Amount Received</label>

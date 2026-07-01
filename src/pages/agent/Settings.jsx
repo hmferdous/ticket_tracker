@@ -42,6 +42,7 @@ export default function Settings() {
   const [reminderEnabled, setReminderEnabled] = useState(true)
   const [reminderDaysClient, setReminderDaysClient] = useState(3)
   const [reminderDaysSupplier, setReminderDaysSupplier] = useState(5)
+  const [reminderHour, setReminderHour] = useState(9)
   const [reminderSaving, setReminderSaving] = useState(false)
   const [reminderError, setReminderError] = useState("")
   const [reminderSuccess, setReminderSuccess] = useState("")
@@ -56,6 +57,7 @@ export default function Settings() {
     setReminderEnabled(agent.reminder_enabled ?? true)
     setReminderDaysClient(agent.reminder_days_client ?? 3)
     setReminderDaysSupplier(agent.reminder_days_supplier ?? 5)
+    setReminderHour(agent.reminder_hour ?? 9)
   }, [agent])
 
   if (!agent) {
@@ -94,6 +96,7 @@ export default function Settings() {
         reminder_enabled: reminderEnabled,
         reminder_days_client: Number(reminderDaysClient) || 0,
         reminder_days_supplier: Number(reminderDaysSupplier) || 0,
+        reminder_hour: Number(reminderHour),
       })
       .eq("id", agent.id)
 
@@ -243,30 +246,47 @@ export default function Settings() {
             </div>
 
             {reminderEnabled && (
-              <div className="grid sm:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Days before flight — client payment reminder
-                  </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={reminderDaysClient}
-                    onChange={(e) => setReminderDaysClient(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+              <div className="space-y-4">
+                <div className="grid sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Days before flight — client payment reminder
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={reminderDaysClient}
+                      onChange={(e) => setReminderDaysClient(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Days before flight — supplier payment reminder
+                    </label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={reminderDaysSupplier}
+                      onChange={(e) => setReminderDaysSupplier(e.target.value)}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                  </div>
                 </div>
-                <div>
+                <div className="sm:w-1/2">
                   <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Days before flight — supplier payment reminder
+                    Send reminders at (Bangladesh time)
                   </label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={reminderDaysSupplier}
-                    onChange={(e) => setReminderDaysSupplier(e.target.value)}
+                  <select
+                    value={reminderHour}
+                    onChange={(e) => setReminderHour(Number(e.target.value))}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  >
+                    {Array.from({ length: 24 }, (_, h) => {
+                      const label = h === 0 ? "12:00 AM" : h < 12 ? `${h}:00 AM` : h === 12 ? "12:00 PM" : `${h - 12}:00 PM`
+                      return <option key={h} value={h}>{label}</option>
+                    })}
+                  </select>
                 </div>
               </div>
             )}

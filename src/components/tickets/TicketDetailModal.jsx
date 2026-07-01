@@ -104,7 +104,7 @@ export default function TicketDetailModal({ isOpen, onClose, ticket, tickets, on
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
               <Field label="Passenger" value={ticket.passenger_name} />
               <Field label="Carrier" value={ticket.carrier} />
-              <Field label="PNR" value={ticket.pnr} />
+              <Field label="PNR" value={ticket.pnr?.toUpperCase()} />
               <Field label="Ticket Number" value={ticket.ticket_number} />
               <Field label="Route" value={ticket.route} />
               <Field label="Issue Date" value={fmtDate(ticket.issue_date)} />

@@ -161,7 +161,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
       passenger_name: form.passenger_name.trim(),
       carrier: form.carrier.trim(),
       ticket_number: form.ticket_number.trim() || null,
-      pnr: form.pnr.trim(),
+      pnr: form.pnr.trim().toUpperCase(),
       route: form.route.trim(),
       issue_date: form.issue_date || null,
       travel_date: form.travel_date,

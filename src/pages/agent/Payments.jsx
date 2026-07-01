@@ -74,7 +74,7 @@ function TicketTagCell({ payment }) {
     const t = tps[0].tickets
     return (
       <div className="flex flex-col gap-0.5">
-        <span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded w-fit">{t?.pnr ?? "—"}</span>
+        <span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded w-fit">{t?.pnr?.toUpperCase() ?? "—"}</span>
         <span className="text-[11px] text-gray-400 truncate max-w-[120px]">{t?.passenger_name ?? ""}</span>
       </div>
     )
@@ -82,7 +82,7 @@ function TicketTagCell({ payment }) {
   return (
     <span
       className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 cursor-default"
-      title={tps.map((tp) => tp.tickets?.pnr ?? "—").join(", ")}
+      title={tps.map((tp) => tp.tickets?.pnr?.toUpperCase() ?? "—").join(", ")}
     >
       {tps.length} tickets
     </span>

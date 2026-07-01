@@ -39,7 +39,7 @@ function TicketTagCell({ payment }) {
     const t = tps[0].tickets
     return (
       <div className="flex flex-col gap-0.5">
-        <span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded w-fit">{t?.pnr ?? "—"}</span>
+        <span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded w-fit">{t?.pnr?.toUpperCase() ?? "—"}</span>
         <span className="text-[11px] text-gray-400 truncate max-w-[120px]">{t?.passenger_name ?? ""}</span>
       </div>
     )
@@ -47,7 +47,7 @@ function TicketTagCell({ payment }) {
   return (
     <span
       className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 cursor-default"
-      title={tps.map((tp) => tp.tickets?.pnr ?? "—").join(", ")}
+      title={tps.map((tp) => tp.tickets?.pnr?.toUpperCase() ?? "—").join(", ")}
     >
       {tps.length} tickets
     </span>
@@ -154,7 +154,7 @@ export default function SupplierDetail() {
         supabase
           .from("tickets")
           .select(`
-            id, passenger_name, route, pnr, travel_date, return_date, issue_date, carrier, narration,
+            id, passenger_name, route, pnr, ticket_number, travel_date, return_date, issue_date, carrier, narration,
             purchase_price, sell_price, gds_price,
             amount_paid, payment_status, status, refund_status,
             is_reissue, is_void, parent_ticket_id,
@@ -208,7 +208,7 @@ export default function SupplierDetail() {
     const { data } = await supabase
       .from("tickets")
       .select(`
-        id, passenger_name, route, pnr, travel_date, return_date, issue_date, carrier, narration,
+        id, passenger_name, route, pnr, ticket_number, travel_date, return_date, issue_date, carrier, narration,
         purchase_price, sell_price, gds_price,
         amount_paid, payment_status, status, refund_status,
         is_reissue, is_void, parent_ticket_id,
@@ -376,6 +376,9 @@ export default function SupplierDetail() {
                     <thead>
                       <tr className="border-b border-gray-100 bg-gray-50 text-left">
                         <th className="px-4 py-3 font-medium text-gray-500">Passenger</th>
+                        <th className="px-4 py-3 font-medium text-gray-500">Ticket No</th>
+                        <th className="px-4 py-3 font-medium text-gray-500">PNR</th>
+                        <th className="px-4 py-3 font-medium text-gray-500">Issue Date</th>
                         <th className="px-4 py-3 font-medium text-gray-500">Route</th>
                         <th className="px-4 py-3 font-medium text-gray-500">Travel Date</th>
                         <th className="px-4 py-3 font-medium text-gray-500">Carrier</th>
@@ -397,6 +400,17 @@ export default function SupplierDetail() {
                             className="hover:bg-gray-50 transition-colors cursor-pointer"
                           >
                             <td className="px-4 py-3 font-medium text-gray-900">{ticket.passenger_name}</td>
+                            <td className="px-4 py-3">
+                              {ticket.ticket_number
+                                ? <span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.ticket_number}</span>
+                                : <span className="text-gray-300 text-xs">—</span>}
+                            </td>
+                            <td className="px-4 py-3">
+                              {ticket.pnr
+                                ? <span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.pnr.toUpperCase()}</span>
+                                : <span className="text-gray-300 text-xs">—</span>}
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">{fmtDate(ticket.issue_date)}</td>
                             <td className="px-4 py-3 text-gray-600">{ticket.route ?? "—"}</td>
                             <td className="px-4 py-3 text-gray-600">{fmtDate(ticket.travel_date)}</td>
                             <td className="px-4 py-3 text-gray-600">{ticket.carrier ?? "—"}</td>

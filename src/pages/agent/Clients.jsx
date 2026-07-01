@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { useNavigate } from "react-router-dom"
@@ -15,40 +16,66 @@ function fmt(n) {
 }
 
 function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
+  const btnRef = useRef(null)
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
+
+  const handleToggle = () => {
+    if (!isOpen && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      const menuHeight = items.length * 36 + 8
+      setMenuPos({
+        top: window.innerHeight - rect.bottom >= menuHeight ? rect.bottom + 4 : rect.top - menuHeight - 4,
+        right: window.innerWidth - rect.right,
+      })
+    }
+    onToggle()
+  }
+
+  useEffect(() => {
+    if (!isOpen) return
+    const close = () => onClose()
+    window.addEventListener("scroll", close, true)
+    window.addEventListener("resize", close)
+    return () => {
+      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("resize", close)
+    }
+  }, [isOpen, onClose])
+
   if (items.length === 0) return <span className="text-gray-300 text-xs">—</span>
   return (
-    <div className="relative inline-block text-left">
+    <div className="inline-block">
       <button
+        ref={btnRef}
         type="button"
-        onClick={onToggle}
-        className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        onClick={handleToggle}
+        className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
         aria-label="Row actions"
       >
-        <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-          <circle cx="12" cy="5" r="1.5" />
-          <circle cx="12" cy="12" r="1.5" />
-          <circle cx="12" cy="19" r="1.5" />
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
         </svg>
       </button>
-      {isOpen && (
+      {isOpen && createPortal(
         <>
-          <div className="fixed inset-0 z-10" onClick={onClose} />
-          <div className="absolute right-0 top-full z-20 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-100 py-1">
+          <div className="fixed inset-0 z-40" onClick={onClose} />
+          <div
+            className="fixed z-50 w-44 bg-white rounded-xl shadow-xl border border-gray-200 py-1 overflow-hidden"
+            style={{ top: menuPos.top, right: menuPos.right }}
+          >
             {items.map((item) => (
               <button
                 key={item.key}
                 type="button"
-                onClick={() => {
-                  onClose()
-                  item.onClick()
-                }}
-                className={`block w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 transition-colors ${item.cls}`}
+                onClick={() => { onClose(); item.onClick() }}
+                className={`flex w-full items-center text-left px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors ${item.cls}`}
               >
                 {item.label}
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )
@@ -66,6 +93,8 @@ export default function Clients() {
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [openActionMenuId, setOpenActionMenuId] = useState(null)
+  const [search, setSearch] = useState("")
+  const [outstandingFilter, setOutstandingFilter] = useState("all")
 
   useEffect(() => {
     if (agent?.id) fetchClients()
@@ -95,12 +124,8 @@ export default function Clients() {
     ])
 
     setLoading(false)
-    if (error) {
-      setError(error.message)
-      return
-    }
+    if (error) { setError(error.message); return }
 
-    // Single pass over each table — grouped by client_id — instead of querying per client
     const billed = new Map()
     for (const t of ticketRows ?? []) {
       billed.set(t.client_id, (billed.get(t.client_id) ?? 0) + (t.sell_price ?? 0))
@@ -127,15 +152,26 @@ export default function Clients() {
     )
   }
 
-  const openAdd = () => {
-    setEditingClient(null)
-    setModalOpen(true)
-  }
+  const filteredClients = useMemo(() => {
+    const q = search.trim().toLowerCase()
+    return clients.filter((c) => {
+      if (q) {
+        const idLabel = clientIdLabel(c.client_id_number).toLowerCase()
+        if (
+          !c.name?.toLowerCase().includes(q) &&
+          !c.phone?.toLowerCase().includes(q) &&
+          !c.email?.toLowerCase().includes(q) &&
+          !idLabel.includes(q)
+        ) return false
+      }
+      if (outstandingFilter === "outstanding" && c.outstanding <= 0) return false
+      if (outstandingFilter === "cleared" && c.outstanding > 0) return false
+      return true
+    })
+  }, [clients, search, outstandingFilter])
 
-  const openEdit = (client) => {
-    setEditingClient(client)
-    setModalOpen(true)
-  }
+  const openAdd = () => { setEditingClient(null); setModalOpen(true) }
+  const openEdit = (client) => { setEditingClient(client); setModalOpen(true) }
 
   const handleSaved = (saved) => {
     setClients((prev) => {
@@ -149,12 +185,8 @@ export default function Clients() {
     setDeleting(true)
     const { error } = await supabase.from("clients").delete().eq("id", id)
     setDeleting(false)
-    if (error) {
-      setError(error.message)
-    } else {
-      setClients((prev) => prev.filter((c) => c.id !== id))
-      setConfirmDeleteId(null)
-    }
+    if (error) { setError(error.message) }
+    else { setClients((prev) => prev.filter((c) => c.id !== id)); setConfirmDeleteId(null) }
   }
 
   return (
@@ -173,12 +205,42 @@ export default function Clients() {
       }
     >
       <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Error banner */}
         {error && (
-          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
-            {error}
-          </div>
+          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
         )}
+
+        {/* Search & filter bar */}
+        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4 flex flex-wrap items-center gap-3">
+          <div className="flex-1 min-w-[200px] relative">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
+            </svg>
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by name, phone, ID…"
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+          </div>
+          <select
+            value={outstandingFilter}
+            onChange={(e) => setOutstandingFilter(e.target.value)}
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">All clients</option>
+            <option value="outstanding">Has outstanding</option>
+            <option value="cleared">Cleared</option>
+          </select>
+          {(search || outstandingFilter !== "all") && (
+            <button
+              onClick={() => { setSearch(""); setOutstandingFilter("all") }}
+              className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              Clear
+            </button>
+          )}
+        </div>
 
         {/* Table */}
         <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
@@ -187,87 +249,95 @@ export default function Clients() {
           ) : clients.length === 0 ? (
             <div className="py-20 text-center">
               <p className="text-gray-400 text-sm">No clients yet.</p>
-              <button
-                onClick={openAdd}
-                className="mt-3 text-blue-600 hover:underline text-sm font-medium"
-              >
+              <button onClick={openAdd} className="mt-3 text-blue-600 hover:underline text-sm font-medium">
                 Add your first client
+              </button>
+            </div>
+          ) : filteredClients.length === 0 ? (
+            <div className="py-20 text-center">
+              <p className="text-gray-400 text-sm">No clients match your search.</p>
+              <button onClick={() => { setSearch(""); setOutstandingFilter("all") }} className="mt-3 text-blue-600 hover:underline text-sm font-medium">
+                Clear filters
               </button>
             </div>
           ) : (
             <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-gray-100 bg-gray-50 text-left">
-                  <th className="px-5 py-3 font-medium text-gray-500">Client ID</th>
-                  <th className="px-5 py-3 font-medium text-gray-500">Name</th>
-                  <th className="px-5 py-3 font-medium text-gray-500">Phone</th>
-                  <th className="px-5 py-3 font-medium text-gray-500">Email</th>
-                  <th className="px-5 py-3 font-medium text-gray-500 text-right">Total Billed</th>
-                  <th className="px-5 py-3 font-medium text-gray-500 text-right">Total Received</th>
-                  <th className="px-5 py-3 font-medium text-gray-500 text-right">Outstanding</th>
-                  <th className="px-5 py-3 font-medium text-gray-500 text-right">Unallocated Credit</th>
-                  <th className="px-5 py-3 font-medium text-gray-500 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {clients.map((client) => (
-                  <tr key={client.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-5 py-3.5">
-                      <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold tracking-wide">
-                        {clientIdLabel(client.client_id_number)}
-                      </span>
-                    </td>
-                    <td className="px-5 py-3.5 font-medium text-gray-900">{client.name}</td>
-                    <td className="px-5 py-3.5 text-gray-600">{client.phone || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-gray-600">{client.email || <span className="text-gray-300">—</span>}</td>
-                    <td className="px-5 py-3.5 text-right tabular-nums text-gray-700">{fmt(client.totalBilled)}</td>
-                    <td className="px-5 py-3.5 text-right tabular-nums text-gray-700">{fmt(client.totalReceived)}</td>
-                    <td className={`px-5 py-3.5 text-right tabular-nums font-medium ${client.outstanding > 0 ? "text-red-600" : "text-green-600"}`}>
-                      {fmt(client.outstanding)}
-                    </td>
-                    <td className="px-5 py-3.5 text-right tabular-nums text-gray-700">{fmt(client.unallocatedCredit)}</td>
-                    <td className="px-5 py-3.5 text-right">
-                      {confirmDeleteId === client.id ? (
-                        <div className="flex items-center justify-end gap-2">
-                          <span className="text-gray-500 text-xs">Delete this client?</span>
-                          <button
-                            onClick={() => handleDelete(client.id)}
-                            disabled={deleting}
-                            className="text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 px-2.5 py-1 rounded-md transition-colors"
-                          >
-                            {deleting ? "Deleting…" : "Yes, delete"}
-                          </button>
-                          <button
-                            onClick={() => setConfirmDeleteId(null)}
-                            className="text-xs font-medium text-gray-600 hover:text-gray-800 px-2.5 py-1 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <RowActionsMenu
-                          isOpen={openActionMenuId === client.id}
-                          onToggle={() => setOpenActionMenuId((prev) => (prev === client.id ? null : client.id))}
-                          onClose={() => setOpenActionMenuId(null)}
-                          items={[
-                            { key: "view", label: "View", cls: "text-gray-700", onClick: () => navigate(`/clients/${client.id}`) },
-                            { key: "edit", label: "Edit", cls: "text-blue-600", onClick: () => openEdit(client) },
-                            { key: "delete", label: "Delete", cls: "text-red-500", onClick: () => setConfirmDeleteId(client.id) },
-                          ]}
-                        />
-                      )}
-                    </td>
+              <table className="w-full text-sm whitespace-nowrap">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50 text-left">
+                    <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Client ID</th>
+                    <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Name</th>
+                    <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Phone</th>
+                    <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Email</th>
+                    <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Total Billed</th>
+                    <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Total Received</th>
+                    <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Outstanding</th>
+                    <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Unallocated Credit</th>
+                    <th className="px-5 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Actions</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {filteredClients.map((client) => (
+                    <tr key={client.id} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 text-blue-700 text-xs font-semibold tracking-wide">
+                          {clientIdLabel(client.client_id_number)}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 font-semibold text-gray-900">{client.name}</td>
+                      <td className="px-5 py-3.5 text-gray-500">{client.phone || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-5 py-3.5 text-gray-500">{client.email || <span className="text-gray-300">—</span>}</td>
+                      <td className="px-5 py-3.5 text-right tabular-nums font-medium text-gray-700">{fmt(client.totalBilled)}</td>
+                      <td className="px-5 py-3.5 text-right tabular-nums text-gray-600">{fmt(client.totalReceived)}</td>
+                      <td className={`px-5 py-3.5 text-right tabular-nums font-semibold ${client.outstanding > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                        {fmt(client.outstanding)}
+                      </td>
+                      <td className="px-5 py-3.5 text-right tabular-nums text-gray-600">{fmt(client.unallocatedCredit)}</td>
+                      <td className="px-5 py-3.5 text-right">
+                        {confirmDeleteId === client.id ? (
+                          <div className="flex items-center justify-end gap-2">
+                            <span className="text-gray-500 text-xs">Delete?</span>
+                            <button
+                              onClick={() => handleDelete(client.id)}
+                              disabled={deleting}
+                              className="text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 px-2.5 py-1 rounded-md transition-colors"
+                            >
+                              {deleting ? "…" : "Yes"}
+                            </button>
+                            <button
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="text-xs font-medium text-gray-600 hover:text-gray-800 px-2.5 py-1 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors"
+                            >
+                              No
+                            </button>
+                          </div>
+                        ) : (
+                          <RowActionsMenu
+                            isOpen={openActionMenuId === client.id}
+                            onToggle={() => setOpenActionMenuId((prev) => (prev === client.id ? null : client.id))}
+                            onClose={() => setOpenActionMenuId(null)}
+                            items={[
+                              { key: "view", label: "View", cls: "text-gray-700", onClick: () => navigate(`/clients/${client.id}`) },
+                              { key: "edit", label: "Edit", cls: "text-blue-600", onClick: () => openEdit(client) },
+                              { key: "delete", label: "Delete", cls: "text-red-500", onClick: () => setConfirmDeleteId(client.id) },
+                            ]}
+                          />
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
 
         {!loading && clients.length > 0 && (
-          <p className="mt-3 text-xs text-gray-400">{clients.length} client{clients.length !== 1 ? "s" : ""}</p>
+          <p className="mt-3 text-xs text-gray-400">
+            {filteredClients.length === clients.length
+              ? `${clients.length} client${clients.length !== 1 ? "s" : ""}`
+              : `${filteredClients.length} of ${clients.length} clients`}
+          </p>
         )}
       </div>
 

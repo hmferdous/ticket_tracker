@@ -259,6 +259,39 @@ export default function ClientDetail() {
     if (oldest) openAllocate(oldest)
   }
 
+  const handleDeletePayment = async (paymentId) => {
+    if (!window.confirm("Delete this payment? This cannot be undone.")) return
+
+    const { data: tps } = await supabase
+      .from("ticket_payments")
+      .select("id, ticket_id, allocated_amount")
+      .eq("payment_id", paymentId)
+
+    for (const tp of tps ?? []) {
+      if ((tp.allocated_amount ?? 0) !== 0) {
+        const { data: ticket } = await supabase
+          .from("tickets")
+          .select("amount_paid, sell_price")
+          .eq("id", tp.ticket_id)
+          .single()
+        if (ticket) {
+          const newAmountPaid = Math.max(0, (ticket.amount_paid ?? 0) - tp.allocated_amount)
+          const newStatus = newAmountPaid <= 0 ? "unpaid" : newAmountPaid >= (ticket.sell_price ?? 0) ? "paid" : "partial"
+          await supabase.from("tickets").update({ amount_paid: newAmountPaid, payment_status: newStatus }).eq("id", tp.ticket_id)
+        }
+      }
+    }
+
+    if ((tps ?? []).length > 0) {
+      await supabase.from("ticket_payments").delete().eq("payment_id", paymentId)
+    }
+
+    const { error } = await supabase.from("payments").delete().eq("id", paymentId)
+    if (error) { setError(error.message); return }
+
+    fetchAll()
+  }
+
   const inputCls =
     "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 
@@ -475,6 +508,7 @@ export default function ClientDetail() {
                                 ...((payment.unallocated_amount ?? 0) > 0
                                   ? [{ key: "allocate", label: "Allocate", cls: "text-blue-600", onClick: () => openAllocate(payment) }]
                                   : []),
+                                { key: "delete", label: "Delete", cls: "text-red-500", onClick: () => handleDeletePayment(payment.id) },
                               ]}
                             />
                           </td>

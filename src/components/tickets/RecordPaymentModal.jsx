@@ -62,7 +62,7 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
         client_id: ticket.client_id,
         type: "client_payment",
         amount,
-        unallocated_amount: amount,
+        unallocated_amount: 0,
         channel: form.channel || null,
         trx_id: form.trx_id.trim() || null,
         notes: form.notes.trim() || null,

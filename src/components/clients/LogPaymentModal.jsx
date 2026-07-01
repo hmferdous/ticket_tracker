@@ -1,8 +1,6 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
-import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
-
 const CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
 
 function emptyForm() {
@@ -12,18 +10,10 @@ function emptyForm() {
     trx_id: "",
     payment_date: new Date().toISOString().split("T")[0],
     notes: "",
-    forward: false,
-    supplier_id: "",
-    fwd_amount: "",
-    fwd_channel: "",
-    fwd_trx_id: "",
-    different_amount: false,
-    fwd_custom_amount: "",
-    fwd_reason: "",
   }
 }
 
-export default function LogPaymentModal({ isOpen, onClose, client, suppliers, onLogged }) {
+export default function LogPaymentModal({ isOpen, onClose, client, onLogged }) {
   const { agent } = useAuth()
   const [form, setForm] = useState(emptyForm)
   const [loading, setLoading] = useState(false)
@@ -40,15 +30,6 @@ export default function LogPaymentModal({ isOpen, onClose, client, suppliers, on
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
 
-  const handleForwardToggle = (e) => {
-    const checked = e.target.checked
-    setForm((f) => ({
-      ...f,
-      forward: checked,
-      fwd_amount: checked && !f.fwd_amount ? f.amount : f.fwd_amount,
-    }))
-  }
-
   const handleBackdrop = (e) => {
     if (e.target === e.currentTarget) onClose()
   }
@@ -64,21 +45,6 @@ export default function LogPaymentModal({ isOpen, onClose, client, suppliers, on
     if (!amount || amount <= 0) {
       setError("Enter a valid amount")
       return
-    }
-
-    let forwardAmount = null
-    if (form.forward) {
-      if (!form.supplier_id) {
-        setError("Select a supplier to forward to")
-        return
-      }
-      forwardAmount = form.different_amount
-        ? parseFloat(form.fwd_custom_amount)
-        : parseFloat(form.fwd_amount || form.amount)
-      if (isNaN(forwardAmount) || forwardAmount < 0) {
-        setError("Enter a valid supplier amount")
-        return
-      }
     }
 
     setLoading(true)
@@ -103,25 +69,6 @@ export default function LogPaymentModal({ isOpen, onClose, client, suppliers, on
       setError(payErr.message)
       setLoading(false)
       return
-    }
-
-    if (form.forward) {
-      const { error: fwdErr } = await supabase.from("payments").insert({
-        agent_id: agent.id,
-        supplier_id: form.supplier_id,
-        type: "supplier_payment",
-        amount: forwardAmount,
-        unallocated_amount: forwardAmount,
-        channel: form.fwd_channel || null,
-        trx_id: form.fwd_trx_id.trim() || null,
-        notes: form.fwd_reason.trim() || null,
-        payment_date: form.payment_date,
-      })
-      if (fwdErr) {
-        setError(fwdErr.message)
-        setLoading(false)
-        return
-      }
     }
 
     setLoading(false)
@@ -212,98 +159,6 @@ export default function LogPaymentModal({ isOpen, onClose, client, suppliers, on
               />
             </div>
 
-            <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none pt-1">
-              <input
-                type="checkbox"
-                checked={form.forward}
-                onChange={handleForwardToggle}
-                className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-              />
-              Forward to supplier
-            </label>
-
-            {form.forward && (
-              <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
-                  <SearchableEntityDropdown
-                    entities={suppliers}
-                    value={form.supplier_id}
-                    onChange={(id) => setForm((f) => ({ ...f, supplier_id: id }))}
-                    placeholder="Search suppliers…"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                    <input
-                      type="number"
-                      min="0"
-                      step="0.01"
-                      value={form.fwd_amount}
-                      onChange={set("fwd_amount")}
-                      disabled={form.different_amount}
-                      placeholder="0.00"
-                      className={`${inputCls} ${form.different_amount ? "bg-gray-100 text-gray-400" : ""}`}
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>
-                    <select value={form.fwd_channel} onChange={set("fwd_channel")} className={inputCls}>
-                      <option value="">— Select —</option>
-                      {CHANNELS.map((ch) => (
-                        <option key={ch} value={ch}>{ch}</option>
-                      ))}
-                    </select>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Transaction ID</label>
-                  <input
-                    type="text"
-                    value={form.fwd_trx_id}
-                    onChange={set("fwd_trx_id")}
-                    placeholder="Reference or TrxID"
-                    className={inputCls}
-                  />
-                </div>
-                <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
-                  <input
-                    type="checkbox"
-                    checked={form.different_amount}
-                    onChange={(e) => setForm((f) => ({ ...f, different_amount: e.target.checked }))}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  Different amount to supplier
-                </label>
-                {form.different_amount && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Amount</label>
-                      <input
-                        type="number"
-                        min="0"
-                        step="0.01"
-                        value={form.fwd_custom_amount}
-                        onChange={set("fwd_custom_amount")}
-                        placeholder="0.00"
-                        className={inputCls}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Reason</label>
-                      <input
-                        type="text"
-                        value={form.fwd_reason}
-                        onChange={set("fwd_reason")}
-                        placeholder="Optional reason"
-                        className={inputCls}
-                      />
-                    </div>
-                  </div>
-                )}
-              </div>
-            )}
           </form>
         </div>
 

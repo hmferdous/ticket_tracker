@@ -67,6 +67,28 @@ function PartyCell({ payment }) {
   )
 }
 
+function TicketTagCell({ payment }) {
+  const tps = payment.ticket_payments ?? []
+  if (tps.length === 0) return <span className="text-gray-300 text-xs">—</span>
+  if (tps.length === 1) {
+    const t = tps[0].tickets
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded w-fit">{t?.pnr ?? "—"}</span>
+        <span className="text-[11px] text-gray-400 truncate max-w-[120px]">{t?.passenger_name ?? ""}</span>
+      </div>
+    )
+  }
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 cursor-default"
+      title={tps.map((tp) => tp.tickets?.pnr ?? "—").join(", ")}
+    >
+      {tps.length} tickets
+    </span>
+  )
+}
+
 function StatChip({ label, value, accent }) {
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full text-sm">
@@ -114,7 +136,8 @@ export default function Payments() {
       .select(`
         id, client_id, supplier_id, type, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at,
         clients(name, client_id_number),
-        suppliers(name, supplier_id_number)
+        suppliers(name, supplier_id_number),
+        ticket_payments(type, tickets(pnr, passenger_name))
       `)
       .eq("agent_id", agent.id)
       .order("payment_date", { ascending: false })
@@ -315,6 +338,7 @@ export default function Payments() {
                     <th className="px-4 py-3 font-medium text-gray-500">Date</th>
                     <th className="px-4 py-3 font-medium text-gray-500">Type</th>
                     <th className="px-4 py-3 font-medium text-gray-500">Party</th>
+                    <th className="px-4 py-3 font-medium text-gray-500">Ticket</th>
                     <th className="px-4 py-3 font-medium text-gray-500 text-right">Amount</th>
                     <th className="px-4 py-3 font-medium text-gray-500">Channel</th>
                     <th className="px-4 py-3 font-medium text-gray-500">Trx ID</th>
@@ -336,6 +360,7 @@ export default function Payments() {
                           </span>
                         </td>
                         <td className="px-4 py-3"><PartyCell payment={payment} /></td>
+                        <td className="px-4 py-3"><TicketTagCell payment={payment} /></td>
                         <td className="px-4 py-3 text-right tabular-nums text-gray-700">{fmt(payment.amount)}</td>
                         <td className="px-4 py-3 text-gray-600">{payment.channel ?? "—"}</td>
                         <td className="px-4 py-3 text-gray-600">{payment.trx_id ?? "—"}</td>

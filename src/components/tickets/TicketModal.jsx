@@ -514,8 +514,8 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
               />
             </fieldset>
 
-            {/* Client Payment — collapsible */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            {/* Client + Supplier Payment — create mode only */}
+            {!ticket && <div className="border border-gray-200 rounded-lg overflow-hidden">
               <button
                 type="button"
                 onClick={() => setClientPayOpen((o) => !o)}
@@ -603,10 +603,9 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                   </label>
                 </div>
               )}
-            </div>
+            </div>}
 
-            {/* Supplier Payment — collapsible */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            {!ticket && <div className="border border-gray-200 rounded-lg overflow-hidden">
               <button
                 type="button"
                 onClick={() => setSupplierPayOpen((o) => !o)}
@@ -679,7 +678,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                   </label>
                 </div>
               )}
-            </div>
+            </div>}
           </form>
         </div>
 

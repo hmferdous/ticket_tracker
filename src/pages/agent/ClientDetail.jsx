@@ -32,6 +32,28 @@ function Badge({ label, className }) {
   )
 }
 
+function TicketTagCell({ payment }) {
+  const tps = payment.ticket_payments ?? []
+  if (tps.length === 0) return <span className="text-gray-300 text-xs">—</span>
+  if (tps.length === 1) {
+    const t = tps[0].tickets
+    return (
+      <div className="flex flex-col gap-0.5">
+        <span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded w-fit">{t?.pnr ?? "—"}</span>
+        <span className="text-[11px] text-gray-400 truncate max-w-[120px]">{t?.passenger_name ?? ""}</span>
+      </div>
+    )
+  }
+  return (
+    <span
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 cursor-default"
+      title={tps.map((tp) => tp.tickets?.pnr ?? "—").join(", ")}
+    >
+      {tps.length} tickets
+    </span>
+  )
+}
+
 function paymentStatusBadge(status) {
   if (status === "unpaid") return { label: "Unpaid", cls: "bg-red-100 text-red-700" }
   if (status === "partial") return { label: "Partial", cls: "bg-yellow-100 text-yellow-700" }
@@ -166,7 +188,7 @@ export default function ClientDetail() {
           .order("created_at", { ascending: false }),
         supabase
           .from("payments")
-          .select("id, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at")
+          .select("id, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at, ticket_payments(type, tickets(pnr, passenger_name))")
           .eq("client_id", id)
           .eq("agent_id", agent.id)
           .eq("type", "client_payment")
@@ -396,6 +418,7 @@ export default function ClientDetail() {
                       <tr className="border-b border-gray-100 bg-gray-50 text-left">
                         <th className="px-4 py-3 font-medium text-gray-500">Date</th>
                         <th className="px-4 py-3 font-medium text-gray-500 text-right">Amount</th>
+                        <th className="px-4 py-3 font-medium text-gray-500">Ticket</th>
                         <th className="px-4 py-3 font-medium text-gray-500">Channel</th>
                         <th className="px-4 py-3 font-medium text-gray-500">Trx ID</th>
                         <th className="px-4 py-3 font-medium text-gray-500 text-right">Unallocated</th>
@@ -408,6 +431,7 @@ export default function ClientDetail() {
                         <tr key={payment.id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 py-3 text-gray-600">{fmtDate(payment.payment_date)}</td>
                           <td className="px-4 py-3 text-right tabular-nums text-gray-700">{fmt(payment.amount)}</td>
+                          <td className="px-4 py-3"><TicketTagCell payment={payment} /></td>
                           <td className="px-4 py-3 text-gray-600">{payment.channel ?? "—"}</td>
                           <td className="px-4 py-3 text-gray-600">{payment.trx_id ?? "—"}</td>
                           <td className="px-4 py-3 text-right tabular-nums text-gray-600">{fmt(payment.unallocated_amount)}</td>
@@ -462,7 +486,6 @@ export default function ClientDetail() {
         isOpen={logPaymentOpen}
         onClose={() => setLogPaymentOpen(false)}
         client={client}
-        suppliers={suppliers}
         onLogged={handleLogged}
       />
 

@@ -31,13 +31,6 @@ function emptyForm() {
     payment_date: new Date().toISOString().split("T")[0],
     notes: "",
     ticket_id: "",
-    forward: false,
-    fwd_supplier_id: "",
-    fwd_amount: "",
-    fwd_channel: "",
-    fwd_trx_id: "",
-    different_amount: false,
-    fwd_custom_amount: "",
   }
 }
 
@@ -143,15 +136,6 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
     if (e.target === e.currentTarget) onClose()
   }
 
-  const handleForwardToggle = (e) => {
-    const checked = e.target.checked
-    setForm((f) => ({
-      ...f,
-      forward: checked,
-      fwd_amount: checked && !f.fwd_amount ? f.amount : f.fwd_amount,
-    }))
-  }
-
   const handleAddNewClient = async (name) => {
     const data = await createClient(supabase, agent.id, name)
     setClients((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
@@ -162,12 +146,6 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
     const data = await createSupplier(supabase, agent.id, name)
     setSuppliers((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
     setForm((f) => ({ ...f, supplier_id: data.id, ticket_id: "" }))
-  }
-
-  const handleAddNewFwdSupplier = async (name) => {
-    const data = await createSupplier(supabase, agent.id, name)
-    setSuppliers((prev) => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
-    setForm((f) => ({ ...f, fwd_supplier_id: data.id }))
   }
 
   const ticketClearOption = {
@@ -188,15 +166,6 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
     if (type === "client_payment") {
       if (!form.client_id) { setError("Select a client"); return }
 
-      let forwardAmount = null
-      if (form.forward) {
-        if (!form.fwd_supplier_id) { setError("Select a supplier to forward to"); return }
-        forwardAmount = form.different_amount
-          ? parseFloat(form.fwd_custom_amount)
-          : parseFloat(form.fwd_amount || form.amount)
-        if (isNaN(forwardAmount) || forwardAmount < 0) { setError("Enter a valid supplier amount"); return }
-      }
-
       setLoading(true)
 
       const { data: clientPayment, error: payErr } = await supabase
@@ -216,21 +185,6 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
         .single()
 
       if (payErr) { setError(payErr.message); setLoading(false); return }
-
-      if (form.forward) {
-        const { error: fwdErr } = await supabase.from("payments").insert({
-          agent_id: agent.id,
-          supplier_id: form.fwd_supplier_id,
-          type: "supplier_payment",
-          amount: forwardAmount,
-          unallocated_amount: forwardAmount,
-          channel: form.fwd_channel || null,
-          trx_id: form.fwd_trx_id.trim() || null,
-          notes: null,
-          payment_date: form.payment_date,
-        })
-        if (fwdErr) { setError(fwdErr.message); setLoading(false); return }
-      }
 
       setLoading(false)
       onLogged(clientPayment)
@@ -529,93 +483,6 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
                 />
               </div>
 
-              {type === "client_payment" && (
-                <>
-                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none pt-1">
-                    <input
-                      type="checkbox"
-                      checked={form.forward}
-                      onChange={handleForwardToggle}
-                      className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                    />
-                    Forward to supplier
-                  </label>
-
-                  {form.forward && (
-                    <div className="border border-gray-200 rounded-lg p-4 space-y-3 bg-gray-50">
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
-                        <SearchableEntityDropdown
-                          entities={suppliers}
-                          value={form.fwd_supplier_id}
-                          onChange={(id) => setForm((f) => ({ ...f, fwd_supplier_id: id }))}
-                          placeholder="Search suppliers…"
-                          onAddNew={handleAddNewFwdSupplier}
-                          entityType="supplier"
-                          idField="supplier_id_number"
-                        />
-                      </div>
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={form.fwd_amount}
-                            onChange={set("fwd_amount")}
-                            disabled={form.different_amount}
-                            placeholder="0.00"
-                            className={`${inputCls} ${form.different_amount ? "bg-gray-100 text-gray-400" : ""}`}
-                          />
-                        </div>
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>
-                          <select value={form.fwd_channel} onChange={set("fwd_channel")} className={inputCls}>
-                            <option value="">— Select —</option>
-                            {CHANNELS.map((ch) => (
-                              <option key={ch} value={ch}>{ch}</option>
-                            ))}
-                          </select>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Transaction ID</label>
-                        <input
-                          type="text"
-                          value={form.fwd_trx_id}
-                          onChange={set("fwd_trx_id")}
-                          placeholder="Reference or TrxID"
-                          className={inputCls}
-                        />
-                      </div>
-                      <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
-                        <input
-                          type="checkbox"
-                          checked={form.different_amount}
-                          onChange={(e) => setForm((f) => ({ ...f, different_amount: e.target.checked }))}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                        Different amount to supplier
-                      </label>
-                      {form.different_amount && (
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-1">Supplier Amount</label>
-                          <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            value={form.fwd_custom_amount}
-                            onChange={set("fwd_custom_amount")}
-                            placeholder="0.00"
-                            className={inputCls}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
 
               {type === "client_refund" && (
                 <div>

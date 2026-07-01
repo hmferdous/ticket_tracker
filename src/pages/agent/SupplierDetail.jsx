@@ -204,8 +204,36 @@ export default function SupplierDetail() {
     if (target) setViewingTicket(target)
   }
 
-  const handleLogged = (payment) => {
+  const openAllocate = async (payment) => {
+    const { data } = await supabase
+      .from("tickets")
+      .select(`
+        id, passenger_name, route, pnr, travel_date, return_date, issue_date, carrier, narration,
+        purchase_price, sell_price, gds_price,
+        amount_paid, payment_status, status, refund_status,
+        is_reissue, is_void, parent_ticket_id,
+        refund_receivable, refund_received, refund_payable, refund_paid, refund_notes,
+        reissue_fee_collected, reissue_fee_paid, fare_difference,
+        client_id, supplier_id,
+        clients(name), suppliers(name),
+        ticket_payments(allocated_amount, type),
+        created_at
+      `)
+      .eq("supplier_id", id)
+      .eq("agent_id", agent.id)
+      .order("created_at", { ascending: false })
+    const withSupplierPaid = (data ?? []).map((t) => ({
+      ...t,
+      supplierAmountPaid: (t.ticket_payments ?? [])
+        .filter((tp) => tp.type === "supplier")
+        .reduce((sum, tp) => sum + (tp.allocated_amount ?? 0), 0),
+    }))
+    setTickets(withSupplierPaid)
     setAllocationTarget(payment)
+  }
+
+  const handleLogged = (payment) => {
+    openAllocate(payment)
   }
 
   const handleAllocationClose = () => {
@@ -217,7 +245,7 @@ export default function SupplierDetail() {
     const oldest = [...payments]
       .filter((p) => (p.unallocated_amount ?? 0) > 0)
       .sort((a, b) => (a.payment_date || a.created_at || "").localeCompare(b.payment_date || b.created_at || ""))[0]
-    if (oldest) setAllocationTarget(oldest)
+    if (oldest) openAllocate(oldest)
   }
 
   return (
@@ -425,7 +453,7 @@ export default function SupplierDetail() {
                               onClose={() => setOpenActionMenuId(null)}
                               items={[
                                 ...((payment.unallocated_amount ?? 0) > 0
-                                  ? [{ key: "allocate", label: "Allocate", cls: "text-blue-600", onClick: () => setAllocationTarget(payment) }]
+                                  ? [{ key: "allocate", label: "Allocate", cls: "text-blue-600", onClick: () => openAllocate(payment) }]
                                   : []),
                               ]}
                             />
@@ -455,7 +483,7 @@ export default function SupplierDetail() {
 
       <TicketDetailModal
         isOpen={!!viewingTicket}
-        onClose={() => setViewingTicket(null)}
+        onClose={() => { setViewingTicket(null); fetchAll() }}
         ticket={viewingTicket}
         tickets={tickets}
         onNavigate={handleNavigateTicket}

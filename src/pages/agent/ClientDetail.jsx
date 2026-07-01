@@ -217,8 +217,29 @@ export default function ClientDetail() {
     if (target) setViewingTicket(target)
   }
 
-  const handleLogged = (payment) => {
+  const openAllocate = async (payment) => {
+    const { data } = await supabase
+      .from("tickets")
+      .select(`
+        id, passenger_name, route, pnr, travel_date, return_date, issue_date, carrier, narration,
+        purchase_price, sell_price, gds_price,
+        amount_paid, payment_status, status, refund_status,
+        is_reissue, is_void, parent_ticket_id,
+        refund_receivable, refund_received, refund_payable, refund_paid, refund_notes,
+        reissue_fee_collected, reissue_fee_paid, fare_difference,
+        client_id, supplier_id,
+        clients(name), suppliers(name),
+        created_at
+      `)
+      .eq("client_id", id)
+      .eq("agent_id", agent.id)
+      .order("created_at", { ascending: false })
+    setTickets(data ?? [])
     setAllocationTarget(payment)
+  }
+
+  const handleLogged = (payment) => {
+    openAllocate(payment)
   }
 
   const handleAllocationClose = () => {
@@ -230,7 +251,7 @@ export default function ClientDetail() {
     const oldest = [...payments]
       .filter((p) => (p.unallocated_amount ?? 0) > 0)
       .sort((a, b) => (a.payment_date || a.created_at || "").localeCompare(b.payment_date || b.created_at || ""))[0]
-    if (oldest) setAllocationTarget(oldest)
+    if (oldest) openAllocate(oldest)
   }
 
   const inputCls =
@@ -445,7 +466,7 @@ export default function ClientDetail() {
                               onClose={() => setOpenActionMenuId(null)}
                               items={[
                                 ...((payment.unallocated_amount ?? 0) > 0
-                                  ? [{ key: "allocate", label: "Allocate", cls: "text-blue-600", onClick: () => setAllocationTarget(payment) }]
+                                  ? [{ key: "allocate", label: "Allocate", cls: "text-blue-600", onClick: () => openAllocate(payment) }]
                                   : []),
                               ]}
                             />
@@ -476,7 +497,7 @@ export default function ClientDetail() {
 
       <TicketDetailModal
         isOpen={!!viewingTicket}
-        onClose={() => setViewingTicket(null)}
+        onClose={() => { setViewingTicket(null); fetchAll() }}
         ticket={viewingTicket}
         tickets={tickets}
         onNavigate={handleNavigateTicket}

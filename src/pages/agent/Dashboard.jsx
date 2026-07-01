@@ -338,6 +338,20 @@ export default function Dashboard() {
             </div>
           )}
 
+          {/* Welcome */}
+          {agent && (
+            <div className="mb-5">
+              <p className="text-2xl font-extrabold text-gray-900 tracking-tight">
+                {(() => {
+                  const h = new Date().getHours()
+                  const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"
+                  const name = agent.full_name?.split(" ")[0] || user?.email?.split("@")[0] || "there"
+                  return `${greeting}, ${name}`
+                })()}
+              </p>
+            </div>
+          )}
+
           {/* Period filter bar */}
           <div className="flex flex-wrap items-center gap-2 mb-5">
             {PRESETS.map(({ value, label }) => (

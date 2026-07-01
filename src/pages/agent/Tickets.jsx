@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import TicketModal from "../../components/tickets/TicketModal"
@@ -119,37 +120,66 @@ function TicketChips({ ticket }) {
 }
 
 function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
+  const btnRef = useRef(null)
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
+
+  const handleToggle = () => {
+    if (!isOpen && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const menuHeight = items.length * 36 + 8
+      setMenuPos({
+        top: spaceBelow >= menuHeight ? rect.bottom + 4 : rect.top - menuHeight - 4,
+        right: window.innerWidth - rect.right,
+      })
+    }
+    onToggle()
+  }
+
+  useEffect(() => {
+    if (!isOpen) return
+    const close = () => onClose()
+    window.addEventListener("scroll", close, true)
+    window.addEventListener("resize", close)
+    return () => {
+      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("resize", close)
+    }
+  }, [isOpen, onClose])
+
   return (
-    <div className="relative inline-block text-left">
+    <div className="inline-block">
       <button
+        ref={btnRef}
         type="button"
-        onClick={onToggle}
-        className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        onClick={handleToggle}
+        className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
         aria-label="Row actions"
       >
-        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+          <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
         </svg>
       </button>
-      {isOpen && (
+      {isOpen && createPortal(
         <>
-          <div className="fixed inset-0 z-10" onClick={onClose} />
-          <div className="absolute right-0 top-full z-20 mt-1 w-52 bg-white rounded-lg shadow-lg border border-gray-100 py-1">
+          <div className="fixed inset-0 z-40" onClick={onClose} />
+          <div
+            className="fixed z-50 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-1 overflow-hidden"
+            style={{ top: menuPos.top, right: menuPos.right }}
+          >
             {items.map((item) => (
               <button
                 key={item.key}
                 type="button"
-                onClick={() => {
-                  onClose()
-                  item.onClick()
-                }}
-                className={`block w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 transition-colors ${item.cls}`}
+                onClick={() => { onClose(); item.onClick() }}
+                className={`flex w-full items-center text-left px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors ${item.cls}`}
               >
                 {item.label}
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )
@@ -303,7 +333,6 @@ export default function Tickets() {
   }, [tickets, searchText, airlineFilter, clientFilter, supplierFilter, dateFrom, dateTo, selectedChips])
 
   const sortedTickets = useMemo(() => {
-    if (!compact) return filteredTickets
     return [...filteredTickets].sort((a, b) => {
       const aDate = getLatestPayDate(a)
       const bDate = getLatestPayDate(b)
@@ -312,7 +341,7 @@ export default function Tickets() {
       if (!bDate) return -1
       return bDate.localeCompare(aDate)
     })
-  }, [filteredTickets, compact])
+  }, [filteredTickets])
 
   const totalPages = Math.max(1, Math.ceil(filteredTickets.length / pageSize))
   const safePage = Math.min(page, totalPages)
@@ -556,17 +585,17 @@ export default function Tickets() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm whitespace-nowrap">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50 text-left">
-                    <th className="px-3 py-2.5 font-medium text-gray-500">Issue Date</th>
-                    <th className="px-3 py-2.5 font-medium text-gray-500">Pay Date</th>
-                    <th className="px-3 py-2.5 font-medium text-gray-500">Flight Date</th>
-                    <th className="px-3 py-2.5 font-medium text-gray-500">PNR</th>
-                    <th className="px-3 py-2.5 font-medium text-gray-500">Ticket No.</th>
-                    <th className="px-3 py-2.5 font-medium text-gray-500">Passenger</th>
-                    <th className="px-3 py-2.5 font-medium text-gray-500 text-right">Sell</th>
-                    <th className="px-3 py-2.5 font-medium text-gray-500 text-right">Outstanding</th>
-                    <th className="px-3 py-2.5 font-medium text-gray-500">Status</th>
-                    <th className="px-3 py-2.5 font-medium text-gray-500 text-right">Actions</th>
+                  <tr className="border-b border-gray-200 bg-gray-50 text-left">
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Issue Date</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Pay Date</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Flight Date</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">PNR</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Ticket No.</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Passenger</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Sell</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Outstanding</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Status</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -582,21 +611,21 @@ export default function Tickets() {
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                       : <span className="text-gray-300">—</span>
                     return (
-                      <tr key={ticket.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-3 py-2.5 text-gray-600 text-xs">{fmtDate(ticket.issue_date)}</td>
-                        <td className="px-3 py-2.5 text-gray-600 text-xs">{fmtDate(latestPayDate)}</td>
-                        <td className="px-3 py-2.5 text-gray-600 text-xs">{fmtDate(ticket.travel_date)}</td>
-                        <td className="px-3 py-2.5 text-gray-600 font-mono text-xs">{ticket.pnr || <span className="text-gray-300">—</span>}</td>
-                        <td className="px-3 py-2.5 text-gray-600 font-mono text-xs">{ticket.ticket_number || <span className="text-gray-300">—</span>}</td>
-                        <td className="px-3 py-2.5 font-medium text-gray-900">{ticket.passenger_name}</td>
-                        <td className="px-3 py-2.5 text-gray-600 text-right tabular-nums">{fmt(ticket.sell_price)}</td>
-                        <td className={`px-3 py-2.5 text-right tabular-nums font-medium ${outstanding > 0 ? "text-red-600" : "text-green-600"}`}>
-                          {outstanding > 0 ? fmt(outstanding) : <span className="text-green-600">—</span>}
+                      <tr key={ticket.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(ticket.issue_date)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(latestPayDate)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(ticket.travel_date)}</td>
+                        <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.pnr || "—"}</span></td>
+                        <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.ticket_number || "—"}</span></td>
+                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">{ticket.passenger_name}</td>
+                        <td className="px-4 py-3 text-sm text-right tabular-nums font-medium text-gray-700">{fmt(ticket.sell_price)}</td>
+                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${outstanding > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                          {outstanding > 0 ? fmt(outstanding) : "—"}
                         </td>
-                        <td className="px-3 py-2.5 whitespace-normal min-w-[100px]">
+                        <td className="px-4 py-3 whitespace-normal min-w-[100px]">
                           <TicketChips ticket={ticket} />
                         </td>
-                        <td className="px-3 py-2.5 text-right">
+                        <td className="px-4 py-3 text-right">
                           {confirmDeleteId === ticket.id ? (
                             <div className="flex items-center justify-end gap-2">
                               <span className="text-gray-500 text-xs">Delete?</span>
@@ -633,22 +662,26 @@ export default function Tickets() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm whitespace-nowrap">
                 <thead>
-                  <tr className="border-b border-gray-100 bg-gray-50 text-left">
-                    <th className="px-4 py-3 font-medium text-gray-500">Issue Date</th>
-                    <th className="px-4 py-3 font-medium text-gray-500">Travel Date</th>
-                    <th className="px-4 py-3 font-medium text-gray-500">Passenger</th>
-                    <th className="px-4 py-3 font-medium text-gray-500">Route</th>
-                    <th className="px-4 py-3 font-medium text-gray-500">Carrier</th>
-                    <th className="px-4 py-3 font-medium text-gray-500">Client</th>
-                    <th className="px-4 py-3 font-medium text-gray-500">Supplier</th>
-                    <th className="px-4 py-3 font-medium text-gray-500 text-right">Sell</th>
-                    <th className="px-4 py-3 font-medium text-gray-500 text-right">Purchase</th>
-                    <th className="px-4 py-3 font-medium text-gray-500 text-right">Margin</th>
-                    <th className="px-4 py-3 font-medium text-gray-500 text-right">Net</th>
-                    <th className="px-4 py-3 font-medium text-gray-500 text-right">Paid</th>
-                    <th className="px-4 py-3 font-medium text-gray-500">Narration</th>
-                    <th className="px-4 py-3 font-medium text-gray-500">Status</th>
-                    <th className="px-4 py-3 font-medium text-gray-500 text-right">Actions</th>
+                  <tr className="border-b border-gray-200 bg-gray-50 text-left">
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Issue Date</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Pay Date</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Travel Date</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">PNR</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Ticket No.</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Passenger</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Route</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Carrier</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Client</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Supplier</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Sell</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Purchase</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Margin</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Net</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Paid</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Outstanding</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Narration</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Status</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -660,44 +693,37 @@ export default function Tickets() {
                         ? ticket.narration.slice(0, 30) + "…"
                         : ticket.narration
                       : null
+                    const detailPayDate = getLatestPayDate(ticket)
+                    const fmtD = (d) => d
+                      ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+                      : <span className="text-gray-300">—</span>
+                    const detailOutstanding = (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
                     return (
-                      <tr key={ticket.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-4 py-3 text-gray-600">
-                          {ticket.issue_date
-                            ? new Date(ticket.issue_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-                            : <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {ticket.travel_date
-                            ? new Date(ticket.travel_date).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-                            : "—"}
-                        </td>
-                        <td className="px-4 py-3 font-medium text-gray-900">{ticket.passenger_name}</td>
-                        <td className="px-4 py-3 text-gray-600 font-mono text-xs">{ticket.route}</td>
-                        <td className="px-4 py-3 text-gray-600">{ticket.carrier}</td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {ticket.clients?.name ?? <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600">
-                          {ticket.suppliers?.name ?? <span className="text-gray-300">—</span>}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 text-right tabular-nums">
-                          {fmt(ticket.sell_price)}
-                        </td>
-                        <td className="px-4 py-3 text-gray-600 text-right tabular-nums">
-                          {fmt(ticket.purchase_price)}
-                        </td>
-                        <td className={`px-4 py-3 text-right tabular-nums font-medium ${ticketMargin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                      <tr key={ticket.id} className="hover:bg-slate-50 transition-colors">
+                        <td className="px-4 py-3 text-xs text-gray-500">{fmtD(ticket.issue_date)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{fmtD(detailPayDate)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500">{fmtD(ticket.travel_date)}</td>
+                        <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.pnr || "—"}</span></td>
+                        <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.ticket_number || "—"}</span></td>
+                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">{ticket.passenger_name}</td>
+                        <td className="px-4 py-3"><span className="font-mono text-xs text-gray-500">{ticket.route || "—"}</span></td>
+                        <td className="px-4 py-3 text-sm text-gray-500">{ticket.carrier || <span className="text-gray-300">—</span>}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{ticket.clients?.name ?? <span className="text-gray-300">—</span>}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{ticket.suppliers?.name ?? <span className="text-gray-300">—</span>}</td>
+                        <td className="px-4 py-3 text-sm text-right tabular-nums font-medium text-gray-700">{fmt(ticket.sell_price)}</td>
+                        <td className="px-4 py-3 text-sm text-right tabular-nums text-gray-500">{fmt(ticket.purchase_price)}</td>
+                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${ticketMargin >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                           {fmtMargin(ticketMargin)}
                         </td>
-                        <td className={`px-4 py-3 text-right tabular-nums font-medium ${netMargin >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${netMargin >= 0 ? "text-emerald-600" : "text-red-600"}`}>
                           {fmtMargin(netMargin)}
                         </td>
-                        <td className="px-4 py-3 text-right tabular-nums text-gray-600">
-                          {fmt(ticket.amount_paid)}
+                        <td className="px-4 py-3 text-sm text-right tabular-nums text-gray-600">{fmt(ticket.amount_paid)}</td>
+                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${detailOutstanding > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                          {detailOutstanding > 0 ? fmt(detailOutstanding) : "—"}
                         </td>
-                        <td className="px-4 py-3 text-gray-400 text-xs max-w-[140px] truncate">
-                          {narration ?? <span className="text-gray-200">—</span>}
+                        <td className="px-4 py-3 text-xs text-gray-400 max-w-[140px] truncate">
+                          {narration ?? <span className="text-gray-300">—</span>}
                         </td>
                         <td className="px-4 py-3 whitespace-normal min-w-[120px]">
                           <TicketChips ticket={ticket} />

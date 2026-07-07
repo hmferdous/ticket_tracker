@@ -147,10 +147,19 @@ function DashboardSkeleton() {
         ))}
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
         {[0, 1, 2].map((i) => (
           <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse">
             <div className="h-3 w-32 bg-gray-200 rounded mb-3" />
+            <div className="h-7 w-20 bg-gray-100 rounded" />
+          </div>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        {[0, 1, 2, 3, 4].map((i) => (
+          <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse">
+            <div className="h-3 w-24 bg-gray-200 rounded mb-3" />
             <div className="h-7 w-20 bg-gray-100 rounded" />
           </div>
         ))}
@@ -207,7 +216,8 @@ export default function Dashboard() {
         .from("tickets")
         .select(
           `id, passenger_name, route, travel_date, issue_date, sell_price, purchase_price, amount_paid, payment_status,
-           is_void, refund_received, refund_payable, reissue_fee_collected, reissue_fee_paid, fare_difference,
+           is_void, refund_status, refund_receivable, refund_received, refund_payable, refund_paid,
+           reissue_fee_collected, reissue_fee_paid, fare_difference,
            office_markup, client_id, clients(name), ticket_payments(allocated_amount, type), created_at`
         )
         .eq("agent_id", agent.id),
@@ -287,6 +297,24 @@ export default function Dashboard() {
   const unallocatedClientCredit = useMemo(
     () => payments.filter((p) => p.type === "client_payment").reduce((sum, p) => sum + (p.unallocated_amount ?? 0), 0),
     [payments]
+  )
+
+  const refundStats = useMemo(() => ({
+    openCount: tickets.filter((t) => t.refund_status === "initiated" || t.refund_status === "supplier_refunded").length,
+    awaitingFromSupplier: tickets
+      .filter((t) => t.refund_status === "initiated")
+      .reduce((sum, t) => sum + (t.refund_receivable ?? 0), 0),
+    owedToClients: tickets
+      .filter((t) => t.refund_status === "supplier_refunded")
+      .reduce((sum, t) => sum + (t.refund_payable ?? 0), 0),
+    netMargin: tickets
+      .filter((t) => t.refund_status === "closed")
+      .reduce((sum, t) => sum + ((t.refund_received ?? 0) - (t.refund_payable ?? 0)), 0),
+  }), [tickets])
+
+  const totalRefundedToClients = useMemo(
+    () => filteredPayments.filter((p) => p.type === "client_refund").reduce((sum, p) => sum + (p.amount ?? 0), 0),
+    [filteredPayments]
   )
 
   // Needs Attention — always all tickets, unaffected by filter
@@ -426,7 +454,39 @@ export default function Dashboard() {
             />
           </div>
 
-          {/* Row 3 — Needs Attention (always all tickets) */}
+          {/* Row 3 — Refund pipeline cards */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+            <StatCard
+              label="Open Refunds"
+              value={fmt(refundStats.openCount)}
+              tag="All time"
+            />
+            <StatCard
+              label="Awaiting from Supplier"
+              value={MA(refundStats.awaitingFromSupplier)}
+              accent={refundStats.awaitingFromSupplier > 0 ? "text-yellow-600" : "text-gray-900"}
+              tag="All time"
+            />
+            <StatCard
+              label="Owed to Clients"
+              value={MA(refundStats.owedToClients)}
+              accent={refundStats.owedToClients > 0 ? "text-red-600" : "text-gray-900"}
+              tag="All time"
+            />
+            <StatCard
+              label="Total Refunded to Clients"
+              value={MA(totalRefundedToClients)}
+              accent={totalRefundedToClients > 0 ? "text-blue-600" : "text-gray-900"}
+            />
+            <StatCard
+              label="Refund Net Margin"
+              value={MA(refundStats.netMargin)}
+              accent={refundStats.netMargin >= 0 ? "text-green-600" : "text-red-600"}
+              tag="All time"
+            />
+          </div>
+
+          {/* Row 4 — Needs Attention (always all tickets) */}
           <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
             <h2 className="text-base font-semibold text-gray-900 mb-4">Needs Attention</h2>
             {needsAttention.length === 0 ? (

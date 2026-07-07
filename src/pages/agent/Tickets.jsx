@@ -24,7 +24,7 @@ function getRowActions(ticket) {
 
   if (ticket.refund_status && ticket.refund_status !== "closed") {
     if (ticket.refund_received == null) actions.push("record_supplier_refund")
-    if (ticket.refund_paid == null) actions.push("record_client_refund")
+    if (ticket.refund_received != null && ticket.refund_paid == null) actions.push("record_client_refund")
   }
 
   actions.push("view")

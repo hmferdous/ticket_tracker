@@ -368,7 +368,7 @@ export default function SupplierDetail() {
 
             {/* Tickets tab */}
             {activeTab === "tickets" && (
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
                 {tickets.length === 0 ? (
                   <div className="py-16 text-center text-sm text-gray-400">No tickets for this supplier yet.</div>
                 ) : (

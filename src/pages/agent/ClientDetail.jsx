@@ -407,7 +407,7 @@ export default function ClientDetail() {
 
             {/* Tickets tab */}
             {activeTab === "tickets" && (
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
                 {tickets.length === 0 ? (
                   <div className="py-16 text-center text-sm text-gray-400">
                     No tickets assigned to this client. If you added tickets from the Tickets page, make sure the Client field was set to this client when creating them.

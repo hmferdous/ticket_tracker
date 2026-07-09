@@ -15,6 +15,7 @@ const NAV_LINKS = [
 const REPORT_LINKS = [
   { to: "/reports/client-ledger", label: "Client Ledger" },
   { to: "/reports/supplier-ledger", label: "Supplier Ledger" },
+  { to: "/reports/channel-ledger", label: "Channel Ledger" },
 ]
 
 export default function Sidebar() {

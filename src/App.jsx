@@ -14,6 +14,7 @@ import AdminAgents from "./pages/admin/Agents"
 import AdminSettings from "./pages/admin/AdminSettings"
 import ClientLedger from "./pages/agent/reports/ClientLedger"
 import SupplierLedger from "./pages/agent/reports/SupplierLedger"
+import ChannelLedger from "./pages/agent/reports/ChannelLedger"
 
 function PrivateRoute({ children }) {
   const { user, loading } = useAuth()
@@ -49,6 +50,7 @@ export default function App() {
       <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
       <Route path="/reports/client-ledger" element={<PrivateRoute><ClientLedger /></PrivateRoute>} />
       <Route path="/reports/supplier-ledger" element={<PrivateRoute><SupplierLedger /></PrivateRoute>} />
+      <Route path="/reports/channel-ledger" element={<PrivateRoute><ChannelLedger /></PrivateRoute>} />
       <Route path="/admin/agents" element={<AdminRoute><AdminAgents /></AdminRoute>} />
       <Route path="/admin/settings" element={<AdminRoute><AdminSettings /></AdminRoute>} />
       <Route path="*" element={<Navigate to="/login" replace />} />

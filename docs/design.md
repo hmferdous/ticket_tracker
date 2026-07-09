@@ -18,7 +18,7 @@ jsPDF + jspdf-autotable for PDF generation (ledger reports)
 - Authenticated pages: sidebar on left, content on right
 - Sidebar links: Dashboard, Tickets, Clients, Suppliers, Payments, Reports (collapsible group), Settings
 - Reports group expands/collapses on click; auto-expands when any /reports/* route is active
-- Reports sub-links: Client Ledger, Supplier Ledger
+- Reports sub-links: Client Ledger, Supplier Ledger, Channel Ledger
 - Admin pages: separate layout with admin sidebar
 
 ## AppLayout Actions Slot
@@ -199,6 +199,15 @@ On save:
 - Same structure as Client Ledger but supplier-side
 - Invoice Debit = purchase_price; supplier_payment and supplier_refund are both Credit entries (both reduce payable)
 - Summary cards: Total Invoiced, Total Paid, Total Refunded, Net Payable, Unallocated
+
+## Reports — Channel Ledger (/reports/channel-ledger)
+- No entity selector — aggregates all payments for the agent across every channel (Cash, bKash, Bank, Office, EBL, DBBL, IBBL, City, BRAC, UCB, plus "No Channel" bucket if any payment has a null channel)
+- Date range (From / To) only — optional, omit both for all-time view
+- Inflow to a channel = client_payment + supplier_refund amounts logged against that channel; outflow = supplier_payment + client_refund amounts
+- Grand totals strip: Total In, Total Out, Net Balance across all channels (period)
+- Per-channel cards: one per channel, shows running balance (opening balance from before dateFrom + period in/out), clickable to filter the transaction list below to that channel
+- Drill-down transaction table (descending by date): Date, Type badge, Party (client/supplier), Channel (hidden when a single channel is selected), Trx ID, signed Amount (+ green inflow, − red outflow)
+- No PDF export on this report
 
 ## Ledger PDF Format
 - Generated via jsPDF + jspdf-autotable; downloaded directly in browser

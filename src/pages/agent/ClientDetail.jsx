@@ -6,6 +6,7 @@ import ClientModal from "../../components/clients/ClientModal"
 import LogPaymentModal from "../../components/clients/LogPaymentModal"
 import AllocationModal from "../../components/clients/AllocationModal"
 import TicketDetailModal from "../../components/tickets/TicketDetailModal"
+import ViewPaymentModal from "../../components/payments/ViewPaymentModal"
 import DocumentsTab from "../../components/ui/DocumentsTab"
 import AppLayout from "../../components/layout/AppLayout"
 
@@ -153,6 +154,7 @@ export default function ClientDetail() {
   const [logPaymentOpen, setLogPaymentOpen] = useState(false)
   const [allocationTarget, setAllocationTarget] = useState(null)
   const [openActionMenuId, setOpenActionMenuId] = useState(null)
+  const [viewingPayment, setViewingPayment] = useState(null)
 
   useEffect(() => {
     if (agent?.id && id) fetchAll()
@@ -192,7 +194,7 @@ export default function ClientDetail() {
         .order("created_at", { ascending: false }),
       supabase
         .from("payments")
-        .select("id, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at, ticket_payments(type, tickets(pnr, passenger_name))")
+        .select("id, type, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at, ticket_payments(type, tickets(pnr, passenger_name))")
         .eq("client_id", id)
         .eq("agent_id", agent.id)
         .eq("type", "client_payment")
@@ -519,6 +521,7 @@ export default function ClientDetail() {
                               onToggle={() => setOpenActionMenuId((prev) => (prev === payment.id ? null : payment.id))}
                               onClose={() => setOpenActionMenuId(null)}
                               items={[
+                                { key: "view", label: "View / Edit", cls: "text-gray-600", onClick: () => setViewingPayment(payment) },
                                 ...((payment.unallocated_amount ?? 0) > 0
                                   ? [{ key: "allocate", label: "Allocate", cls: "text-blue-600", onClick: () => openAllocate(payment) }]
                                   : []),
@@ -556,6 +559,13 @@ export default function ClientDetail() {
         ticket={viewingTicket}
         tickets={tickets}
         onNavigate={handleNavigateTicket}
+      />
+
+      <ViewPaymentModal
+        isOpen={!!viewingPayment}
+        onClose={() => setViewingPayment(null)}
+        payment={viewingPayment}
+        onSaved={fetchAll}
       />
 
       <LogPaymentModal

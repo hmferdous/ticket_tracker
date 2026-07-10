@@ -6,6 +6,8 @@ const MODE_CONFIG = {
   edit: { title: "Edit refund terms", confirmLabel: "Save changes" },
   supplier: { title: "Record supplier refund", confirmLabel: "Record received" },
   client: { title: "Record client refund", confirmLabel: "Record paid" },
+  edit_supplier_actual: { title: "Edit Supplier Refund Received", confirmLabel: "Save changes" },
+  edit_client_actual: { title: "Edit Client Refund Paid", confirmLabel: "Save changes" },
 }
 
 export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) {
@@ -21,7 +23,11 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
       setReceivable(mode === "edit" && ticket?.refund_receivable != null ? String(ticket.refund_receivable) : "")
       setPayable(mode === "edit" && ticket?.refund_payable != null ? String(ticket.refund_payable) : "")
       setNotes(mode === "edit" ? ticket?.refund_notes ?? "" : "")
-      setAmount("")
+      setAmount(
+        mode === "edit_supplier_actual" && ticket?.refund_received != null ? String(ticket.refund_received) :
+        mode === "edit_client_actual" && ticket?.refund_paid != null ? String(ticket.refund_paid) :
+        ""
+      )
       setError("")
     }
   }, [isOpen, ticket, mode])
@@ -76,6 +82,20 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
         refund_paid: value,
         refund_status: ticket.refund_received != null ? "closed" : "client_refunded",
       }
+    } else if (mode === "edit_supplier_actual") {
+      const value = parseFloat(amount)
+      if (isNaN(value)) {
+        setError("Enter a valid amount")
+        return
+      }
+      updates = { refund_received: value }
+    } else if (mode === "edit_client_actual") {
+      const value = parseFloat(amount)
+      if (isNaN(value)) {
+        setError("Enter a valid amount")
+        return
+      }
+      updates = { refund_paid: value }
     }
 
     setLoading(true)
@@ -157,7 +177,7 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
               </>
             )}
 
-            {mode === "supplier" && (
+            {(mode === "supplier" || mode === "edit_supplier_actual") && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Amount received from supplier</label>
                 <input
@@ -175,7 +195,7 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
               </div>
             )}
 
-            {mode === "client" && (
+            {(mode === "client" || mode === "edit_client_actual") && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Amount paid to client</label>
                 <input

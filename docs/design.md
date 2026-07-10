@@ -92,7 +92,9 @@ On save:
   - Reissue: status not void, not reissued, refund_status not initiated
   - Record Payment: payment_status not paid and status not void
   - Record Supplier Refund / Record Client Refund: shown once a refund is initiated, independently per side (whichever of refund_received / refund_paid is still null)
-  - Edit Refund Terms: shown while refund_status is initiated (before either side has settled)
+  - Edit Refund Terms: shown whenever a refund exists (refund_status not null), including after settlement
+  - Edit Refund Received / Edit Refund Paid: shown per side once that side's actual amount has been recorded, for correcting typos
+  - Edit Reissue Details: shown on reissue child tickets (is_reissue = true), not void
 - Actions that aren't applicable are omitted from the menu entirely, never shown disabled
 - Suppliers list also uses the same hamburger-menu pattern for row actions
 
@@ -108,13 +110,21 @@ On save:
 - Collapsible Record Payment section at bottom (same pattern as ticket form, uses computed sell_price)
 - On save: original ticket marked reissued, new child ticket created with computed prices
 
+## Edit Reissue Details Modal
+- Opens from "Edit Reissue Details" row action on a reissue child ticket
+- Pre-filled with the child's current reissue_fee_collected, reissue_fee_paid, fare_difference
+- sell_price and purchase_price shown read-only, recomputed live the same way as the Reissue Modal — base price (backed out of the ticket's current stored prices) + fare_difference + fee
+- On save: updates reissue_fee_collected, reissue_fee_paid, fare_difference, sell_price, purchase_price, office_markup
+- This is the correct place to fix a reissue fee/fare entry mistake — editing sell_price/purchase_price directly via the generic ticket Edit action does not keep them in sync with the fee fields
+
 ## Refund Flow UI
 - Initiated from row level action on ticket list
 - Step 1 modal: enter refund_receivable, refund_payable, and an optional Notes field (saved to its own refund_notes column)
 - Step 2: when supplier sends — Record Supplier Refund action updates refund_received
 - Step 3: when paying client — Record Client Refund action updates refund_paid
 - Refund margin shown at all times: refund_received - refund_payable
-- Edit Refund Terms action (available while refund_status is initiated): reopens the same modal pre-filled with the current refund_receivable / refund_payable / refund_notes, lets the agent correct the agreed figures before either side has actually settled. Does not touch refund_status or the actual refund_received / refund_paid amounts. Disappears once either side has been recorded as settled — at that point the actuals are the source of truth, not the original terms.
+- Edit Refund Terms action (available whenever a refund exists, including after settlement): reopens the same modal pre-filled with the current refund_receivable / refund_payable / refund_notes. Updates only those fields — never refund_status, refund_received, or refund_paid.
+- Edit Refund Received / Edit Refund Paid actions (available once that actual amount has been recorded): reopens the same modal pre-filled with the current refund_received / refund_paid, for correcting a typo in the real amount. Updates only that one field — never refund_status.
 
 ## Payment Allocation UX
 - Triggered immediately after logging a client_payment or supplier_payment (from Payments page or client/supplier detail)
@@ -137,6 +147,15 @@ On save:
 - Client/Supplier Refund extras: optional "Link to Ticket" searchable dropdown filtered by selected entity
 - On save for client_payment/supplier_payment: AllocationModal triggered immediately
 - On save for refunds: refreshes payments list
+
+## Payment Details / Edit Modal (ViewPaymentModal)
+- Opened via "View" (Payments page) or "View / Edit" (Client/Supplier Detail payment history) row action, for any payment type
+- Read-only view by default; "Edit" button switches the amount/channel/trx_id/notes/payment_date fields into inputs, "Cancel" reverts, "Save changes" commits
+- Amount editing rules by type:
+  - client_payment / supplier_payment: unallocated_amount adjusts by the same delta as amount — can't reduce amount below the already-allocated portion
+  - client_refund linked to a ticket: also updates that ticket's ticket_payments allocation and recomputes the ticket's amount_paid / payment_status
+  - client_refund not linked, or supplier_refund: only the payment row updates — a note explains this doesn't cascade to any ticket's refund figures (supplier_refund payments have no stored ticket linkage to cascade to; edit the ticket's refund directly via Edit Refund Received if needed)
+- "Allocated to Tickets" list always shown read-only below, same as the original view
 
 ## Forward to Supplier UX
 - Optional section inside the client payment form (in Log Transaction Modal)
@@ -175,6 +194,7 @@ On save:
 - Header actions: Edit | View Ledger | Log Payment
 - "View Ledger" navigates to /reports/client-ledger?clientId=<uuid> (or supplier equivalent) and auto-generates the statement
 - Three tabs: Tickets | Payment History | Documents
+- Payment History tab row actions: View / Edit (opens ViewPaymentModal), Allocate (if unallocated_amount > 0), Delete (client side only — reverses any ticket_payments allocations first)
 - Documents tab: shows uploaded document cards (type badge, filename, date); Open button generates a 1-hour signed URL; Delete removes from storage and DB; Upload button with type selector at the bottom; maximum 5 documents per entity
 
 ## Document Upload System

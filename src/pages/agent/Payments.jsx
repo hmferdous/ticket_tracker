@@ -441,7 +441,12 @@ export default function Payments() {
         )}
       </div>
 
-      <ViewPaymentModal isOpen={!!viewingPayment} onClose={() => setViewingPayment(null)} payment={viewingPayment} />
+      <ViewPaymentModal
+        isOpen={!!viewingPayment}
+        onClose={() => setViewingPayment(null)}
+        payment={viewingPayment}
+        onSaved={fetchPayments}
+      />
 
       <LogTransactionModal
         isOpen={showLogTransaction}

@@ -6,6 +6,7 @@ import TicketModal from "../../components/tickets/TicketModal"
 import VoidConfirmModal from "../../components/tickets/VoidConfirmModal"
 import RefundModal from "../../components/tickets/RefundModal"
 import ReissueModal from "../../components/tickets/ReissueModal"
+import EditReissueModal from "../../components/tickets/EditReissueModal"
 import RecordPaymentModal from "../../components/tickets/RecordPaymentModal"
 import TicketDetailModal from "../../components/tickets/TicketDetailModal"
 import AppLayout from "../../components/layout/AppLayout"
@@ -21,12 +22,17 @@ function getRowActions(ticket) {
   if (notVoid && notReissued && ticket.refund_status === null) actions.push("refund")
   if (notVoid && notReissued && ticket.refund_status !== "initiated") actions.push("reissue")
   if (ticket.payment_status !== "paid" && notVoid) actions.push("record_payment")
+  if (ticket.is_reissue && notVoid) actions.push("edit_reissue_details")
 
   if (ticket.refund_status && ticket.refund_status !== "closed") {
     if (ticket.refund_received == null) actions.push("record_supplier_refund")
     if (ticket.refund_received != null && ticket.refund_paid == null) actions.push("record_client_refund")
   }
-  if (ticket.refund_status === "initiated") actions.push("edit_refund_terms")
+  if (ticket.refund_status) {
+    actions.push("edit_refund_terms")
+    if (ticket.refund_received != null) actions.push("edit_supplier_refund_received")
+    if (ticket.refund_paid != null) actions.push("edit_client_refund_paid")
+  }
 
   actions.push("view")
   return actions
@@ -309,6 +315,7 @@ export default function Tickets() {
   const [voidingTicket, setVoidingTicket] = useState(null)
   const [refundModal, setRefundModal] = useState(null) // { ticket, mode: 'initiate' | 'supplier' | 'client' }
   const [reissuingTicket, setReissuingTicket] = useState(null)
+  const [reissueEditTicket, setReissueEditTicket] = useState(null)
   const [recordPaymentTicket, setRecordPaymentTicket] = useState(null)
   const [viewingTicket, setViewingTicket] = useState(null)
   const [openActionMenuId, setOpenActionMenuId] = useState(null)
@@ -485,6 +492,7 @@ export default function Tickets() {
   const openVoid = (ticket) => setVoidingTicket(ticket)
   const openRefund = (ticket, mode) => setRefundModal({ ticket, mode })
   const openReissue = (ticket) => setReissuingTicket(ticket)
+  const openReissueEdit = (ticket) => setReissueEditTicket(ticket)
   const openRecordPayment = (ticket) => setRecordPaymentTicket(ticket)
   const openView = (ticket) => setViewingTicket(ticket)
 
@@ -508,6 +516,8 @@ export default function Tickets() {
         return { label: "Refund", cls: "text-purple-600", onClick: () => openRefund(ticket, "initiate") }
       case "reissue":
         return { label: "Reissue", cls: "text-orange-600", onClick: () => openReissue(ticket) }
+      case "edit_reissue_details":
+        return { label: "Edit Reissue Details", cls: "text-orange-600", onClick: () => openReissueEdit(ticket) }
       case "record_payment":
         return { label: "Record Payment", cls: "text-green-600", onClick: () => openRecordPayment(ticket) }
       case "record_supplier_refund":
@@ -516,6 +526,10 @@ export default function Tickets() {
         return { label: "Record Client Refund", cls: "text-purple-600", onClick: () => openRefund(ticket, "client") }
       case "edit_refund_terms":
         return { label: "Edit Refund Terms", cls: "text-purple-600", onClick: () => openRefund(ticket, "edit") }
+      case "edit_supplier_refund_received":
+        return { label: "Edit Refund Received", cls: "text-purple-600", onClick: () => openRefund(ticket, "edit_supplier_actual") }
+      case "edit_client_refund_paid":
+        return { label: "Edit Refund Paid", cls: "text-purple-600", onClick: () => openRefund(ticket, "edit_client_actual") }
       case "view":
         return { label: "View", cls: "text-gray-600", onClick: () => openView(ticket) }
       default:
@@ -932,6 +946,13 @@ export default function Tickets() {
         onClose={() => setReissuingTicket(null)}
         ticket={reissuingTicket}
         onSaved={handleReissueSaved}
+      />
+
+      <EditReissueModal
+        isOpen={!!reissueEditTicket}
+        onClose={() => setReissueEditTicket(null)}
+        ticket={reissueEditTicket}
+        onSaved={handleSaved}
       />
 
       <RecordPaymentModal

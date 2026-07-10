@@ -26,6 +26,7 @@ function getRowActions(ticket) {
     if (ticket.refund_received == null) actions.push("record_supplier_refund")
     if (ticket.refund_received != null && ticket.refund_paid == null) actions.push("record_client_refund")
   }
+  if (ticket.refund_status === "initiated") actions.push("edit_refund_terms")
 
   actions.push("view")
   return actions
@@ -513,6 +514,8 @@ export default function Tickets() {
         return { label: "Record Supplier Refund", cls: "text-purple-600", onClick: () => openRefund(ticket, "supplier") }
       case "record_client_refund":
         return { label: "Record Client Refund", cls: "text-purple-600", onClick: () => openRefund(ticket, "client") }
+      case "edit_refund_terms":
+        return { label: "Edit Refund Terms", cls: "text-purple-600", onClick: () => openRefund(ticket, "edit") }
       case "view":
         return { label: "View", cls: "text-gray-600", onClick: () => openView(ticket) }
       default:

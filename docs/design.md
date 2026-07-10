@@ -92,6 +92,7 @@ On save:
   - Reissue: status not void, not reissued, refund_status not initiated
   - Record Payment: payment_status not paid and status not void
   - Record Supplier Refund / Record Client Refund: shown once a refund is initiated, independently per side (whichever of refund_received / refund_paid is still null)
+  - Edit Refund Terms: shown while refund_status is initiated (before either side has settled)
 - Actions that aren't applicable are omitted from the menu entirely, never shown disabled
 - Suppliers list also uses the same hamburger-menu pattern for row actions
 
@@ -113,6 +114,7 @@ On save:
 - Step 2: when supplier sends — Record Supplier Refund action updates refund_received
 - Step 3: when paying client — Record Client Refund action updates refund_paid
 - Refund margin shown at all times: refund_received - refund_payable
+- Edit Refund Terms action (available while refund_status is initiated): reopens the same modal pre-filled with the current refund_receivable / refund_payable / refund_notes, lets the agent correct the agreed figures before either side has actually settled. Does not touch refund_status or the actual refund_received / refund_paid amounts. Disappears once either side has been recorded as settled — at that point the actuals are the source of truth, not the original terms.
 
 ## Payment Allocation UX
 - Triggered immediately after logging a client_payment or supplier_payment (from Payments page or client/supplier detail)

@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase"
 
 const MODE_CONFIG = {
   initiate: { title: "Initiate refund", confirmLabel: "Start refund" },
+  edit: { title: "Edit refund terms", confirmLabel: "Save changes" },
   supplier: { title: "Record supplier refund", confirmLabel: "Record received" },
   client: { title: "Record client refund", confirmLabel: "Record paid" },
 }
@@ -17,9 +18,9 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
 
   useEffect(() => {
     if (isOpen) {
-      setReceivable("")
-      setPayable("")
-      setNotes("")
+      setReceivable(mode === "edit" && ticket?.refund_receivable != null ? String(ticket.refund_receivable) : "")
+      setPayable(mode === "edit" && ticket?.refund_payable != null ? String(ticket.refund_payable) : "")
+      setNotes(mode === "edit" ? ticket?.refund_notes ?? "" : "")
       setAmount("")
       setError("")
     }
@@ -47,6 +48,12 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
         refund_status: "initiated",
         refund_receivable: refundReceivable,
         refund_payable: refundPayable,
+        refund_notes: notes.trim() || null,
+      }
+    } else if (mode === "edit") {
+      updates = {
+        refund_receivable: receivable !== "" ? parseFloat(receivable) : null,
+        refund_payable: payable !== "" ? parseFloat(payable) : null,
         refund_notes: notes.trim() || null,
       }
     } else if (mode === "supplier") {
@@ -113,7 +120,7 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
           )}
 
           <form id="refund-form" onSubmit={handleSubmit} className="space-y-3">
-            {mode === "initiate" && (
+            {(mode === "initiate" || mode === "edit") && (
               <>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Expected from Supplier</label>

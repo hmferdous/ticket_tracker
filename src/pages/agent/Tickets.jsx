@@ -352,7 +352,7 @@ export default function Tickets() {
         purchase_price, gds_price, sell_price,
         amount_paid, payment_status, status, refund_status,
         is_reissue, is_void, parent_ticket_id,
-        refund_received, refund_payable,
+        refund_receivable, refund_received, refund_payable, refund_paid, refund_notes,
         reissue_fee_collected, reissue_fee_paid, fare_difference,
         client_id, supplier_id,
         clients(name),

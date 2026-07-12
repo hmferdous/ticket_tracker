@@ -124,7 +124,7 @@ On save:
 - Step 3: when paying client — Record Client Refund action updates refund_paid
 - Refund margin shown at all times: refund_received - refund_payable
 - Edit Refund Terms action (available whenever a refund exists, including after settlement): reopens the same modal pre-filled with the current refund_receivable / refund_payable / refund_notes. Updates only those fields — never refund_status, refund_received, or refund_paid.
-- Edit Refund Received / Edit Refund Paid actions (available once that actual amount has been recorded): reopens the same modal pre-filled with the current refund_received / refund_paid, for correcting a typo in the real amount. Updates only that one field — never refund_status.
+- Edit Refund Received / Edit Refund Paid actions (available once that actual amount has been recorded): reopens the same modal pre-filled with the current refund_received / refund_paid, for correcting a typo in the real amount. Updates that field — never refund_status — and also syncs any linked payment record from Log Transaction (payments.amount for supplier_refund via ticket_id; the ticket_payments allocation, amount_paid, and payment_status for client_refund), so a correction from either side keeps both in sync. The client_refund sync is blocked with a validation error if it would drive amount_paid negative.
 
 ## Payment Allocation UX
 - Triggered immediately after logging a client_payment or supplier_payment (from Payments page or client/supplier detail)
@@ -153,8 +153,9 @@ On save:
 - Read-only view by default; "Edit" button switches the amount/channel/trx_id/notes/payment_date fields into inputs, "Cancel" reverts, "Save changes" commits
 - Amount editing rules by type:
   - client_payment / supplier_payment: unallocated_amount adjusts by the same delta as amount — can't reduce amount below the already-allocated portion
-  - client_refund linked to a ticket: also updates that ticket's ticket_payments allocation and recomputes the ticket's amount_paid / payment_status
-  - client_refund not linked, or supplier_refund: only the payment row updates — a note explains this doesn't cascade to any ticket's refund figures (supplier_refund payments have no stored ticket linkage to cascade to; edit the ticket's refund directly via Edit Refund Received if needed)
+  - client_refund linked to a ticket: also updates that ticket's ticket_payments allocation and recomputes the ticket's amount_paid / payment_status; blocked with a validation error (not clamped) if the result would go negative
+  - supplier_refund linked to a ticket (via payments.ticket_id): also updates that ticket's refund_received
+  - client_refund not linked, or supplier_refund not linked: only the payment row updates — a note explains this doesn't cascade to any ticket
 - "Allocated to Tickets" list always shown read-only below, same as the original view
 
 ## Forward to Supplier UX

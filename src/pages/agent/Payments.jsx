@@ -134,7 +134,7 @@ export default function Payments() {
     const { data, error } = await supabase
       .from("payments")
       .select(`
-        id, client_id, supplier_id, type, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at,
+        id, client_id, supplier_id, ticket_id, type, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at,
         clients(name, client_id_number),
         suppliers(name, supplier_id_number),
         ticket_payments(type, tickets(pnr, passenger_name))

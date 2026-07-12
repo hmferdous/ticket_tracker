@@ -64,6 +64,16 @@ AND (storage.foldername(name))[1] IN (
 )
 ```
 
+## Pending Migrations (manual — run in SQL Editor, existing environments)
+Not yet applied to the live Supabase project — run once, then this section can be removed:
+
+```sql
+-- Lets supplier_refund payments track which ticket they were recorded against,
+-- so editing the payment's amount later can cascade to that ticket's refund_received.
+-- (client_refund already has this via a ticket_payments row; supplier_refund never did.)
+ALTER TABLE payments ADD COLUMN ticket_id uuid REFERENCES tickets(id) ON DELETE SET NULL;
+```
+
 ## Folder Structure
 - src/pages/agent/ — agent facing pages
 - src/pages/agent/reports/ — report pages (Client Ledger, Supplier Ledger)

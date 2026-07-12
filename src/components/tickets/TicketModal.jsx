@@ -4,8 +4,7 @@ import { useAuth } from "../../context/AuthContext"
 import { AIRLINES } from "../../lib/airlines"
 import SearchableDropdown from "../ui/SearchableDropdown"
 import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
-
-const CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
+import { fetchChannels } from "../../lib/channels"
 
 export async function createClient(supabase, agentId, name, extra = {}) {
   const { data, error } = await supabase
@@ -52,13 +51,14 @@ const EMPTY = {
   narration: "",
 }
 
-const EMPTY_PAYMENT = { amount: "", channel: "", trx_id: "", notes: "", paid_in_full: false, payment_date: "" }
+const EMPTY_PAYMENT = { amount: "", channel_id: "", trx_id: "", notes: "", paid_in_full: false, payment_date: "" }
 
 export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
   const { agent } = useAuth()
   const [form, setForm] = useState(EMPTY)
   const [clients, setClients] = useState([])
   const [suppliers, setSuppliers] = useState([])
+  const [channels, setChannels] = useState([])
   const [clientPay, setClientPay] = useState(EMPTY_PAYMENT)
   const [supplierPay, setSupplierPay] = useState(EMPTY_PAYMENT)
   const [clientPayOpen, setClientPayOpen] = useState(false)
@@ -98,12 +98,14 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
   }, [isOpen, ticket])
 
   const fetchDropdowns = async () => {
-    const [{ data: c }, { data: s }] = await Promise.all([
+    const [{ data: c }, { data: s }, { data: ch }] = await Promise.all([
       supabase.from("clients").select("id, name, client_id_number").eq("agent_id", agent.id).order("client_id_number", { ascending: true }),
       supabase.from("suppliers").select("id, name, supplier_id_number").eq("agent_id", agent.id).order("supplier_id_number", { ascending: true }),
+      fetchChannels(agent.id),
     ])
     setClients(c ?? [])
     setSuppliers(s ?? [])
+    setChannels(ch ?? [])
   }
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
@@ -204,6 +206,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
     // Client payment — independent transaction
     const clientAmount = clientPay.paid_in_full ? parseFloat(form.sell_price) : parseFloat(clientPay.amount)
     if (clientAmount > 0) {
+      const selectedClientChannel = channels.find((c) => c.id === clientPay.channel_id)
       const { data: payRow, error: payErr } = await supabase
         .from("payments")
         .insert({
@@ -212,7 +215,8 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
           type: "client_payment",
           amount: clientAmount,
           unallocated_amount: 0,
-          channel: clientPay.channel || null,
+          channel: selectedClientChannel?.name ?? null,
+          channel_id: clientPay.channel_id || null,
           trx_id: clientPay.trx_id.trim() || null,
           notes: clientPay.notes.trim() || null,
           payment_date: clientPay.payment_date || form.issue_date || today,
@@ -233,6 +237,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
     // Supplier payment — independent transaction
     const supplierAmount = supplierPay.paid_in_full ? parseFloat(form.purchase_price) : parseFloat(supplierPay.amount)
     if (supplierAmount > 0) {
+      const selectedSupplierChannel = channels.find((c) => c.id === supplierPay.channel_id)
       const { data: payRow, error: payErr } = await supabase
         .from("payments")
         .insert({
@@ -241,7 +246,8 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
           type: "supplier_payment",
           amount: supplierAmount,
           unallocated_amount: 0,
-          channel: supplierPay.channel || null,
+          channel: selectedSupplierChannel?.name ?? null,
+          channel_id: supplierPay.channel_id || null,
           trx_id: supplierPay.trx_id.trim() || null,
           notes: supplierPay.notes.trim() || null,
           payment_date: today,
@@ -564,10 +570,10 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>
-                      <select value={clientPay.channel} onChange={setC("channel")} className={inputCls}>
+                      <select value={clientPay.channel_id} onChange={setC("channel_id")} className={inputCls}>
                         <option value="">— Select —</option>
-                        {CHANNELS.map((ch) => (
-                          <option key={ch} value={ch}>{ch}</option>
+                        {channels.map((ch) => (
+                          <option key={ch.id} value={ch.id}>{ch.name}</option>
                         ))}
                       </select>
                     </div>
@@ -639,10 +645,10 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>
-                      <select value={supplierPay.channel} onChange={setS("channel")} className={inputCls}>
+                      <select value={supplierPay.channel_id} onChange={setS("channel_id")} className={inputCls}>
                         <option value="">— Select —</option>
-                        {CHANNELS.map((ch) => (
-                          <option key={ch} value={ch}>{ch}</option>
+                        {channels.map((ch) => (
+                          <option key={ch.id} value={ch.id}>{ch.name}</option>
                         ))}
                       </select>
                     </div>

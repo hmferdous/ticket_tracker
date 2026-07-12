@@ -224,13 +224,23 @@ On save:
 - Summary cards: Total Invoiced, Total Paid, Total Refunded, Net Payable, Unallocated
 
 ## Reports — Channel Ledger (/reports/channel-ledger)
-- No entity selector — aggregates all payments for the agent across every channel (Cash, bKash, Bank, Office, EBL, DBBL, IBBL, City, BRAC, UCB, plus "No Channel" bucket if any payment has a null channel)
+- No entity selector — aggregates all payments for the agent across every channel (dynamic, per-agent list from payment_channels — see "Payment Channels" below — plus a "No Channel" bucket for any payment that doesn't resolve to one)
 - Date range (From / To) only — optional, omit both for all-time view
 - Inflow to a channel = client_payment + supplier_refund amounts logged against that channel; outflow = supplier_payment + client_refund amounts
-- Grand totals strip: Total In, Total Out, Net Balance across all channels (period)
-- Per-channel cards: one per channel, shows running balance (opening balance from before dateFrom + period in/out), clickable to filter the transaction list below to that channel
+- Grand totals strip: Total In, Total Out, Net Balance across all channels (period), Net Balance includes every channel's starting_balance
+- Per-channel cards: one per active channel plus "No Channel", shows running balance (starting_balance + opening balance from before dateFrom + period in/out), clickable to filter the transaction list below to that channel
+- Archived channels collapsed behind a "Show archived (n)" toggle below the active cards — still fully reportable, just out of the way by default
+- Each channel card has a kebab menu: Edit (reopens ChannelModal), Archive/Restore
+- "+ Add Channel" button in the page header opens ChannelModal in create mode
 - Drill-down transaction table (descending by date): Date, Type badge, Party (client/supplier), Channel (hidden when a single channel is selected), Trx ID, signed Amount (+ green inflow, − red outflow)
 - No PDF export on this report
+
+## Payment Channels (per-agent wallets)
+- Table: payment_channels (agent_id, name, starting_balance, is_active) — replaces the old hardcoded 10-value CHANNELS list; every payment-logging form (Log Payment, Log Transaction, Record Payment, Reissue, Ticket Form, and the Payments filter) now fetches the agent's active channels instead of a fixed array
+- ChannelModal (src/components/payments/ChannelModal.jsx) — create/edit, two fields: Channel Name (required) and Starting Balance (optional, defaults to 0)
+- Duplicate name handling: case-insensitive, trimmed comparison against all of the agent's channels (active + archived). A collision doesn't block the save — it shows a confirmation step ("already exists, save as 'Bkash 2'?") with the next available numeric suffix, backed by a case-insensitive unique DB index as the real guard against races
+- A channel with existing payments can never be hard-deleted — Archive (is_active = false) is the only removal path. Archived channels disappear from "pick a channel" dropdowns on new payments but stay fully visible in history, filters, and Channel Ledger, and can be restored
+- payments.channel (legacy text) is kept in sync on every write for safety, but payments.channel_id is the source of truth going forward
 
 ## Ledger PDF Format
 - Generated via jsPDF + jspdf-autotable; downloaded directly in browser

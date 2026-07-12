@@ -1,10 +1,9 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
+import { fetchChannels } from "../../lib/channels"
 
-const CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
-
-const EMPTY = { amount: "", channel: "", trx_id: "", notes: "", paid_in_full: false, payment_date: "" }
+const EMPTY = { amount: "", channel_id: "", trx_id: "", notes: "", paid_in_full: false, payment_date: "" }
 
 function derivePaymentStatus(amountPaid, sellPrice) {
   if (amountPaid <= 0) return "unpaid"
@@ -15,6 +14,7 @@ function derivePaymentStatus(amountPaid, sellPrice) {
 export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved }) {
   const { agent } = useAuth()
   const [form, setForm] = useState(EMPTY)
+  const [channels, setChannels] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -22,8 +22,9 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
     if (isOpen) {
       setForm({ ...EMPTY, payment_date: new Date().toISOString().split("T")[0] })
       setError("")
+      if (agent?.id) fetchChannels(agent.id).then(({ data }) => setChannels(data ?? []))
     }
-  }, [isOpen, ticket])
+  }, [isOpen, ticket, agent?.id])
 
   if (!isOpen) return null
 
@@ -53,6 +54,8 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
     }
     setLoading(true)
 
+    const selectedChannel = channels.find((c) => c.id === form.channel_id)
+
     const { data: payRow, error: payErr } = await supabase
       .from("payments")
       .insert({
@@ -61,7 +64,8 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
         type: "client_payment",
         amount,
         unallocated_amount: 0,
-        channel: form.channel || null,
+        channel: selectedChannel?.name ?? null,
+        channel_id: form.channel_id || null,
         trx_id: form.trx_id.trim() || null,
         notes: form.notes.trim() || null,
         payment_date: form.payment_date || new Date().toISOString().split("T")[0],
@@ -166,10 +170,10 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>
-              <select value={form.channel} onChange={set("channel")} className={inputCls}>
+              <select value={form.channel_id} onChange={set("channel_id")} className={inputCls}>
                 <option value="">— Select —</option>
-                {CHANNELS.map((ch) => (
-                  <option key={ch} value={ch}>{ch}</option>
+                {channels.map((ch) => (
+                  <option key={ch.id} value={ch.id}>{ch.name}</option>
                 ))}
               </select>
             </div>

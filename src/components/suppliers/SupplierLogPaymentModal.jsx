@@ -1,13 +1,12 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
-
-const CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
+import { fetchChannels } from "../../lib/channels"
 
 function emptyForm() {
   return {
     amount: "",
-    channel: "",
+    channel_id: "",
     trx_id: "",
     payment_date: new Date().toISOString().split("T")[0],
     notes: "",
@@ -17,6 +16,7 @@ function emptyForm() {
 export default function SupplierLogPaymentModal({ isOpen, onClose, supplier, onLogged }) {
   const { agent } = useAuth()
   const [form, setForm] = useState(emptyForm)
+  const [channels, setChannels] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -24,8 +24,9 @@ export default function SupplierLogPaymentModal({ isOpen, onClose, supplier, onL
     if (isOpen) {
       setForm(emptyForm())
       setError("")
+      if (agent?.id) fetchChannels(agent.id).then(({ data }) => setChannels(data ?? []))
     }
-  }, [isOpen, supplier])
+  }, [isOpen, supplier, agent?.id])
 
   if (!isOpen) return null
 
@@ -50,6 +51,8 @@ export default function SupplierLogPaymentModal({ isOpen, onClose, supplier, onL
 
     setLoading(true)
 
+    const selectedChannel = channels.find((c) => c.id === form.channel_id)
+
     const { data: payment, error: payErr } = await supabase
       .from("payments")
       .insert({
@@ -58,7 +61,8 @@ export default function SupplierLogPaymentModal({ isOpen, onClose, supplier, onL
         type: "supplier_payment",
         amount,
         unallocated_amount: amount,
-        channel: form.channel || null,
+        channel: selectedChannel?.name ?? null,
+        channel_id: form.channel_id || null,
         trx_id: form.trx_id.trim() || null,
         notes: form.notes.trim() || null,
         payment_date: form.payment_date,
@@ -120,11 +124,11 @@ export default function SupplierLogPaymentModal({ isOpen, onClose, supplier, onL
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>
-                <select value={form.channel} onChange={set("channel")} className={inputCls}>
+                <select value={form.channel_id} onChange={set("channel_id")} className={inputCls}>
                   <option value="">— Select —</option>
-                  {CHANNELS.map((ch) => (
-                    <option key={ch} value={ch}>
-                      {ch}
+                  {channels.map((ch) => (
+                    <option key={ch.id} value={ch.id}>
+                      {ch.name}
                     </option>
                   ))}
                 </select>

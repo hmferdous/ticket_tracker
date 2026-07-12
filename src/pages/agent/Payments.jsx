@@ -6,8 +6,8 @@ import AllocationModal from "../../components/clients/AllocationModal"
 import SupplierAllocationModal from "../../components/suppliers/SupplierAllocationModal"
 import ViewPaymentModal from "../../components/payments/ViewPaymentModal"
 import LogTransactionModal from "../../components/payments/LogTransactionModal"
+import { fetchChannels } from "../../lib/channels"
 
-const CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 200]
 
 const TYPE_OPTIONS = [
@@ -102,6 +102,7 @@ export default function Payments() {
   const { agent } = useAuth()
 
   const [payments, setPayments] = useState([])
+  const [channels, setChannels] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
@@ -120,7 +121,10 @@ export default function Payments() {
   const [showLogTransaction, setShowLogTransaction] = useState(false)
 
   useEffect(() => {
-    if (agent?.id) fetchPayments()
+    if (agent?.id) {
+      fetchPayments()
+      fetchChannels(agent.id, { includeArchived: true }).then(({ data }) => setChannels(data ?? []))
+    }
   }, [agent])
 
   // Reset to page 1 whenever any filter changes
@@ -134,7 +138,7 @@ export default function Payments() {
     const { data, error } = await supabase
       .from("payments")
       .select(`
-        id, client_id, supplier_id, ticket_id, type, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at,
+        id, client_id, supplier_id, ticket_id, type, amount, unallocated_amount, channel, channel_id, trx_id, notes, payment_date, created_at,
         clients(name, client_id_number),
         suppliers(name, supplier_id_number),
         ticket_payments(type, tickets(pnr, passenger_name))
@@ -163,7 +167,7 @@ export default function Payments() {
         if (!haystack.includes(search)) return false
       }
       if (typeFilter && p.type !== typeFilter) return false
-      if (channelFilter && p.channel !== channelFilter) return false
+      if (channelFilter && p.channel_id !== channelFilter) return false
       if (dateFrom && (!p.payment_date || p.payment_date < dateFrom)) return false
       if (dateTo && (!p.payment_date || p.payment_date > dateTo)) return false
       return true
@@ -278,8 +282,8 @@ export default function Payments() {
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="">All Channels</option>
-                {CHANNELS.map((ch) => (
-                  <option key={ch} value={ch}>{ch}</option>
+                {channels.map((ch) => (
+                  <option key={ch.id} value={ch.id}>{ch.name}{!ch.is_active ? " (archived)" : ""}</option>
                 ))}
               </select>
             </div>

@@ -2,9 +2,11 @@ import { useEffect, useMemo, useState } from "react"
 import { supabase } from "../../../lib/supabase"
 import { useAuth } from "../../../context/AuthContext"
 import AppLayout from "../../../components/layout/AppLayout"
+import ChannelModal from "../../../components/payments/ChannelModal"
+import { fetchChannels } from "../../../lib/channels"
 
-const CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
-const NO_CHANNEL = "No Channel"
+const NO_CHANNEL_KEY = "__no_channel__"
+const NO_CHANNEL_LABEL = "No Channel"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -68,89 +70,192 @@ function StatChip({ label, value, accent }) {
   )
 }
 
+function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
+  return (
+    <div className="relative inline-block text-left">
+      <button
+        type="button"
+        onClick={(e) => { e.stopPropagation(); onToggle() }}
+        className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        aria-label="Channel actions"
+      >
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+          <circle cx="12" cy="5" r="1.5" />
+          <circle cx="12" cy="12" r="1.5" />
+          <circle cx="12" cy="19" r="1.5" />
+        </svg>
+      </button>
+      {isOpen && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); onClose() }} />
+          <div className="absolute right-0 top-full z-20 mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-100 py-1">
+            {items.map((item) => (
+              <button
+                key={item.key}
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onClose(); item.onClick() }}
+                className={`block w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 transition-colors ${item.cls}`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function ChannelCard({ channel, balance, stats, isSelected, isMenuOpen, onSelect, onToggleMenu, onCloseMenu, onEdit, onToggleArchive }) {
+  const menuItems = channel
+    ? [
+        { key: "edit", label: "Edit", cls: "text-gray-700", onClick: onEdit },
+        {
+          key: "archive",
+          label: channel.is_active ? "Archive" : "Restore",
+          cls: channel.is_active ? "text-red-500" : "text-green-600",
+          onClick: onToggleArchive,
+        },
+      ]
+    : []
+
+  return (
+    <div
+      className={`relative text-left bg-white border rounded-xl p-4 transition-colors ${
+        isSelected ? "border-blue-500 ring-2 ring-blue-100" : "border-gray-200 hover:border-gray-300"
+      } ${channel && !channel.is_active ? "opacity-60" : ""}`}
+    >
+      {channel && (
+        <div className="absolute top-2 right-2">
+          <RowActionsMenu items={menuItems} isOpen={isMenuOpen} onToggle={onToggleMenu} onClose={onCloseMenu} />
+        </div>
+      )}
+      <button onClick={onSelect} className="w-full text-left">
+        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1 pr-6">
+          {channel ? channel.name : NO_CHANNEL_LABEL}
+        </p>
+        <p className={`text-lg font-semibold tabular-nums ${balance >= 0 ? "text-gray-900" : "text-red-600"}`}>
+          {fmt(balance)} BDT
+        </p>
+        <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-400">
+          <span className="text-green-600">+{fmt(stats.periodIn)}</span>
+          <span className="text-red-600">-{fmt(stats.periodOut)}</span>
+          <span>· {stats.count} txn{stats.count !== 1 ? "s" : ""}</span>
+        </div>
+      </button>
+    </div>
+  )
+}
+
 export default function ChannelLedger() {
   const { agent } = useAuth()
 
   const [payments, setPayments] = useState([])
+  const [channels, setChannels] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
 
   const [dateFrom, setDateFrom] = useState("")
   const [dateTo, setDateTo] = useState("")
   const [selectedChannel, setSelectedChannel] = useState("")
+  const [showArchived, setShowArchived] = useState(false)
 
-  const fetchPayments = async () => {
+  const [openMenuId, setOpenMenuId] = useState(null)
+  const [channelModal, setChannelModal] = useState(null) // { channel: null | object }
+
+  const fetchAll = async () => {
     setLoading(true)
     setError("")
-    const { data, error } = await supabase
-      .from("payments")
-      .select(`
-        id, client_id, supplier_id, type, amount, channel, trx_id, notes, payment_date,
-        clients(name, client_id_number),
-        suppliers(name, supplier_id_number)
-      `)
-      .eq("agent_id", agent.id)
-      .order("payment_date", { ascending: false })
+    const [paymentsRes, channelsRes] = await Promise.all([
+      supabase
+        .from("payments")
+        .select(`
+          id, client_id, supplier_id, type, amount, channel, channel_id, trx_id, notes, payment_date,
+          clients(name, client_id_number),
+          suppliers(name, supplier_id_number)
+        `)
+        .eq("agent_id", agent.id)
+        .order("payment_date", { ascending: false }),
+      fetchChannels(agent.id, { includeArchived: true }),
+    ])
 
     setLoading(false)
-    if (error) setError(error.message)
-    else setPayments(data ?? [])
+    const firstErr = paymentsRes.error || channelsRes.error
+    if (firstErr) { setError(firstErr.message); return }
+    setPayments(paymentsRes.data ?? [])
+    setChannels(channelsRes.data ?? [])
   }
 
   useEffect(() => {
-    if (agent?.id) fetchPayments()
+    if (agent?.id) fetchAll()
   }, [agent])
 
-  const channels = useMemo(() => {
-    const hasNoChannel = payments.some((p) => !p.channel)
-    return hasNoChannel ? [...CHANNELS, NO_CHANNEL] : CHANNELS
-  }, [payments])
+  const channelById = useMemo(() => new Map(channels.map((c) => [c.id, c])), [channels])
+  const channelByName = useMemo(() => new Map(channels.map((c) => [c.name.toLowerCase(), c])), [channels])
+
+  const resolveChannel = (payment) => {
+    if (payment.channel_id && channelById.has(payment.channel_id)) return channelById.get(payment.channel_id)
+    if (payment.channel) return channelByName.get(payment.channel.toLowerCase()) ?? null
+    return null
+  }
 
   const channelStats = useMemo(() => {
-    const stats = {}
-    for (const ch of channels) {
-      stats[ch] = { openingBalance: 0, periodIn: 0, periodOut: 0, count: 0 }
-    }
+    const stats = new Map()
+    for (const c of channels) stats.set(c.id, { openingBalance: 0, periodIn: 0, periodOut: 0, count: 0 })
+    stats.set(NO_CHANNEL_KEY, { openingBalance: 0, periodIn: 0, periodOut: 0, count: 0 })
+
     for (const p of payments) {
-      const ch = p.channel || NO_CHANNEL
-      if (!stats[ch]) continue
+      const c = resolveChannel(p)
+      const bucket = stats.get(c ? c.id : NO_CHANNEL_KEY)
+      if (!bucket) continue
       const amount = p.amount ?? 0
       const signed = isInflow(p.type) ? amount : -amount
 
       if (dateFrom && p.payment_date && p.payment_date < dateFrom) {
-        stats[ch].openingBalance += signed
+        bucket.openingBalance += signed
         continue
       }
       if (dateFrom && !p.payment_date) continue
       if (dateTo && p.payment_date && p.payment_date > dateTo) continue
 
-      stats[ch].count += 1
-      if (isInflow(p.type)) stats[ch].periodIn += amount
-      else stats[ch].periodOut += amount
+      bucket.count += 1
+      if (isInflow(p.type)) bucket.periodIn += amount
+      else bucket.periodOut += amount
     }
     return stats
-  }, [payments, channels, dateFrom, dateTo])
+  }, [payments, channels, dateFrom, dateTo]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const balanceFor = (channel) => {
+    const s = channelStats.get(channel ? channel.id : NO_CHANNEL_KEY) ?? { openingBalance: 0, periodIn: 0, periodOut: 0, count: 0 }
+    return (channel?.starting_balance ?? 0) + s.openingBalance + s.periodIn - s.periodOut
+  }
 
   const grandTotals = useMemo(() => {
-    return Object.values(channelStats).reduce(
-      (acc, s) => ({
-        openingBalance: acc.openingBalance + s.openingBalance,
-        periodIn: acc.periodIn + s.periodIn,
-        periodOut: acc.periodOut + s.periodOut,
-      }),
-      { openingBalance: 0, periodIn: 0, periodOut: 0 }
-    )
-  }, [channelStats])
+    let startingBalance = 0
+    let openingBalance = 0
+    let periodIn = 0
+    let periodOut = 0
+    for (const [, s] of channelStats) {
+      openingBalance += s.openingBalance
+      periodIn += s.periodIn
+      periodOut += s.periodOut
+    }
+    for (const c of channels) startingBalance += c.starting_balance ?? 0
+    return { startingBalance, openingBalance, periodIn, periodOut }
+  }, [channelStats, channels])
 
   const filteredEntries = useMemo(() => {
     return payments.filter((p) => {
-      const ch = p.channel || NO_CHANNEL
-      if (selectedChannel && ch !== selectedChannel) return false
+      if (selectedChannel) {
+        const c = resolveChannel(p)
+        const key = c ? c.id : NO_CHANNEL_KEY
+        if (key !== selectedChannel) return false
+      }
       if (dateFrom && (!p.payment_date || p.payment_date < dateFrom)) return false
       if (dateTo && (!p.payment_date || p.payment_date > dateTo)) return false
       return true
     })
-  }, [payments, selectedChannel, dateFrom, dateTo])
+  }, [payments, selectedChannel, dateFrom, dateTo]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const clearFilters = () => {
     setDateFrom("")
@@ -158,10 +263,67 @@ export default function ChannelLedger() {
     setSelectedChannel("")
   }
 
+  const toggleArchive = async (channel) => {
+    const { data, error } = await supabase
+      .from("payment_channels")
+      .update({ is_active: !channel.is_active })
+      .eq("id", channel.id)
+      .select()
+      .single()
+    if (error) { setError(error.message); return }
+    setChannels((prev) => prev.map((c) => (c.id === channel.id ? data : c)))
+  }
+
+  const handleChannelSaved = (saved) => {
+    setChannels((prev) => {
+      const exists = prev.find((c) => c.id === saved.id)
+      return exists ? prev.map((c) => (c.id === saved.id ? saved : c)) : [...prev, saved]
+    })
+  }
+
+  const activeChannels = channels.filter((c) => c.is_active)
+  const archivedChannels = channels.filter((c) => !c.is_active)
+
   const inputCls = "px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 
+  const selectedLabel = selectedChannel
+    ? selectedChannel === NO_CHANNEL_KEY
+      ? NO_CHANNEL_LABEL
+      : channelById.get(selectedChannel)?.name ?? "Channel"
+    : null
+
+  const renderChannelCard = (channel) => {
+    const key = channel ? channel.id : NO_CHANNEL_KEY
+    const stats = channelStats.get(key) ?? { periodIn: 0, periodOut: 0, count: 0 }
+    return (
+      <ChannelCard
+        key={key}
+        channel={channel}
+        balance={balanceFor(channel)}
+        stats={stats}
+        isSelected={selectedChannel === key}
+        isMenuOpen={channel ? openMenuId === channel.id : false}
+        onSelect={() => setSelectedChannel(selectedChannel === key ? "" : key)}
+        onToggleMenu={() => channel && setOpenMenuId((prev) => (prev === channel.id ? null : channel.id))}
+        onCloseMenu={() => setOpenMenuId(null)}
+        onEdit={() => setChannelModal({ channel })}
+        onToggleArchive={() => channel && toggleArchive(channel)}
+      />
+    )
+  }
+
   return (
-    <AppLayout title="Channel Ledger">
+    <AppLayout
+      title="Channel Ledger"
+      actions={
+        <button
+          onClick={() => setChannelModal({ channel: null })}
+          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition-colors"
+        >
+          + Add Channel
+        </button>
+      }
+    >
       <div className="max-w-screen-xl mx-auto px-6 py-8">
         {error && (
           <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
@@ -199,44 +361,42 @@ export default function ChannelLedger() {
               <StatChip label="Total Out" value={grandTotals.periodOut} accent="text-red-600" />
               <StatChip
                 label="Net Balance"
-                value={grandTotals.openingBalance + grandTotals.periodIn - grandTotals.periodOut}
-                accent={grandTotals.openingBalance + grandTotals.periodIn - grandTotals.periodOut >= 0 ? "text-green-600" : "text-red-600"}
+                value={grandTotals.startingBalance + grandTotals.openingBalance + grandTotals.periodIn - grandTotals.periodOut}
+                accent={
+                  grandTotals.startingBalance + grandTotals.openingBalance + grandTotals.periodIn - grandTotals.periodOut >= 0
+                    ? "text-green-600"
+                    : "text-red-600"
+                }
               />
             </div>
 
             {/* Per-channel cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
-              {channels.map((ch) => {
-                const s = channelStats[ch]
-                const balance = s.openingBalance + s.periodIn - s.periodOut
-                const isSelected = selectedChannel === ch
-                return (
-                  <button
-                    key={ch}
-                    onClick={() => setSelectedChannel(isSelected ? "" : ch)}
-                    className={`text-left bg-white border rounded-xl p-4 transition-colors ${
-                      isSelected ? "border-blue-500 ring-2 ring-blue-100" : "border-gray-200 hover:border-gray-300"
-                    }`}
-                  >
-                    <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">{ch}</p>
-                    <p className={`text-lg font-semibold tabular-nums ${balance >= 0 ? "text-gray-900" : "text-red-600"}`}>
-                      {fmt(balance)} BDT
-                    </p>
-                    <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-400">
-                      <span className="text-green-600">+{fmt(s.periodIn)}</span>
-                      <span className="text-red-600">-{fmt(s.periodOut)}</span>
-                      <span>· {s.count} txn{s.count !== 1 ? "s" : ""}</span>
-                    </div>
-                  </button>
-                )
-              })}
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-3">
+              {activeChannels.map((c) => renderChannelCard(c))}
+              {renderChannelCard(null)}
             </div>
+
+            {archivedChannels.length > 0 && (
+              <div className="mb-6">
+                <button
+                  onClick={() => setShowArchived((v) => !v)}
+                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  {showArchived ? "Hide" : "Show"} archived channels ({archivedChannels.length})
+                </button>
+                {showArchived && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mt-3">
+                    {archivedChannels.map((c) => renderChannelCard(c))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Drill-down transaction list */}
             <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
                 <span className="text-sm font-medium text-gray-600">
-                  {selectedChannel ? `${selectedChannel} Transactions` : "All Transactions"}
+                  {selectedLabel ? `${selectedLabel} Transactions` : "All Transactions"}
                 </span>
                 <span className="text-xs text-gray-400">{filteredEntries.length} entries</span>
               </div>
@@ -260,6 +420,7 @@ export default function ChannelLedger() {
                       {filteredEntries.map((p) => {
                         const badge = typeBadge(p.type)
                         const inflow = isInflow(p.type)
+                        const c = resolveChannel(p)
                         return (
                           <tr key={p.id} className="hover:bg-gray-50 transition-colors">
                             <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(p.payment_date)}</td>
@@ -269,7 +430,7 @@ export default function ChannelLedger() {
                               </span>
                             </td>
                             <td className="px-4 py-3"><PartyCell payment={p} /></td>
-                            {!selectedChannel && <td className="px-4 py-3 text-gray-600">{p.channel || NO_CHANNEL}</td>}
+                            {!selectedChannel && <td className="px-4 py-3 text-gray-600">{c?.name ?? NO_CHANNEL_LABEL}</td>}
                             <td className="px-4 py-3 text-gray-500">{p.trx_id ?? "—"}</td>
                             <td className={`px-4 py-3 text-right tabular-nums font-medium ${inflow ? "text-green-600" : "text-red-600"}`}>
                               {inflow ? "+" : "-"}{fmt(p.amount)}
@@ -285,6 +446,15 @@ export default function ChannelLedger() {
           </>
         )}
       </div>
+
+      <ChannelModal
+        isOpen={!!channelModal}
+        onClose={() => setChannelModal(null)}
+        agentId={agent?.id}
+        channel={channelModal?.channel ?? null}
+        existingChannels={channels}
+        onSaved={handleChannelSaved}
+      />
     </AppLayout>
   )
 }

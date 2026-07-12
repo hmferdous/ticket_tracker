@@ -71,8 +71,26 @@ export const AuthProvider = ({ children }) => {
       .eq("user_id", user.id)
       .single()
 
+    if (agentRow) await seedDefaultChannels(agentRow.id)
+
     setAgent(agentRow)
     setLoading(false)
+  }
+
+  // Idempotent — skips if the agent already has any channels, so a race
+  // between tabs at most double-inserts (harmless, agent can archive dupes)
+  // rather than failing the whole login. Errors here are non-fatal; the
+  // agent can always add channels manually from Channel Ledger.
+  const seedDefaultChannels = async (agentId) => {
+    const { count } = await supabase
+      .from("payment_channels")
+      .select("id", { count: "exact", head: true })
+      .eq("agent_id", agentId)
+
+    if (count) return
+
+    const DEFAULT_CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
+    await supabase.from("payment_channels").insert(DEFAULT_CHANNELS.map((name) => ({ agent_id: agentId, name })))
   }
 
   const signUp = async (email, password, fullName) => {

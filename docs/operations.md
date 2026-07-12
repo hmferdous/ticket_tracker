@@ -68,69 +68,9 @@ AND (storage.foldername(name))[1] IN (
 Not yet applied to the live Supabase project — run once, then this section can be removed:
 
 ```sql
--- Lets supplier_refund payments track which ticket they were recorded against,
--- so editing the payment's amount later can cascade to that ticket's refund_received.
--- (client_refund already has this via a ticket_payments row; supplier_refund never did.)
-ALTER TABLE payments ADD COLUMN ticket_id uuid REFERENCES tickets(id) ON DELETE SET NULL;
-```
-
-```sql
--- Per-agent payment channels ("wallets") — replaces the hardcoded 10-value
--- CHANNELS list. Additive only: payments.channel (text) is untouched, a new
--- nullable channel_id is added alongside it. Existing payments are backfilled
--- by exact string match against the 10 known values already in use.
-
--- 1. New table
-CREATE TABLE payment_channels (
-  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-  agent_id uuid NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz DEFAULT now()
-);
-
--- Case-insensitive uniqueness per agent — a UNIQUE table constraint can't take
--- an expression like lower(name), so this has to be a unique index instead.
-CREATE UNIQUE INDEX payment_channels_unique_name_per_agent ON payment_channels (agent_id, lower(name));
-
-ALTER TABLE payment_channels ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY "agents_own_payment_channels" ON payment_channels
-  FOR ALL
-  USING (agent_id IN (SELECT id FROM agents WHERE user_id = auth.uid()))
-  WITH CHECK (agent_id IN (SELECT id FROM agents WHERE user_id = auth.uid()));
-
--- 2. New nullable column on payments
-ALTER TABLE payments ADD COLUMN channel_id uuid REFERENCES payment_channels(id) ON DELETE SET NULL;
-
--- 3. Seed the 10 default channels for every existing agent
-INSERT INTO payment_channels (agent_id, name)
-SELECT a.id, c.name
-FROM agents a
-CROSS JOIN (VALUES ('Cash'), ('bKash'), ('Bank'), ('Office'), ('EBL'), ('DBBL'), ('IBBL'), ('City'), ('BRAC'), ('UCB')) AS c(name)
-ON CONFLICT (agent_id, lower(name)) DO NOTHING;
-
--- 4. Defensive: catch any distinct channel value already in use that isn't one of the 10 defaults
-INSERT INTO payment_channels (agent_id, name)
-SELECT DISTINCT p.agent_id, p.channel
-FROM payments p
-WHERE p.channel IS NOT NULL
-ON CONFLICT (agent_id, lower(name)) DO NOTHING;
-
--- 5. Backfill channel_id on existing payments by matching channel text -> the new wallet row
-UPDATE payments p
-SET channel_id = pc.id
-FROM payment_channels pc
-WHERE pc.agent_id = p.agent_id
-  AND lower(pc.name) = lower(p.channel)
-  AND p.channel_id IS NULL;
-```
-
-Verify after running, should return 0 in the `missed` column:
-```sql
-SELECT count(*) AS total, count(channel_id) AS backfilled,
-       count(*) FILTER (WHERE channel IS NOT NULL AND channel_id IS NULL) AS missed
-FROM payments;
+-- Optional starting balance per wallet, for money that was already in that
+-- channel before the agent started logging payments in the app. Additive.
+ALTER TABLE payment_channels ADD COLUMN starting_balance numeric NOT NULL DEFAULT 0;
 ```
 
 ## Folder Structure

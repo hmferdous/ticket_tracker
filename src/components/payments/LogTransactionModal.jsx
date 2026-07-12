@@ -4,8 +4,7 @@ import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
 import { createClient, createSupplier } from "../tickets/TicketModal"
-
-const CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
+import { fetchChannels } from "../../lib/channels"
 
 const TYPE_CARDS = [
   { value: "client_payment", label: "Client Payment", direction: "IN", icon: Wallet },
@@ -26,7 +25,7 @@ function emptyForm() {
     client_id: "",
     supplier_id: "",
     amount: "",
-    channel: "",
+    channel_id: "",
     trx_id: "",
     payment_date: new Date().toISOString().split("T")[0],
     notes: "",
@@ -51,6 +50,7 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
   const [form, setForm] = useState(emptyForm)
   const [clients, setClients] = useState([])
   const [suppliers, setSuppliers] = useState([])
+  const [channels, setChannels] = useState([])
   const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
@@ -63,12 +63,14 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
 
   const fetchDropdowns = useCallback(async () => {
     if (!agent?.id) return
-    const [{ data: c }, { data: s }] = await Promise.all([
+    const [{ data: c }, { data: s }, { data: ch }] = await Promise.all([
       supabase.from("clients").select("id, name, client_id_number").eq("agent_id", agent.id).order("name"),
       supabase.from("suppliers").select("id, name, supplier_id_number").eq("agent_id", agent.id).order("name"),
+      fetchChannels(agent.id),
     ])
     setClients(c ?? [])
     setSuppliers(s ?? [])
+    setChannels(ch ?? [])
   }, [agent?.id])
 
   const fetchTicketsForClient = useCallback(async (clientId) => {
@@ -163,6 +165,8 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
       return
     }
 
+    const selectedChannel = channels.find((c) => c.id === form.channel_id)
+
     if (type === "client_payment") {
       if (!form.client_id) { setError("Select a client"); return }
 
@@ -176,7 +180,8 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
           type: "client_payment",
           amount,
           unallocated_amount: amount,
-          channel: form.channel || null,
+          channel: selectedChannel?.name ?? null,
+          channel_id: form.channel_id || null,
           trx_id: form.trx_id.trim() || null,
           notes: form.notes.trim() || null,
           payment_date: form.payment_date,
@@ -205,7 +210,8 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
           type: "supplier_payment",
           amount,
           unallocated_amount: amount,
-          channel: form.channel || null,
+          channel: selectedChannel?.name ?? null,
+          channel_id: form.channel_id || null,
           trx_id: form.trx_id.trim() || null,
           notes: form.notes.trim() || null,
           payment_date: form.payment_date,
@@ -234,7 +240,8 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
           type: "client_refund",
           amount,
           unallocated_amount: 0,
-          channel: form.channel || null,
+          channel: selectedChannel?.name ?? null,
+          channel_id: form.channel_id || null,
           trx_id: form.trx_id.trim() || null,
           notes: form.notes.trim() || null,
           payment_date: form.payment_date,
@@ -285,7 +292,8 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
           type: "supplier_refund",
           amount,
           unallocated_amount: 0,
-          channel: form.channel || null,
+          channel: selectedChannel?.name ?? null,
+          channel_id: form.channel_id || null,
           trx_id: form.trx_id.trim() || null,
           notes: form.notes.trim() || null,
           payment_date: form.payment_date,
@@ -454,10 +462,10 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>
-                  <select value={form.channel} onChange={set("channel")} className={inputCls}>
+                  <select value={form.channel_id} onChange={set("channel_id")} className={inputCls}>
                     <option value="">— Select —</option>
-                    {CHANNELS.map((ch) => (
-                      <option key={ch} value={ch}>{ch}</option>
+                    {channels.map((ch) => (
+                      <option key={ch.id} value={ch.id}>{ch.name}</option>
                     ))}
                   </select>
                 </div>

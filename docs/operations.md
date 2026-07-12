@@ -68,10 +68,9 @@ AND (storage.foldername(name))[1] IN (
 Not yet applied to the live Supabase project — run once, then this section can be removed:
 
 ```sql
--- Lets supplier_refund payments track which ticket they were recorded against,
--- so editing the payment's amount later can cascade to that ticket's refund_received.
--- (client_refund already has this via a ticket_payments row; supplier_refund never did.)
-ALTER TABLE payments ADD COLUMN ticket_id uuid REFERENCES tickets(id) ON DELETE SET NULL;
+-- Optional starting balance per wallet, for money that was already in that
+-- channel before the agent started logging payments in the app. Additive.
+ALTER TABLE payment_channels ADD COLUMN starting_balance numeric NOT NULL DEFAULT 0;
 ```
 
 ## Folder Structure

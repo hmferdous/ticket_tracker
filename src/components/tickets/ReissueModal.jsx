@@ -4,15 +4,14 @@ import { useAuth } from "../../context/AuthContext"
 import { AIRLINES } from "../../lib/airlines"
 import SearchableDropdown from "../ui/SearchableDropdown"
 import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
-
-const CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
+import { fetchChannels } from "../../lib/channels"
 
 const AIRLINE_OPTIONS = AIRLINES.map((a) => ({
   value: a.code,
   label: `${a.code} — ${a.name}`,
 }))
 
-const EMPTY_PAYMENT = { amount: "", channel: "", trx_id: "", notes: "", paid_in_full: false }
+const EMPTY_PAYMENT = { amount: "", channel_id: "", trx_id: "", notes: "", paid_in_full: false }
 
 function buildForm(ticket) {
   return {
@@ -41,6 +40,7 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
   const [form, setForm] = useState(() => buildForm(ticket))
   const [clients, setClients] = useState([])
   const [suppliers, setSuppliers] = useState([])
+  const [channels, setChannels] = useState([])
   const [clientPay, setClientPay] = useState(EMPTY_PAYMENT)
   const [clientPayOpen, setClientPayOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -56,12 +56,14 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
   }, [isOpen, ticket])
 
   const fetchDropdowns = async () => {
-    const [{ data: c }, { data: s }] = await Promise.all([
+    const [{ data: c }, { data: s }, { data: ch }] = await Promise.all([
       supabase.from("clients").select("id, name").eq("agent_id", agent.id).order("name"),
       supabase.from("suppliers").select("id, name").eq("agent_id", agent.id).order("name"),
+      fetchChannels(agent.id),
     ])
     setClients(c ?? [])
     setSuppliers(s ?? [])
+    setChannels(ch ?? [])
   }
 
   if (!isOpen) return null
@@ -171,6 +173,7 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
     const clientAmount = clientPay.paid_in_full ? computedSellPrice : parseFloat(clientPay.amount)
     if (clientAmount > 0) {
       const today = new Date().toISOString().split("T")[0]
+      const selectedChannel = channels.find((c) => c.id === clientPay.channel_id)
       const { data: payRow, error: payErr } = await supabase
         .from("payments")
         .insert({
@@ -179,7 +182,8 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
           type: "client_payment",
           amount: clientAmount,
           unallocated_amount: clientAmount,
-          channel: clientPay.channel || null,
+          channel: selectedChannel?.name ?? null,
+          channel_id: clientPay.channel_id || null,
           trx_id: clientPay.trx_id.trim() || null,
           notes: clientPay.notes.trim() || null,
           payment_date: today,
@@ -406,10 +410,10 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>
-                      <select value={clientPay.channel} onChange={setC("channel")} className={inputCls}>
+                      <select value={clientPay.channel_id} onChange={setC("channel_id")} className={inputCls}>
                         <option value="">— Select —</option>
-                        {CHANNELS.map((ch) => (
-                          <option key={ch} value={ch}>{ch}</option>
+                        {channels.map((ch) => (
+                          <option key={ch.id} value={ch.id}>{ch.name}</option>
                         ))}
                       </select>
                     </div>

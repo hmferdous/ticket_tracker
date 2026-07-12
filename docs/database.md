@@ -76,7 +76,8 @@ payments:
   type: client_payment | supplier_payment | client_refund | supplier_refund
   amount — total payment amount
   unallocated_amount — starts equal to amount, reduces as allocations are made, never goes below 0
-  channel — Cash, bKash, Bank, Office, EBL, DBBL, IBBL, City, BRAC, UCB
+  channel — legacy free-text column, kept in sync for safety but no longer the source of truth
+  channel_id — FK to payment_channels. Source of truth for which wallet a payment used
   trx_id, notes, payment_date, created_at
 
 ticket_payments:
@@ -84,6 +85,15 @@ ticket_payments:
   allocated_amount — amount from this payment applied to this ticket
   type: client | supplier | client_refund (client_refund used when linking a client_refund payment to a ticket — allocated_amount is negative, reducing the ticket's amount_paid)
   created_at
+
+payment_channels:
+  id, agent_id
+  name — per-agent, case-insensitive unique (enforced by a unique index on (agent_id, lower(name)), since a plain UNIQUE constraint can't take an expression)
+  starting_balance — optional, defaults to 0. Balance already in that wallet before the agent started logging payments in the app
+  is_active — false = archived. Archived channels are hidden from "select a channel" pickers on new payments but stay fully visible in history, filters, and Channel Ledger
+  created_at
+  New agents are seeded with 10 defaults on signup: Cash, bKash, Bank, Office, EBL, DBBL, IBBL, City, BRAC, UCB. Agents can add, rename, or archive from there.
+  A channel with existing payments can never be hard-deleted — archive is the only removal path once it's in use.
 
 ### Balance Calculations
 - Client total billed = SUM(tickets.sell_price) for all non-void tickets belonging to that client

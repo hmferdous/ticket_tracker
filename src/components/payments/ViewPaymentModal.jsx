@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
-
-const CHANNELS = ["Cash", "bKash", "Bank", "Office", "EBL", "DBBL", "IBBL", "City", "BRAC", "UCB"]
+import { useAuth } from "../../context/AuthContext"
+import { fetchChannels } from "../../lib/channels"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -47,7 +47,7 @@ function derivePaymentStatus(amountPaid, sellPrice) {
 function buildForm(payment) {
   return {
     amount: payment?.amount ?? "",
-    channel: payment?.channel ?? "",
+    channel_id: payment?.channel_id ?? "",
     trx_id: payment?.trx_id ?? "",
     notes: payment?.notes ?? "",
     payment_date: payment?.payment_date ?? "",
@@ -55,7 +55,9 @@ function buildForm(payment) {
 }
 
 export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) {
+  const { agent } = useAuth()
   const [allocations, setAllocations] = useState([])
+  const [channels, setChannels] = useState([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(() => buildForm(payment))
@@ -67,11 +69,12 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
       setEditing(false)
       setForm(buildForm(payment))
       fetchAllocations()
+      if (agent?.id) fetchChannels(agent.id, { includeArchived: true }).then(({ data }) => setChannels(data ?? []))
     } else {
       setAllocations([])
       setError("")
     }
-  }, [isOpen, payment])
+  }, [isOpen, payment, agent?.id])
 
   const fetchAllocations = async () => {
     setLoading(true)
@@ -121,9 +124,12 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
 
     setSaving(true)
 
+    const selectedChannel = channels.find((c) => c.id === form.channel_id)
+
     const baseUpdates = {
       amount,
-      channel: form.channel || null,
+      channel: selectedChannel?.name ?? null,
+      channel_id: form.channel_id || null,
       trx_id: form.trx_id.trim() || null,
       notes: form.notes.trim() || null,
       payment_date: form.payment_date || null,
@@ -263,10 +269,10 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Channel</label>
-                  <select value={form.channel} onChange={set("channel")} className={inputCls}>
+                  <select value={form.channel_id} onChange={set("channel_id")} className={inputCls}>
                     <option value="">— Select —</option>
-                    {CHANNELS.map((ch) => (
-                      <option key={ch} value={ch}>{ch}</option>
+                    {channels.map((ch) => (
+                      <option key={ch.id} value={ch.id}>{ch.name}{!ch.is_active ? " (archived)" : ""}</option>
                     ))}
                   </select>
                 </div>

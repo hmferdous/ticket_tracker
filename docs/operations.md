@@ -86,9 +86,12 @@ CREATE TABLE payment_channels (
   agent_id uuid NOT NULL REFERENCES agents(id) ON DELETE CASCADE,
   name text NOT NULL,
   is_active boolean NOT NULL DEFAULT true,
-  created_at timestamptz DEFAULT now(),
-  CONSTRAINT payment_channels_unique_name_per_agent UNIQUE (agent_id, lower(name))
+  created_at timestamptz DEFAULT now()
 );
+
+-- Case-insensitive uniqueness per agent — a UNIQUE table constraint can't take
+-- an expression like lower(name), so this has to be a unique index instead.
+CREATE UNIQUE INDEX payment_channels_unique_name_per_agent ON payment_channels (agent_id, lower(name));
 
 ALTER TABLE payment_channels ENABLE ROW LEVEL SECURITY;
 

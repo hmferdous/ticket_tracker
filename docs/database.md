@@ -72,6 +72,7 @@ payments:
   id, agent_id
   client_id (nullable — set when receiving from client)
   supplier_id (nullable — set when paying supplier)
+  ticket_id (nullable — set only on supplier_refund when linked to a ticket at creation; lets a later amount edit cascade to that ticket's refund_received. client_refund uses the ticket_payments link instead, not this column)
   type: client_payment | supplier_payment | client_refund | supplier_refund
   amount — total payment amount
   unallocated_amount — starts equal to amount, reduces as allocations are made, never goes below 0
@@ -115,7 +116,14 @@ ticket_payments:
 - Types: Client Payment (IN), Supplier Payment (OUT), Client Refund (OUT), Supplier Refund (IN)
 - After logging a client_payment or supplier_payment, the AllocationModal is triggered automatically
 - client_refund: unallocated_amount = 0; if linked to a ticket, inserts a ticket_payments row with type=client_refund and negative allocated_amount, then updates ticket.amount_paid and payment_status
-- supplier_refund: unallocated_amount = 0; if linked to a ticket, updates ticket.refund_received and refund_status
+- supplier_refund: unallocated_amount = 0; if linked to a ticket, sets payments.ticket_id and updates ticket.refund_received and refund_status
+
+### Editing a Logged Payment (ViewPaymentModal)
+- Any payment can be reopened and edited: amount, channel, trx_id, notes, payment_date
+- client_payment / supplier_payment: unallocated_amount shifts by the same delta as the amount edit; can't be reduced below the already-allocated portion
+- client_refund linked to a ticket (via ticket_payments): amount edit also updates that ticket_payments row's allocated_amount and recomputes the ticket's amount_paid/payment_status; blocked if it would drive amount_paid negative
+- supplier_refund linked to a ticket (via payments.ticket_id): amount edit also updates that ticket's refund_received
+- Editing a ticket's refund_received/refund_paid directly (RefundModal's "Edit Refund Received"/"Edit Refund Paid" row actions) does the reverse sync — it looks up and updates the linked payments/ticket_payments rows so the two stay consistent regardless of which side is corrected
 
 ### Forward to Supplier (Passthrough Payment)
 - When logging a client payment, agent can optionally forward all or part to a supplier in the same action

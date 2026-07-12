@@ -172,7 +172,7 @@ export default function SupplierDetail() {
           .order("created_at", { ascending: false }),
         supabase
           .from("payments")
-          .select("id, type, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at, ticket_payments(type, tickets(pnr, passenger_name))")
+          .select("id, type, amount, unallocated_amount, channel, trx_id, notes, payment_date, created_at, suppliers(name, supplier_id_number), ticket_payments(type, tickets(pnr, passenger_name))")
           .eq("supplier_id", id)
           .eq("agent_id", agent.id)
           .eq("type", "supplier_payment")

@@ -281,6 +281,7 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
         .insert({
           agent_id: agent.id,
           supplier_id: form.supplier_id,
+          ticket_id: form.ticket_id || null,
           type: "supplier_refund",
           amount,
           unallocated_amount: 0,

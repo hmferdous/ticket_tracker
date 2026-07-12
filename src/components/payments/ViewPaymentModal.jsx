@@ -150,6 +150,14 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
     if (cascadesToTicket) {
       const oldAmount = payment.amount ?? 0
       const ticket = linkedRefundAlloc.tickets
+      const newAmountPaid = (ticket?.amount_paid ?? 0) + oldAmount - amount
+
+      if (newAmountPaid < 0) {
+        setSaving(false)
+        setError(`That would leave the linked ticket's paid amount negative. The most this refund can be is ${fmt((ticket?.amount_paid ?? 0) + oldAmount)}.`)
+        return
+      }
+
       const { error: tpErr } = await supabase
         .from("ticket_payments")
         .update({ allocated_amount: -amount })
@@ -157,13 +165,21 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
       if (tpErr) { setSaving(false); setError(tpErr.message); return }
 
       if (ticket) {
-        const newAmountPaid = (ticket.amount_paid ?? 0) + oldAmount - amount
         const newStatus = derivePaymentStatus(newAmountPaid, ticket.sell_price ?? 0)
-        await supabase
+        const { error: tErr } = await supabase
           .from("tickets")
           .update({ amount_paid: newAmountPaid, payment_status: newStatus })
           .eq("id", ticket.id)
+        if (tErr) { setSaving(false); setError(tErr.message); return }
       }
+    }
+
+    if (payment.type === "supplier_refund" && payment.ticket_id) {
+      const { error: srErr } = await supabase
+        .from("tickets")
+        .update({ refund_received: amount })
+        .eq("id", payment.ticket_id)
+      if (srErr) { setSaving(false); setError(srErr.message); return }
     }
 
     const { error } = await supabase.from("payments").update(baseUpdates).eq("id", payment.id)
@@ -263,9 +279,14 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
                 <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
                 <input type="text" value={form.notes} onChange={set("notes")} className={inputCls} />
               </div>
-              {payment.type === "supplier_refund" && (
+              {payment.type === "supplier_refund" && !payment.ticket_id && (
                 <p className="text-xs text-gray-400">
-                  This doesn't cascade to any ticket's refund figures — edit the ticket's refund directly if needed.
+                  Not linked to a ticket — this edit only changes the payment record.
+                </p>
+              )}
+              {payment.type === "supplier_refund" && payment.ticket_id && (
+                <p className="text-xs text-gray-400">
+                  Linked to a ticket — the amount also updates that ticket's refund received.
                 </p>
               )}
               {payment.type === "client_refund" && !cascadesToTicket && (

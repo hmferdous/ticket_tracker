@@ -99,6 +99,56 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
     }
 
     setLoading(true)
+
+    // Keep any linked payment record (from Log Transaction) in sync with a corrected actual amount
+    if (mode === "edit_supplier_actual") {
+      const { error: prErr } = await supabase
+        .from("payments")
+        .update({ amount: updates.refund_received })
+        .eq("ticket_id", ticket.id)
+        .eq("type", "supplier_refund")
+      if (prErr) { setLoading(false); setError(prErr.message); return }
+    }
+
+    if (mode === "edit_client_actual") {
+      const { data: linkedTps, error: findErr } = await supabase
+        .from("ticket_payments")
+        .select("id, payment_id, allocated_amount")
+        .eq("ticket_id", ticket.id)
+        .eq("type", "client_refund")
+      if (findErr) { setLoading(false); setError(findErr.message); return }
+
+      const linkedTp = linkedTps?.[0]
+      if (linkedTp) {
+        const oldAmount = -(linkedTp.allocated_amount ?? 0)
+        const newValue = updates.refund_paid
+        const newAmountPaid = (ticket.amount_paid ?? 0) + oldAmount - newValue
+
+        if (newAmountPaid < 0) {
+          setLoading(false)
+          setError(`That would leave the ticket's paid amount negative. The most this can be is ${((ticket.amount_paid ?? 0) + oldAmount).toLocaleString("en-BD")}.`)
+          return
+        }
+
+        const newStatus = newAmountPaid <= 0 ? "unpaid" : newAmountPaid >= (ticket.sell_price ?? 0) ? "paid" : "partial"
+
+        const { error: tpErr } = await supabase
+          .from("ticket_payments")
+          .update({ allocated_amount: -newValue })
+          .eq("id", linkedTp.id)
+        if (tpErr) { setLoading(false); setError(tpErr.message); return }
+
+        const { error: pErr } = await supabase
+          .from("payments")
+          .update({ amount: newValue })
+          .eq("id", linkedTp.payment_id)
+        if (pErr) { setLoading(false); setError(pErr.message); return }
+
+        updates.amount_paid = newAmountPaid
+        updates.payment_status = newStatus
+      }
+    }
+
     const { data, error } = await supabase
       .from("tickets")
       .update(updates)

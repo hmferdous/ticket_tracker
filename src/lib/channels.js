@@ -5,7 +5,11 @@ export function fetchChannels(agentId, { includeArchived = false } = {}) {
     .from("payment_channels")
     .select("id, name, starting_balance, is_active, created_at")
     .eq("agent_id", agentId)
+    // Secondary sort on id: rows seeded together in one INSERT (e.g. the
+    // default-channel migration) can share an identical created_at, which
+    // Postgres doesn't break ties on deterministically without one.
     .order("created_at", { ascending: true })
+    .order("id", { ascending: true })
   if (!includeArchived) query = query.eq("is_active", true)
   return query
 }

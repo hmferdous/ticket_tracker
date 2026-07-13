@@ -296,7 +296,8 @@ function fmtMargin(n) {
 function computeNetMargin(ticket) {
   const ticketMargin = (ticket.sell_price ?? 0) - (ticket.purchase_price ?? 0)
   const refundMargin = (ticket.refund_received ?? 0) - (ticket.refund_payable ?? 0)
-  return ticketMargin + refundMargin
+  const voidFeeMargin = (ticket.void_fee_collected ?? 0) - (ticket.void_fee_paid ?? 0)
+  return ticketMargin + refundMargin + voidFeeMargin
 }
 
 export default function Tickets() {
@@ -354,6 +355,7 @@ export default function Tickets() {
         is_reissue, is_void, parent_ticket_id,
         refund_receivable, refund_received, refund_payable, refund_paid, refund_notes,
         reissue_fee_collected, reissue_fee_paid, fare_difference,
+        void_fee_collected, void_fee_paid,
         client_id, supplier_id,
         clients(name),
         suppliers(name),
@@ -709,7 +711,9 @@ export default function Tickets() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {pagedTickets.map((ticket) => {
-                    const outstanding = (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
+                    const outstanding = !ticket.is_void && ticket.refund_status == null
+                      ? (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
+                      : 0
                     const fmtDate = (d) => d
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                       : <span className="text-gray-300">—</span>
@@ -797,7 +801,9 @@ export default function Tickets() {
                     const fmtD = (d) => d
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                       : <span className="text-gray-300">—</span>
-                    const detailOutstanding = (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
+                    const detailOutstanding = !ticket.is_void && ticket.refund_status == null
+                      ? (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
+                      : 0
                     return (
                       <tr key={ticket.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3 text-xs text-gray-500">{fmtD(ticket.issue_date)}</td>

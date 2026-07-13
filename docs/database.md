@@ -42,9 +42,10 @@ Never disable RLS on any table
 ### Per Ticket
 - ticket_margin = sell_price - purchase_price
 - refund_margin = refund_received - refund_payable
-- net_margin = ticket_margin + refund_margin
+- void_fee_margin = void_fee_collected - void_fee_paid
+- net_margin = ticket_margin + refund_margin + void_fee_margin
 
-Note: reissue fees and fare_difference are NOT separately added to net_margin. They are already embedded in sell_price and purchase_price on the child reissue ticket. Adding them again would double-count.
+Note: reissue fees and fare_difference are NOT separately added to net_margin. They are already embedded in sell_price and purchase_price on the child reissue ticket. Adding them again would double-count. void_fee_collected/void_fee_paid ARE separately added — they're a standalone transaction tied to the void event, not embedded in sell_price/purchase_price anywhere.
 
 ### Reissue Profit (display only, not added to net_margin)
 - profit_from_reissue = reissue_fee_collected - reissue_fee_paid
@@ -98,10 +99,11 @@ payment_channels:
 ### Balance Calculations
 - Client total billed = SUM(tickets.sell_price) for all non-void tickets belonging to that client
 - Client total received = SUM(payments.amount) for all client_payments for that client
-- Client balance outstanding = total billed - total received
 - Ticket amount paid = SUM(ticket_payments.allocated_amount) for that ticket where type = client
-- Ticket outstanding = sell_price - ticket amount paid
+- Ticket outstanding = sell_price - ticket amount paid — but only for tickets that are still eligible (see below); void or refund-active tickets contribute 0, not a raw subtraction
 - Unallocated credit on client = SUM(payments.unallocated_amount) for that client
+- Client/Supplier balance outstanding = SUM(ticket outstanding) across that entity's eligible tickets — computed per-ticket, not as totalBilled - totalReceived, so a void/refund-active ticket can't inflate the balance via a payments-side number it isn't actually tied to
+- **Outstanding eligibility**: a ticket only contributes to any outstanding total (Dashboard's Collection Pending / Total Payable to Suppliers, Client/Supplier Detail's Outstanding Balance/Payable, the Outstanding column on Tickets/Client/Supplier tables) when `!is_void && refund_status == null`. Once a ticket is void, or has any refund activity at all (even just initiated), its money story is told by is_void/refund_* instead — amount_paid/purchase_price no longer represent a real collection/payable expectation for it, so it drops out entirely rather than being netted in. This prevents a settled-refund ticket (refund_status = closed) from still showing as fully outstanding just because amount_paid/payment_status were never touched by the refund flow (see "Editing a Logged Payment" above re: the two independent refund-tracking surfaces).
 
 ### Payment Flow (Client Side)
 1. Agent receives bulk payment from client — logs amount, channel, trx_id
@@ -179,8 +181,14 @@ payments rows created on forward:
 ### Void Flow
 - Agent marks ticket as void — status → void, is_void = true
 - Ticket stays in system for audit trail — never deleted
-- If client had paid — refund flow still applies
-- If no money exchanged — ticket sits as void record with zero margin impact
+- If client had paid — refund flow still applies (Type 2, partial refund with penalty, covers a supplier penalty / reduced client refund on an already-paid ticket)
+- If no money exchanged — ticket sits as void record with zero margin impact, unless...
+- Cancellation fees (VoidConfirmModal): optional, entered on the void action itself — a supplier fee charged to the agent, and/or a fee the agent charges the client for handling the cancellation. Independent of the refund flow — this is for a ticket that was never actually paid/purchased for real money, just a standalone administrative charge tied to voiding it. Both optional, blank by default.
+  - void_fee_paid stored on the ticket; if > 0, also creates a real supplier_payment row (channel-tracked) linked via a ticket_payments row with type=void_fee_supplier
+  - void_fee_collected stored on the ticket; if > 0, also creates a real client_payment row (channel-tracked) linked via a ticket_payments row with type=void_fee_client
+  - Both ticket_payments types are deliberately distinct from type=client/supplier — they're excluded from the amount_paid/supplierAmountPaid derivation (that SUM only counts type=client/supplier), since these fees aren't paying down the original sell_price/purchase_price
+  - Requires the ticket to actually have a client_id/supplier_id linked before that side's fee can be entered
+  - void_fee_margin = void_fee_collected - void_fee_paid, folded into net_margin (see Margin Calculations)
 
 ## Reissue Architecture
 

@@ -98,6 +98,12 @@ On save:
 - Actions that aren't applicable are omitted from the menu entirely, never shown disabled
 - Suppliers list also uses the same hamburger-menu pattern for row actions
 
+## Void Confirm Modal
+- Opens from the "Void" row action — still a confirm-to-proceed modal ("This cannot be undone"), not a full form
+- Adds an optional "Cancellation fees" section: two independent amount + channel pairs — "Fee charged by supplier" and "Fee charged to client" — both blank by default, no requirement to fill either
+- Blocked with an inline error if an amount is entered on a side the ticket has no client_id/supplier_id for
+- On confirm: any non-zero fee creates a real, channel-tracked payment (client_payment / supplier_payment) allocated to the ticket, in addition to voiding it — so cancellation fees show up in Payments, Channel Ledger, and the entity's payment history like any other transaction
+
 ## Reissue Modal
 - Opens from row level action on ticket list
 - Pre-filled with original ticket data — passenger, carrier, PNR, route, dates, client, supplier all editable

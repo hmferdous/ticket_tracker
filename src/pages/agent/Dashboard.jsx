@@ -16,7 +16,8 @@ function fmtDate(d) {
 function ticketNetMargin(t) {
   const ticketMargin = (t.sell_price ?? 0) - (t.purchase_price ?? 0)
   const refundMargin = (t.refund_received ?? 0) - (t.refund_payable ?? 0)
-  return ticketMargin + refundMargin
+  const voidFeeMargin = (t.void_fee_collected ?? 0) - (t.void_fee_paid ?? 0)
+  return ticketMargin + refundMargin + voidFeeMargin
 }
 
 function supplierAmountPaid(t) {
@@ -218,6 +219,7 @@ export default function Dashboard() {
           `id, passenger_name, route, travel_date, issue_date, sell_price, purchase_price, amount_paid, payment_status,
            is_void, refund_status, refund_receivable, refund_received, refund_payable, refund_paid,
            reissue_fee_collected, reissue_fee_paid, fare_difference,
+           void_fee_collected, void_fee_paid,
            office_markup, client_id, clients(name), ticket_payments(allocated_amount, type), created_at`
         )
         .eq("agent_id", agent.id),
@@ -283,13 +285,18 @@ export default function Dashboard() {
 
   // Cumulative stats — always all-time, never filtered
   const cumulativeStats = useMemo(() => {
+    // Once a ticket is void or has any refund activity, its money story is
+    // told by is_void/refund_* — amount_paid/purchase_price no longer
+    // represent a real collection/payable expectation, so it drops out of
+    // both outstanding totals entirely rather than being netted in.
+    const stillOutstandingEligible = (t) => !t.is_void && t.refund_status == null
+
     const outstandingReceivable = tickets
-      .filter((t) => t.payment_status === "unpaid" || t.payment_status === "partial")
+      .filter((t) => stillOutstandingEligible(t) && (t.payment_status === "unpaid" || t.payment_status === "partial"))
       .reduce((sum, t) => sum + ((t.sell_price ?? 0) - (t.amount_paid ?? 0)), 0)
-    const totalPayableToSuppliers = tickets.reduce(
-      (sum, t) => sum + Math.max((t.purchase_price ?? 0) - supplierAmountPaid(t), 0),
-      0
-    )
+    const totalPayableToSuppliers = tickets
+      .filter(stillOutstandingEligible)
+      .reduce((sum, t) => sum + Math.max((t.purchase_price ?? 0) - supplierAmountPaid(t), 0), 0)
     const officeMarkupContributed = tickets.reduce((sum, t) => sum + (t.office_markup ?? 0), 0)
     return { outstandingReceivable, totalPayableToSuppliers, officeMarkupContributed }
   }, [tickets])

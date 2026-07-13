@@ -11,6 +11,15 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
 }
 
+function paymentSideLabel(type) {
+  switch (type) {
+    case "void_fee_client": return "Void Fee (Client)"
+    case "void_fee_supplier": return "Void Fee (Supplier)"
+    case "client_refund": return "Client Refund"
+    default: return type
+  }
+}
+
 function Field({ label, value }) {
   return (
     <div>
@@ -50,6 +59,10 @@ export default function TicketDetailModal({ isOpen, onClose, ticket, tickets, on
   const refundMargin =
     ticket.refund_received != null && ticket.refund_payable != null
       ? ticket.refund_received - ticket.refund_payable
+      : null
+  const voidFeeMargin =
+    ticket.void_fee_collected != null || ticket.void_fee_paid != null
+      ? (ticket.void_fee_collected ?? 0) - (ticket.void_fee_paid ?? 0)
       : null
 
   const parentTicket = ticket.parent_ticket_id
@@ -152,6 +165,21 @@ export default function TicketDetailModal({ isOpen, onClose, ticket, tickets, on
             </div>
           )}
 
+          {/* Void cancellation fees */}
+          {voidFeeMargin != null && (
+            <div>
+              <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Void Fees</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                <Field label="Fee Charged by Supplier" value={fmt(ticket.void_fee_paid)} />
+                <Field label="Fee Charged to Client" value={fmt(ticket.void_fee_collected)} />
+                <Field
+                  label="Void Margin"
+                  value={<span className={voidFeeMargin >= 0 ? "text-green-600" : "text-red-600"}>{fmt(voidFeeMargin)}</span>}
+                />
+              </div>
+            </div>
+          )}
+
           {/* Refund details */}
           {ticket.refund_status && (
             <div>
@@ -210,7 +238,7 @@ export default function TicketDetailModal({ isOpen, onClose, ticket, tickets, on
                     {history.map((row) => (
                       <tr key={row.id}>
                         <td className="px-3 py-2 text-gray-600">{fmtDate(row.payments?.payment_date)}</td>
-                        <td className="px-3 py-2 text-gray-600 capitalize">{row.type}</td>
+                        <td className="px-3 py-2 text-gray-600">{paymentSideLabel(row.type)}</td>
                         <td className="px-3 py-2 text-gray-600">{row.payments?.channel ?? "—"}</td>
                         <td className="px-3 py-2 text-gray-600">{row.payments?.trx_id ?? "—"}</td>
                         <td className="px-3 py-2 text-gray-600 text-right tabular-nums">{fmt(row.allocated_amount)}</td>

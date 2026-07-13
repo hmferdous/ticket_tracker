@@ -283,13 +283,18 @@ export default function Dashboard() {
 
   // Cumulative stats — always all-time, never filtered
   const cumulativeStats = useMemo(() => {
+    // Once a ticket is void or has any refund activity, its money story is
+    // told by is_void/refund_* — amount_paid/purchase_price no longer
+    // represent a real collection/payable expectation, so it drops out of
+    // both outstanding totals entirely rather than being netted in.
+    const stillOutstandingEligible = (t) => !t.is_void && t.refund_status == null
+
     const outstandingReceivable = tickets
-      .filter((t) => t.payment_status === "unpaid" || t.payment_status === "partial")
+      .filter((t) => stillOutstandingEligible(t) && (t.payment_status === "unpaid" || t.payment_status === "partial"))
       .reduce((sum, t) => sum + ((t.sell_price ?? 0) - (t.amount_paid ?? 0)), 0)
-    const totalPayableToSuppliers = tickets.reduce(
-      (sum, t) => sum + Math.max((t.purchase_price ?? 0) - supplierAmountPaid(t), 0),
-      0
-    )
+    const totalPayableToSuppliers = tickets
+      .filter(stillOutstandingEligible)
+      .reduce((sum, t) => sum + Math.max((t.purchase_price ?? 0) - supplierAmountPaid(t), 0), 0)
     const officeMarkupContributed = tickets.reduce((sum, t) => sum + (t.office_markup ?? 0), 0)
     return { outstandingReceivable, totalPayableToSuppliers, officeMarkupContributed }
   }, [tickets])

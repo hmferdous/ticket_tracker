@@ -216,7 +216,16 @@ export default function ClientDetail() {
 
   const totalBilled = useMemo(() => tickets.reduce((sum, t) => sum + (t.sell_price ?? 0), 0), [tickets])
   const totalReceived = useMemo(() => payments.reduce((sum, p) => sum + (p.amount ?? 0), 0), [payments])
-  const outstandingBalance = totalBilled - totalReceived
+  // Void/refund-active tickets don't represent a real collection expectation
+  // anymore — sum per-ticket outstanding instead of netting totalBilled
+  // against totalReceived, so those tickets can't inflate the balance.
+  const outstandingBalance = useMemo(
+    () =>
+      tickets
+        .filter((t) => !t.is_void && t.refund_status == null)
+        .reduce((sum, t) => sum + Math.max((t.sell_price ?? 0) - (t.amount_paid ?? 0), 0), 0),
+    [tickets]
+  )
   const unallocatedCredit = useMemo(() => payments.reduce((sum, p) => sum + (p.unallocated_amount ?? 0), 0), [payments])
 
   const handleNavigateTicket = (ticketId) => {
@@ -434,7 +443,9 @@ export default function ClientDetail() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {tickets.map((ticket) => {
-                        const outstanding = (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
+                        const outstanding = !ticket.is_void && ticket.refund_status == null
+                          ? (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
+                          : 0
                         const statusBadge = paymentStatusBadge(ticket.payment_status)
                         const chips = computeTicketChips(ticket)
                         return (

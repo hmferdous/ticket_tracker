@@ -98,10 +98,11 @@ payment_channels:
 ### Balance Calculations
 - Client total billed = SUM(tickets.sell_price) for all non-void tickets belonging to that client
 - Client total received = SUM(payments.amount) for all client_payments for that client
-- Client balance outstanding = total billed - total received
 - Ticket amount paid = SUM(ticket_payments.allocated_amount) for that ticket where type = client
-- Ticket outstanding = sell_price - ticket amount paid
+- Ticket outstanding = sell_price - ticket amount paid — but only for tickets that are still eligible (see below); void or refund-active tickets contribute 0, not a raw subtraction
 - Unallocated credit on client = SUM(payments.unallocated_amount) for that client
+- Client/Supplier balance outstanding = SUM(ticket outstanding) across that entity's eligible tickets — computed per-ticket, not as totalBilled - totalReceived, so a void/refund-active ticket can't inflate the balance via a payments-side number it isn't actually tied to
+- **Outstanding eligibility**: a ticket only contributes to any outstanding total (Dashboard's Collection Pending / Total Payable to Suppliers, Client/Supplier Detail's Outstanding Balance/Payable, the Outstanding column on Tickets/Client/Supplier tables) when `!is_void && refund_status == null`. Once a ticket is void, or has any refund activity at all (even just initiated), its money story is told by is_void/refund_* instead — amount_paid/purchase_price no longer represent a real collection/payable expectation for it, so it drops out entirely rather than being netted in. This prevents a settled-refund ticket (refund_status = closed) from still showing as fully outstanding just because amount_paid/payment_status were never touched by the refund flow (see "Editing a Logged Payment" above re: the two independent refund-tracking surfaces).
 
 ### Payment Flow (Client Side)
 1. Agent receives bulk payment from client — logs amount, channel, trx_id

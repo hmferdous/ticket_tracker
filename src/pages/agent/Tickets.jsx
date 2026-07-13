@@ -709,7 +709,9 @@ export default function Tickets() {
                 </thead>
                 <tbody className="divide-y divide-gray-100">
                   {pagedTickets.map((ticket) => {
-                    const outstanding = (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
+                    const outstanding = !ticket.is_void && ticket.refund_status == null
+                      ? (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
+                      : 0
                     const fmtDate = (d) => d
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                       : <span className="text-gray-300">—</span>
@@ -797,7 +799,9 @@ export default function Tickets() {
                     const fmtD = (d) => d
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                       : <span className="text-gray-300">—</span>
-                    const detailOutstanding = (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
+                    const detailOutstanding = !ticket.is_void && ticket.refund_status == null
+                      ? (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
+                      : 0
                     return (
                       <tr key={ticket.id} className="hover:bg-slate-50 transition-colors">
                         <td className="px-4 py-3 text-xs text-gray-500">{fmtD(ticket.issue_date)}</td>

@@ -198,7 +198,16 @@ export default function SupplierDetail() {
 
   const totalPurchased = useMemo(() => tickets.reduce((sum, t) => sum + (t.purchase_price ?? 0), 0), [tickets])
   const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + (p.amount ?? 0), 0), [payments])
-  const outstandingPayable = totalPurchased - totalPaid
+  // Void/refund-active tickets don't represent a real payable expectation
+  // anymore — sum per-ticket outstanding instead of netting totalPurchased
+  // against totalPaid, so those tickets can't inflate the balance.
+  const outstandingPayable = useMemo(
+    () =>
+      tickets
+        .filter((t) => !t.is_void && t.refund_status == null)
+        .reduce((sum, t) => sum + Math.max((t.purchase_price ?? 0) - (t.supplierAmountPaid ?? 0), 0), 0),
+    [tickets]
+  )
   const unallocated = useMemo(() => payments.reduce((sum, p) => sum + (p.unallocated_amount ?? 0), 0), [payments])
 
   const handleNavigateTicket = (ticketId) => {
@@ -392,7 +401,9 @@ export default function SupplierDetail() {
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {tickets.map((ticket) => {
-                        const outstanding = (ticket.purchase_price ?? 0) - (ticket.supplierAmountPaid ?? 0)
+                        const outstanding = !ticket.is_void && ticket.refund_status == null
+                          ? (ticket.purchase_price ?? 0) - (ticket.supplierAmountPaid ?? 0)
+                          : 0
                         const status = derivePaymentStatus(ticket.supplierAmountPaid ?? 0, ticket.purchase_price ?? 0)
                         const statusBadge = paymentStatusBadge(status)
                         return (

@@ -68,9 +68,12 @@ AND (storage.foldername(name))[1] IN (
 Not yet applied to the live Supabase project — run once, then this section can be removed:
 
 ```sql
--- Optional starting balance per wallet, for money that was already in that
--- channel before the agent started logging payments in the app. Additive.
-ALTER TABLE payment_channels ADD COLUMN starting_balance numeric NOT NULL DEFAULT 0;
+-- Standalone cancellation fees on a void — e.g. supplier charges the agent
+-- a penalty, agent in turn charges the client a premium. Independent of
+-- the sell_price/purchase_price and of the refund flow (see VoidConfirmModal
+-- and docs/database.md "Void Flow"). Additive, both nullable.
+ALTER TABLE tickets ADD COLUMN void_fee_collected numeric;
+ALTER TABLE tickets ADD COLUMN void_fee_paid numeric;
 ```
 
 ## Folder Structure

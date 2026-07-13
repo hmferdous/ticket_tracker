@@ -296,7 +296,8 @@ function fmtMargin(n) {
 function computeNetMargin(ticket) {
   const ticketMargin = (ticket.sell_price ?? 0) - (ticket.purchase_price ?? 0)
   const refundMargin = (ticket.refund_received ?? 0) - (ticket.refund_payable ?? 0)
-  return ticketMargin + refundMargin
+  const voidFeeMargin = (ticket.void_fee_collected ?? 0) - (ticket.void_fee_paid ?? 0)
+  return ticketMargin + refundMargin + voidFeeMargin
 }
 
 export default function Tickets() {
@@ -354,6 +355,7 @@ export default function Tickets() {
         is_reissue, is_void, parent_ticket_id,
         refund_receivable, refund_received, refund_payable, refund_paid, refund_notes,
         reissue_fee_collected, reissue_fee_paid, fare_difference,
+        void_fee_collected, void_fee_paid,
         client_id, supplier_id,
         clients(name),
         suppliers(name),

@@ -1,18 +1,114 @@
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
+import { useAuth } from "../../context/AuthContext"
+import { fetchChannels } from "../../lib/channels"
 
 export default function VoidConfirmModal({ isOpen, onClose, ticket, onSaved }) {
+  const { agent } = useAuth()
+  const [channels, setChannels] = useState([])
+  const [supplierFee, setSupplierFee] = useState("")
+  const [supplierFeeChannelId, setSupplierFeeChannelId] = useState("")
+  const [clientFee, setClientFee] = useState("")
+  const [clientFeeChannelId, setClientFeeChannelId] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  useEffect(() => {
+    if (isOpen) {
+      setSupplierFee("")
+      setSupplierFeeChannelId("")
+      setClientFee("")
+      setClientFeeChannelId("")
+      setError("")
+      if (agent?.id) fetchChannels(agent.id).then(({ data }) => setChannels(data ?? []))
+    }
+  }, [isOpen, agent?.id])
 
   if (!isOpen) return null
 
   const handleConfirm = async () => {
-    setLoading(true)
     setError("")
+
+    const supplierFeeAmount = supplierFee !== "" ? parseFloat(supplierFee) : 0
+    const clientFeeAmount = clientFee !== "" ? parseFloat(clientFee) : 0
+
+    if (supplierFeeAmount > 0 && !ticket.supplier_id) {
+      setError("This ticket has no supplier linked — can't record a supplier fee")
+      return
+    }
+    if (clientFeeAmount > 0 && !ticket.client_id) {
+      setError("This ticket has no client linked — can't record a client fee")
+      return
+    }
+
+    setLoading(true)
+
+    const today = new Date().toISOString().split("T")[0]
+    const supplierChannel = channels.find((c) => c.id === supplierFeeChannelId)
+    const clientChannel = channels.find((c) => c.id === clientFeeChannelId)
+
+    if (supplierFeeAmount > 0) {
+      const { data: payRow, error: payErr } = await supabase
+        .from("payments")
+        .insert({
+          agent_id: agent.id,
+          supplier_id: ticket.supplier_id,
+          type: "supplier_payment",
+          amount: supplierFeeAmount,
+          unallocated_amount: 0,
+          channel: supplierChannel?.name ?? null,
+          channel_id: supplierFeeChannelId || null,
+          payment_date: today,
+        })
+        .select("id")
+        .single()
+
+      if (payErr) { setLoading(false); setError(payErr.message); return }
+
+      const { error: tpErr } = await supabase.from("ticket_payments").insert({
+        payment_id: payRow.id,
+        ticket_id: ticket.id,
+        allocated_amount: supplierFeeAmount,
+        type: "void_fee_supplier",
+      })
+      if (tpErr) { setLoading(false); setError(tpErr.message); return }
+    }
+
+    if (clientFeeAmount > 0) {
+      const { data: payRow, error: payErr } = await supabase
+        .from("payments")
+        .insert({
+          agent_id: agent.id,
+          client_id: ticket.client_id,
+          type: "client_payment",
+          amount: clientFeeAmount,
+          unallocated_amount: 0,
+          channel: clientChannel?.name ?? null,
+          channel_id: clientFeeChannelId || null,
+          payment_date: today,
+        })
+        .select("id")
+        .single()
+
+      if (payErr) { setLoading(false); setError(payErr.message); return }
+
+      const { error: tpErr } = await supabase.from("ticket_payments").insert({
+        payment_id: payRow.id,
+        ticket_id: ticket.id,
+        allocated_amount: clientFeeAmount,
+        type: "void_fee_client",
+      })
+      if (tpErr) { setLoading(false); setError(tpErr.message); return }
+    }
+
     const { data, error } = await supabase
       .from("tickets")
-      .update({ is_void: true, status: "void" })
+      .update({
+        is_void: true,
+        status: "void",
+        void_fee_paid: supplierFeeAmount > 0 ? supplierFeeAmount : null,
+        void_fee_collected: clientFeeAmount > 0 ? clientFeeAmount : null,
+      })
       .eq("id", ticket.id)
       .select(`*, clients(name), suppliers(name)`)
       .single()
@@ -30,6 +126,9 @@ export default function VoidConfirmModal({ isOpen, onClose, ticket, onSaved }) {
     if (e.target === e.currentTarget) onClose()
   }
 
+  const inputCls =
+    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
@@ -38,14 +137,51 @@ export default function VoidConfirmModal({ isOpen, onClose, ticket, onSaved }) {
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl flex flex-col">
         <div className="px-6 py-5">
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Void this ticket?</h2>
-          <p className="text-sm text-gray-500">
+          <p className="text-sm text-gray-500 mb-4">
             Mark this ticket as void? This cannot be undone.
           </p>
+
           {error && (
-            <div className="mt-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
               {error}
             </div>
           )}
+
+          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+            Cancellation fees (optional)
+          </p>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Fee charged by supplier</label>
+                <input type="number" min="0" step="0.01" value={supplierFee} onChange={(e) => setSupplierFee(e.target.value)} placeholder="0.00" className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Channel</label>
+                <select value={supplierFeeChannelId} onChange={(e) => setSupplierFeeChannelId(e.target.value)} className={inputCls}>
+                  <option value="">— Select —</option>
+                  {channels.map((ch) => (
+                    <option key={ch.id} value={ch.id}>{ch.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Fee charged to client</label>
+                <input type="number" min="0" step="0.01" value={clientFee} onChange={(e) => setClientFee(e.target.value)} placeholder="0.00" className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Channel</label>
+                <select value={clientFeeChannelId} onChange={(e) => setClientFeeChannelId(e.target.value)} className={inputCls}>
+                  <option value="">— Select —</option>
+                  {channels.map((ch) => (
+                    <option key={ch.id} value={ch.id}>{ch.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
         <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
           <button

@@ -306,22 +306,31 @@ export default function Dashboard() {
     [payments]
   )
 
+  // The refund lifecycle has 4 states: initiated -> supplier_refunded or
+  // client_refunded (whichever side settles first) -> closed. Filtering by
+  // exact status string misses whichever intermediate state isn't named —
+  // these check the actual field that's still null instead, so a refund
+  // stays visible regardless of which side settled first.
   const refundStats = useMemo(() => ({
-    openCount: tickets.filter((t) => t.refund_status === "initiated" || t.refund_status === "supplier_refunded").length,
+    openCount: tickets.filter((t) => t.refund_status != null && t.refund_status !== "closed").length,
     awaitingFromSupplier: tickets
-      .filter((t) => t.refund_status === "initiated")
+      .filter((t) => t.refund_status != null && t.refund_received == null)
       .reduce((sum, t) => sum + (t.refund_receivable ?? 0), 0),
     owedToClients: tickets
-      .filter((t) => t.refund_status === "supplier_refunded")
+      .filter((t) => t.refund_status != null && t.refund_paid == null)
       .reduce((sum, t) => sum + (t.refund_payable ?? 0), 0),
     netMargin: tickets
       .filter((t) => t.refund_status === "closed")
       .reduce((sum, t) => sum + ((t.refund_received ?? 0) - (t.refund_payable ?? 0)), 0),
   }), [tickets])
 
+  // Ticket-level refund_paid, not the payments table — a client refund
+  // recorded via the ticket-row "Record Client Refund" action never creates
+  // a payments row (see RefundModal), so summing payments.client_refund
+  // undercounts. refund_paid is set by both recording paths.
   const totalRefundedToClients = useMemo(
-    () => filteredPayments.filter((p) => p.type === "client_refund").reduce((sum, p) => sum + (p.amount ?? 0), 0),
-    [filteredPayments]
+    () => tickets.reduce((sum, t) => sum + (t.refund_paid ?? 0), 0),
+    [tickets]
   )
 
   // Needs Attention — always all tickets, unaffected by filter

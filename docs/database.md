@@ -57,6 +57,8 @@ Note: reissue fees and fare_difference are NOT separately added to net_margin. T
 ### Dashboard Reporting
 - Total Profit = SUM(net_margin) across all tickets in period
 - Office Margin = SUM(office_markup) across all tickets in period
+- Total Refunded to Clients = SUM(tickets.refund_paid) across all tickets — ticket-level, not the payments table. A client refund recorded via the ticket-row "Record Client Refund" action never creates a payments row (see Void Flow / Refund Flow), so summing payments.type=client_refund undercounts; refund_paid is set by both recording paths
+- Open Refunds / Awaiting From Supplier / Owed To Clients — the refund lifecycle has 4 states (initiated -> supplier_refunded or client_refunded, whichever side settles first -> closed). These filter on the actual field that's still null (refund_received == null / refund_paid == null) rather than a specific status string, so a refund stays counted regardless of which side settled first. Refund Net Margin only counts refund_status = closed (fully settled on both sides)
 
 ### Removed Fields
 - reported_price — REMOVED. Do not use or reference anywhere.

@@ -162,6 +162,18 @@ On save:
 - On save for client_payment/supplier_payment: AllocationModal triggered immediately
 - On save for refunds: refreshes payments list. If linked to a ticket that has an open refund on file, also advances that ticket's cumulative refund_received/refund_paid and recomputes refund_status the same way RefundModal's row actions do — a plain fare-refund link (no open refund on file) only adjusts amount_paid, same as before
 
+## Payments Page — Delete Action
+- Every row in the Payments list (any type) has a "Delete" action alongside View/Allocate
+- Reverses every linked ticket_payments row before deleting it, branching by that row's type — not payments.type, since one payment can allocate across ticket_payments rows of different types:
+  - client / supplier: client reverses amount_paid + payment_status; supplier reverses nothing (supplierAmountPaid is derived live from ticket_payments, so it self-corrects once the row is gone)
+  - client_refund: reverses amount_paid (adds back), refund_paid (subtracts), recomputes payment_status and refund_status
+  - supplier_refund (netted via SupplierAllocationModal): reverses refund_received, recomputes refund_status
+  - void_fee_client / void_fee_supplier: nulls out void_fee_collected / void_fee_paid (single-value fields, never counted in amount_paid to begin with)
+- A standalone supplier_refund payment (linked via payments.ticket_id, no ticket_payments row — see RefundModal/LogTransactionModal) reverses refund_received directly against that ticket
+- All reversals floor at 0 rather than go negative. If a running total was already edited down below what this payment contributed (e.g. via "Edit Refund Paid"), the confirm dialog warns that the reversal will floor-clamp rather than fully undo the payment
+- Forward-to-Supplier pairs are NOT linked in the schema — deleting one side never touches the other
+- Not atomic (sequential calls, no DB transaction) — consistent with the rest of the app
+
 ## Payment Details / Edit Modal (ViewPaymentModal)
 - Opened via "View" (Payments page) or "View / Edit" (Client/Supplier Detail payment history) row action, for any payment type
 - Read-only view by default; "Edit" button switches the amount/channel/trx_id/notes/payment_date fields into inputs, "Cancel" reverts, "Save changes" commits

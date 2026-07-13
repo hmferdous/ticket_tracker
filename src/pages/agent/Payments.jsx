@@ -7,6 +7,7 @@ import SupplierAllocationModal from "../../components/suppliers/SupplierAllocati
 import ViewPaymentModal from "../../components/payments/ViewPaymentModal"
 import LogTransactionModal from "../../components/payments/LogTransactionModal"
 import { fetchChannels } from "../../lib/channels"
+import { deriveRefundStatus } from "../../lib/refunds"
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 200]
 
@@ -89,6 +90,67 @@ function TicketTagCell({ payment }) {
   )
 }
 
+function derivePaymentStatus(amountPaid, sellPrice) {
+  if (amountPaid <= 0) return "unpaid"
+  if (amountPaid >= sellPrice) return "paid"
+  return "partial"
+}
+
+// Reverses the effect of one ticket_payments row when its parent payment is
+// deleted. allocated_amount is already signed (negative for client_refund /
+// netted supplier_refund rows), so the same subtraction/addition works for
+// both the normal and refund-settling cases. `clamped` flags when the
+// reversal would have gone negative — the running total was already edited
+// down below what this row contributed, so we're floor-clamping rather than
+// truly undoing it.
+function reverseTicketPaymentRow(ticket, tp) {
+  if (tp.type === "client") {
+    const raw = (ticket.amount_paid ?? 0) - tp.allocated_amount
+    const newAmountPaid = Math.max(0, raw)
+    return {
+      clamped: raw < 0,
+      updates: { amount_paid: newAmountPaid, payment_status: derivePaymentStatus(newAmountPaid, ticket.sell_price ?? 0) },
+    }
+  }
+  if (tp.type === "supplier") {
+    // supplierAmountPaid is derived live from ticket_payments — nothing stored to reverse
+    return { clamped: false, updates: {} }
+  }
+  if (tp.type === "client_refund") {
+    const rawAmountPaid = (ticket.amount_paid ?? 0) - tp.allocated_amount
+    const rawRefundPaid = (ticket.refund_paid ?? 0) + tp.allocated_amount
+    const newAmountPaid = Math.max(0, rawAmountPaid)
+    const newRefundPaid = Math.max(0, rawRefundPaid)
+    return {
+      clamped: rawAmountPaid < 0 || rawRefundPaid < 0,
+      updates: {
+        amount_paid: newAmountPaid,
+        payment_status: derivePaymentStatus(newAmountPaid, ticket.sell_price ?? 0),
+        refund_paid: newRefundPaid,
+        refund_status: deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, ticket.refund_received, newRefundPaid),
+      },
+    }
+  }
+  if (tp.type === "supplier_refund") {
+    const raw = (ticket.refund_received ?? 0) + tp.allocated_amount
+    const newReceived = Math.max(0, raw)
+    return {
+      clamped: raw < 0,
+      updates: {
+        refund_received: newReceived,
+        refund_status: deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, newReceived, ticket.refund_paid),
+      },
+    }
+  }
+  if (tp.type === "void_fee_client") {
+    return { clamped: false, updates: { void_fee_collected: null } }
+  }
+  if (tp.type === "void_fee_supplier") {
+    return { clamped: false, updates: { void_fee_paid: null } }
+  }
+  return { clamped: false, updates: {} }
+}
+
 function StatChip({ label, value, accent }) {
   return (
     <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full text-sm">
@@ -119,6 +181,7 @@ export default function Payments() {
   const [allocationTarget, setAllocationTarget] = useState(null) // { kind: 'client'|'supplier', payment, tickets, name }
   const [allocatingId, setAllocatingId] = useState(null)
   const [showLogTransaction, setShowLogTransaction] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
 
   useEffect(() => {
     if (agent?.id) {
@@ -225,6 +288,74 @@ export default function Payments() {
 
   const handleAllocationClose = () => {
     setAllocationTarget(null)
+    fetchPayments()
+  }
+
+  const handleDeletePayment = async (payment) => {
+    const { data: tps } = await supabase
+      .from("ticket_payments")
+      .select("id, ticket_id, allocated_amount, type")
+      .eq("payment_id", payment.id)
+
+    const isStandaloneSupplierRefund = payment.type === "supplier_refund" && payment.ticket_id && (tps ?? []).length === 0
+
+    const ticketIds = new Set((tps ?? []).map((tp) => tp.ticket_id))
+    if (isStandaloneSupplierRefund) ticketIds.add(payment.ticket_id)
+
+    let ticketsById = new Map()
+    if (ticketIds.size > 0) {
+      const { data: tickets } = await supabase
+        .from("tickets")
+        .select("id, amount_paid, sell_price, refund_receivable, refund_payable, refund_received, refund_paid, void_fee_collected, void_fee_paid")
+        .in("id", Array.from(ticketIds))
+      ticketsById = new Map((tickets ?? []).map((t) => [t.id, t]))
+    }
+
+    const reversals = (tps ?? [])
+      .map((tp) => ({ tp, ticket: ticketsById.get(tp.ticket_id) }))
+      .filter((r) => r.ticket)
+      .map((r) => ({ ...r, ...reverseTicketPaymentRow(r.ticket, r.tp) }))
+
+    let standaloneReversal = null
+    if (isStandaloneSupplierRefund) {
+      const ticket = ticketsById.get(payment.ticket_id)
+      if (ticket) {
+        const raw = (ticket.refund_received ?? 0) - (payment.amount ?? 0)
+        const newReceived = Math.max(0, raw)
+        standaloneReversal = {
+          clamped: raw < 0,
+          updates: {
+            refund_received: newReceived,
+            refund_status: deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, newReceived, ticket.refund_paid),
+          },
+        }
+      }
+    }
+
+    const anyClamped = reversals.some((r) => r.clamped) || standaloneReversal?.clamped
+    const warning = anyClamped
+      ? "\n\nWarning: one or more linked tickets already had their running total edited lower than what this payment contributed — the reversal will floor at 0 instead of going negative, which may not fully undo this payment's effect."
+      : ""
+    if (!window.confirm(`Delete this payment? This cannot be undone.${warning}`)) return
+
+    setDeletingId(payment.id)
+
+    for (const r of reversals) {
+      if (Object.keys(r.updates).length > 0) {
+        await supabase.from("tickets").update(r.updates).eq("id", r.tp.ticket_id)
+      }
+    }
+    if (standaloneReversal) {
+      await supabase.from("tickets").update(standaloneReversal.updates).eq("id", payment.ticket_id)
+    }
+
+    if ((tps ?? []).length > 0) {
+      await supabase.from("ticket_payments").delete().eq("payment_id", payment.id)
+    }
+
+    const { error } = await supabase.from("payments").delete().eq("id", payment.id)
+    setDeletingId(null)
+    if (error) { setError(error.message); return }
     fetchPayments()
   }
 
@@ -396,6 +527,13 @@ export default function Payments() {
                               className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
                             >
                               View
+                            </button>
+                            <button
+                              onClick={() => handleDeletePayment(payment)}
+                              disabled={deletingId === payment.id}
+                              className="text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50"
+                            >
+                              {deletingId === payment.id ? "…" : "Delete"}
                             </button>
                           </div>
                         </td>

@@ -24,7 +24,7 @@ Never disable RLS on any table
 - amount_paid — derived from SUM(ticket_payments.allocated_amount) for this ticket
 - payment_status — unpaid, partial, paid (derived from amount_paid vs sell_price)
 - status — booked, collected, supplier_paid, flown, closed, reissued, void
-- refund_status — null, initiated, supplier_refunded, client_refunded, closed
+- refund_status — null, initiated, supplier_refunded, client_refunded, closed. Derived, not manually set past initiation — see "Refund Architecture" below
 - parent_ticket_id — nullable FK to tickets.id. Set when this ticket is a reissue of another.
 - is_reissue — boolean. true if this ticket was created as a reissue of another ticket.
 - is_void — boolean. true if ticket was voided.
@@ -57,8 +57,8 @@ Note: reissue fees and fare_difference are NOT separately added to net_margin. T
 ### Dashboard Reporting
 - Total Profit = SUM(net_margin) across all tickets in period
 - Office Margin = SUM(office_markup) across all tickets in period
-- Total Refunded to Clients = SUM(tickets.refund_paid) across all tickets — ticket-level, not the payments table. A client refund recorded via the ticket-row "Record Client Refund" action never creates a payments row (see Void Flow / Refund Flow), so summing payments.type=client_refund undercounts; refund_paid is set by both recording paths
-- Open Refunds / Awaiting From Supplier / Owed To Clients — the refund lifecycle has 4 states (initiated -> supplier_refunded or client_refunded, whichever side settles first -> closed). These filter on the actual field that's still null (refund_received == null / refund_paid == null) rather than a specific status string, so a refund stays counted regardless of which side settled first. Refund Net Margin only counts refund_status = closed (fully settled on both sides)
+- Total Refunded to Clients = SUM(tickets.refund_paid) across all tickets — ticket-level, not the payments table. refund_paid is the running cumulative total (see "Refund Architecture"), kept in sync with the real client_refund payment rows by every recording path
+- Open Refunds / Awaiting From Supplier / Owed To Clients — the refund lifecycle has 4 states (initiated -> supplier_refunded or client_refunded, whichever side settles first -> closed), derived by comparing cumulative actuals against agreed targets (see deriveRefundStatus in "Refund Architecture"). Awaiting From Supplier / Owed To Clients sum the actual remaining balance per ticket (`max(receivable - received, 0)` / `max(payable - paid, 0)`), not an all-or-nothing null check, so a partial receipt still counts toward what's left. Refund Net Margin only counts refund_status = closed (fully settled on both sides)
 
 ### Removed Fields
 - reported_price — REMOVED. Do not use or reference anywhere.
@@ -86,7 +86,11 @@ payments:
 ticket_payments:
   id, payment_id, ticket_id
   allocated_amount — amount from this payment applied to this ticket
-  type: client | supplier | client_refund (client_refund used when linking a client_refund payment to a ticket — allocated_amount is negative, reducing the ticket's amount_paid)
+  type: client | supplier | client_refund | supplier_refund | void_fee_client | void_fee_supplier
+    - client / supplier: normal fare/purchase payments, positive allocated_amount, summed into amount_paid/supplierAmountPaid
+    - client_refund: a client refund settled through the client-side AllocationModal (netted against a bulk client payment) — negative allocated_amount, reducing the ticket's amount_paid
+    - supplier_refund: a supplier refund settled through the supplier-side SupplierAllocationModal (netted against a bulk outgoing supplier payment) — negative allocated_amount. Distinct from payments.type=supplier_refund (a standalone receipt, linked via payments.ticket_id instead — see "Refund Architecture")
+    - void_fee_client / void_fee_supplier: cancellation fee payments, excluded from the amount_paid/supplierAmountPaid derivation (see Void Flow)
   created_at
 
 payment_channels:
@@ -129,15 +133,15 @@ payment_channels:
 - 2-step modal: type selector → type-specific form
 - Types: Client Payment (IN), Supplier Payment (OUT), Client Refund (OUT), Supplier Refund (IN)
 - After logging a client_payment or supplier_payment, the AllocationModal is triggered automatically
-- client_refund: unallocated_amount = 0; if linked to a ticket, inserts a ticket_payments row with type=client_refund and negative allocated_amount, then updates ticket.amount_paid and payment_status
-- supplier_refund: unallocated_amount = 0; if linked to a ticket, sets payments.ticket_id and updates ticket.refund_received and refund_status
+- client_refund: unallocated_amount = 0; if linked to a ticket, inserts a ticket_payments row with type=client_refund and negative allocated_amount, then updates ticket.amount_paid/payment_status. If that ticket has an open refund on file (refund_status set and not closed), also adds the amount to the ticket's cumulative refund_paid and recomputes refund_status via deriveRefundStatus — otherwise it's treated as a plain fare refund with no formal refund tracking to advance
+- supplier_refund: unallocated_amount = 0; if linked to a ticket with an open refund on file, adds the amount to the ticket's cumulative refund_received and recomputes refund_status via deriveRefundStatus (payments.ticket_id is always set when a ticket is picked, regardless of whether refund tracking was advanced — see Payment Tables Schema)
 
 ### Editing a Logged Payment (ViewPaymentModal)
 - Any payment can be reopened and edited: amount, channel, trx_id, notes, payment_date
 - client_payment / supplier_payment: unallocated_amount shifts by the same delta as the amount edit; can't be reduced below the already-allocated portion
-- client_refund linked to a ticket (via ticket_payments): amount edit also updates that ticket_payments row's allocated_amount and recomputes the ticket's amount_paid/payment_status; blocked if it would drive amount_paid negative
-- supplier_refund linked to a ticket (via payments.ticket_id): amount edit also updates that ticket's refund_received
-- Editing a ticket's refund_received/refund_paid directly (RefundModal's "Edit Refund Received"/"Edit Refund Paid" row actions) does the reverse sync — it looks up and updates the linked payments/ticket_payments rows so the two stay consistent regardless of which side is corrected
+- client_refund linked to a ticket (via ticket_payments): amount edit is delta-based — the delta shifts the ticket_payments row's allocated_amount, the ticket's amount_paid (opposite direction) and refund_paid (same direction), and recomputes payment_status/refund_status via deriveRefundStatus; blocked if it would drive amount_paid or refund_paid negative
+- supplier_refund linked to a ticket (via payments.ticket_id): amount edit is delta-based — the delta shifts the ticket's refund_received and recomputes refund_status via deriveRefundStatus; blocked if it would drive refund_received negative
+- Editing a ticket's refund_received/refund_paid directly (RefundModal's "Edit Refund Received"/"Edit Refund Paid" row actions) is a blunt override of the running total — it does NOT reverse-sync the individual payments/ticket_payments rows that fed into it (there's no reliable way to redistribute a single overridden total back across multiple prior receipts). Use it only to correct the running total itself, not to edit an individual receipt — edit the individual payment via ViewPaymentModal for that
 
 ### Forward to Supplier (Passthrough Payment)
 - When logging a client payment, agent can optionally forward all or part to a supplier in the same action
@@ -171,14 +175,35 @@ payments rows created on forward:
 - Type 2: Partial refund with penalty — supplier refunds less due to airline penalty, agent decides how much to pass to client
 - Type 3: Void — ticket cancelled, may or may not have money exchanged
 
+### Cumulative Tracking Model
+refund_receivable/refund_payable are the agreed TARGETS, set once via Initiate/Edit Refund Terms. refund_received/refund_paid are cumulative running ACTUALS — every recording action adds to them rather than overwriting, so a refund can be settled across multiple partial receipts/payments on either side, independently, in any order. refund_status is derived (never manually set past initiation) by `deriveRefundStatus` (`src/lib/refunds.js`), shared by every write path (RefundModal, LogTransactionModal, AllocationModal, SupplierAllocationModal, ViewPaymentModal):
+  - supplierDone = receivable is null, OR received >= receivable
+  - clientDone = payable is null, OR paid >= payable
+  - both done → closed; only supplier done → supplier_refunded; only client done → client_refunded; neither → initiated
+  - A side with no agreed target (null) is trivially treated as done, since there's nothing to collect/pay on it
+
+### Recording a Refund — Real Payments
+Every refund recording action creates a real, channel-tracked payment row (not just a field update on the ticket), so refunds show up correctly in Payments page totals and channel balances:
+- Supplier side: RefundModal's "Record Supplier Refund" (or LogTransactionModal's Supplier Refund) inserts a payments row (type=supplier_refund, payments.ticket_id set), then adds the amount to refund_received and recomputes refund_status
+- Client side: RefundModal's "Record Client Refund" (or LogTransactionModal's Client Refund) inserts a payments row (type=client_refund) + a ticket_payments row (type=client_refund, negative allocated_amount), then adds the amount to refund_paid, subtracts it from amount_paid (floored at 0), and recomputes payment_status/refund_status
+- Both sides can also be settled by netting against an unrelated bulk payment via AllocationModal/SupplierAllocationModal (see "Refund-Aware Allocation" below) instead of a standalone refund receipt
+- "Edit Refund Received"/"Edit Refund Paid" row actions are a blunt override of the running total — for correcting the total itself, not for editing an individual receipt (see "Editing a Logged Payment")
+
 ### Refund Flow
 1. Agent marks ticket as refund initiated
 2. Enters refund_receivable (expected from supplier) and refund_payable (agreed with client)
-3. When supplier sends money — logs refund_received, status → supplier_refunded
-4. When agent pays client — logs refund_paid, status → client_refunded
-5. Both sides settled — status → closed
+3. Supplier sends money, one or more times — refund_received accumulates; refund_status recomputes to supplier_refunded once it meets refund_receivable
+4. Agent pays client, one or more times — refund_paid accumulates; refund_status recomputes to client_refunded once it meets refund_payable
+5. Both sides settled (or one/both sides has no target at all) — refund_status → closed
 6. refund_margin auto-calculated at all times = refund_received - refund_payable
-7. Agent can refund client before receiving from supplier — system tracks both sides independently
+7. Agent can refund client before receiving from supplier, and either side can be a partial/multi-installment settlement — the two sides are tracked and derived fully independently
+8. Row actions for recording supplier/client refunds stay available for as long as refund_status is set and not closed — not gated on the other side, and not gated on this side already having some progress (label switches from "Record ..." to "Add ..." once there's existing progress on that side)
+
+### Refund-Aware Allocation (Netting)
+AllocationModal (client bulk payments) and SupplierAllocationModal (supplier bulk payments) both treat a ticket with an open refund as a second kind of allocation target, alongside the normal outstanding fare/purchase price:
+- Client side: an incoming bulk client payment can be partly allocated against a DIFFERENT ticket's refund_payable instead of a fare — e.g. the client sends one lump sum that covers a new ticket's fare while implicitly netting off a refund owed to them on an older ticket. Inserts a ticket_payments row (type=client_refund, negative allocated_amount) against the refund ticket, adds to its refund_paid, subtracts from its amount_paid, recomputes both statuses
+- Supplier side: an outgoing bulk supplier payment can be partly allocated against a different ticket's refund_receivable instead of a purchase price — e.g. paying a supplier for new tickets while netting off a refund they owe on a voided ticket instead of collecting it separately. Inserts a ticket_payments row (type=supplier_refund, negative allocated_amount) against the refund ticket, adds to its refund_received, recomputes refund_status
+- "Distribute Evenly" mode only considers fare-kind tickets (an even split across a mix of fare/refund purposes isn't a meaningful default); "Select Tickets" mode shows both kinds with a Purpose badge ("Fare" / "Refund owed")
 
 ### Void Flow
 - Agent marks ticket as void — status → void, is_void = true
@@ -255,8 +280,8 @@ RLS policy: agent can only access rows where agent_id matches their own agents.i
 - Refund: status is not void, not reissued, refund_status is null
 - Reissue: status is not void, not reissued, refund_status is not initiated
 - Record Payment: payment_status is not paid and status is not void
-- Record Supplier Refund: refund_status is set and not closed, refund_received is null
-- Record Client Refund: refund_status is set and not closed, refund_paid is null
+- Record/Add Supplier Refund: refund_status is set and not closed (available repeatedly regardless of existing progress on either side — label switches to "Add ..." once refund_received > 0)
+- Record/Add Client Refund: refund_status is set and not closed (available repeatedly regardless of existing progress on either side — label switches to "Add ..." once refund_paid > 0)
 - View: always shown
 - Edit and Delete remain available on every row alongside the contextual actions above
 - Actions are grouped behind a row-level hamburger menu (not inline buttons)

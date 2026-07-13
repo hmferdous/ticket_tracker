@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { fetchChannels } from "../../lib/channels"
+import { deriveRefundStatus } from "../../lib/refunds"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -57,6 +58,7 @@ function buildForm(payment) {
 export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) {
   const { agent } = useAuth()
   const [allocations, setAllocations] = useState([])
+  const [linkedTicket, setLinkedTicket] = useState(null)
   const [channels, setChannels] = useState([])
   const [loading, setLoading] = useState(false)
   const [editing, setEditing] = useState(false)
@@ -69,9 +71,12 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
       setEditing(false)
       setForm(buildForm(payment))
       fetchAllocations()
+      if (payment.type === "supplier_refund" && payment.ticket_id) fetchLinkedTicket()
+      else setLinkedTicket(null)
       if (agent?.id) fetchChannels(agent.id, { includeArchived: true }).then(({ data }) => setChannels(data ?? []))
     } else {
       setAllocations([])
+      setLinkedTicket(null)
       setError("")
     }
   }, [isOpen, payment, agent?.id])
@@ -81,12 +86,24 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
     setError("")
     const { data, error } = await supabase
       .from("ticket_payments")
-      .select("id, allocated_amount, type, tickets(id, passenger_name, route, amount_paid, sell_price)")
+      .select(
+        "id, allocated_amount, type, tickets(id, passenger_name, route, amount_paid, sell_price, " +
+          "refund_receivable, refund_payable, refund_received, refund_paid, refund_status)"
+      )
       .eq("payment_id", payment.id)
 
     setLoading(false)
     if (error) setError(error.message)
     else setAllocations(data ?? [])
+  }
+
+  const fetchLinkedTicket = async () => {
+    const { data } = await supabase
+      .from("tickets")
+      .select("id, refund_receivable, refund_payable, refund_received, refund_paid, refund_status")
+      .eq("id", payment.ticket_id)
+      .single()
+    setLinkedTicket(data ?? null)
   }
 
   if (!isOpen || !payment) return null
@@ -155,12 +172,19 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
 
     if (cascadesToTicket) {
       const oldAmount = payment.amount ?? 0
+      const delta = amount - oldAmount
       const ticket = linkedRefundAlloc.tickets
-      const newAmountPaid = (ticket?.amount_paid ?? 0) + oldAmount - amount
+      const newAmountPaid = (ticket?.amount_paid ?? 0) - delta
+      const newRefundPaid = (ticket?.refund_paid ?? 0) + delta
 
       if (newAmountPaid < 0) {
         setSaving(false)
         setError(`That would leave the linked ticket's paid amount negative. The most this refund can be is ${fmt((ticket?.amount_paid ?? 0) + oldAmount)}.`)
+        return
+      }
+      if (newRefundPaid < 0) {
+        setSaving(false)
+        setError("That would leave the linked ticket's refund paid negative.")
         return
       }
 
@@ -172,18 +196,30 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
 
       if (ticket) {
         const newStatus = derivePaymentStatus(newAmountPaid, ticket.sell_price ?? 0)
+        const newRefundStatus = deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, ticket.refund_received, newRefundPaid)
         const { error: tErr } = await supabase
           .from("tickets")
-          .update({ amount_paid: newAmountPaid, payment_status: newStatus })
+          .update({ amount_paid: newAmountPaid, payment_status: newStatus, refund_paid: newRefundPaid, refund_status: newRefundStatus })
           .eq("id", ticket.id)
         if (tErr) { setSaving(false); setError(tErr.message); return }
       }
     }
 
-    if (payment.type === "supplier_refund" && payment.ticket_id) {
+    if (payment.type === "supplier_refund" && payment.ticket_id && linkedTicket) {
+      const oldAmount = payment.amount ?? 0
+      const delta = amount - oldAmount
+      const newReceived = (linkedTicket.refund_received ?? 0) + delta
+
+      if (newReceived < 0) {
+        setSaving(false)
+        setError("That would leave the linked ticket's refund received negative.")
+        return
+      }
+
+      const newRefundStatus = deriveRefundStatus(linkedTicket.refund_receivable, linkedTicket.refund_payable, newReceived, linkedTicket.refund_paid)
       const { error: srErr } = await supabase
         .from("tickets")
-        .update({ refund_received: amount })
+        .update({ refund_received: newReceived, refund_status: newRefundStatus })
         .eq("id", payment.ticket_id)
       if (srErr) { setSaving(false); setError(srErr.message); return }
     }

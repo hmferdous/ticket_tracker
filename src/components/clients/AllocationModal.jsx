@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "../../lib/supabase"
+import { deriveRefundStatus } from "../../lib/refunds"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -19,12 +20,13 @@ function derivePaymentStatus(amountPaid, sellPrice) {
 
 function buildAllocations(eligibleTickets, available, mode, selectedIds) {
   if (mode === "distribute") {
-    const count = eligibleTickets.length
+    const fareTickets = eligibleTickets.filter((t) => t.kind === "fare")
+    const count = fareTickets.length
     if (count === 0 || available <= 0) return []
     const share = available / count
     let remaining = available
     const allocations = []
-    for (const t of eligibleTickets) {
+    for (const t of fareTickets) {
       if (remaining <= 0) break
       const amt = Math.min(share, t.outstanding, remaining)
       if (amt > 0) {
@@ -63,11 +65,18 @@ export default function AllocationModal({ isOpen, onClose, payment, clientName, 
     }
   }, [isOpen, payment])
 
+  // Two kinds of allocation target: a normal unpaid/partial fare (pays down
+  // the ticket), or a ticket with an active refund still owed to the client
+  // (settles the refund instead) — e.g. netting an incoming bulk payment
+  // against a refund owed on a different ticket for the same client.
   const eligibleTickets = useMemo(() => {
-    return tickets
+    const fare = tickets
       .filter((t) => t.payment_status === "unpaid" || t.payment_status === "partial")
-      .map((t) => ({ ...t, outstanding: (t.sell_price ?? 0) - (t.amount_paid ?? 0) }))
-      .sort((a, b) => (a.issue_date || a.created_at || "").localeCompare(b.issue_date || b.created_at || ""))
+      .map((t) => ({ ...t, kind: "fare", outstanding: (t.sell_price ?? 0) - (t.amount_paid ?? 0) }))
+    const refund = tickets
+      .filter((t) => t.refund_status != null && (t.refund_payable ?? 0) - (t.refund_paid ?? 0) > 0)
+      .map((t) => ({ ...t, kind: "refund", outstanding: (t.refund_payable ?? 0) - (t.refund_paid ?? 0) }))
+    return [...fare, ...refund].sort((a, b) => (a.issue_date || a.created_at || "").localeCompare(b.issue_date || b.created_at || ""))
   }, [tickets])
 
   if (!isOpen || !payment) return null
@@ -101,8 +110,8 @@ export default function AllocationModal({ isOpen, onClose, payment, clientName, 
       allocations.map((a) => ({
         payment_id: payment.id,
         ticket_id: a.ticket.id,
-        allocated_amount: a.amount,
-        type: "client",
+        allocated_amount: a.ticket.kind === "refund" ? -a.amount : a.amount,
+        type: a.ticket.kind === "refund" ? "client_refund" : "client",
       }))
     )
     if (tpErr) {
@@ -122,12 +131,28 @@ export default function AllocationModal({ isOpen, onClose, payment, clientName, 
     }
 
     for (const a of allocations) {
-      const newAmountPaid = (a.ticket.amount_paid ?? 0) + a.amount
-      const newStatus = derivePaymentStatus(newAmountPaid, a.ticket.sell_price ?? 0)
-      await supabase
-        .from("tickets")
-        .update({ amount_paid: newAmountPaid, payment_status: newStatus })
-        .eq("id", a.ticket.id)
+      if (a.ticket.kind === "refund") {
+        const newPaid = (a.ticket.refund_paid ?? 0) + a.amount
+        const newAmountPaid = Math.max(0, (a.ticket.amount_paid ?? 0) - a.amount)
+        const newPaymentStatus = derivePaymentStatus(newAmountPaid, a.ticket.sell_price ?? 0)
+        const newRefundStatus = deriveRefundStatus(a.ticket.refund_receivable, a.ticket.refund_payable, a.ticket.refund_received, newPaid)
+        await supabase
+          .from("tickets")
+          .update({
+            refund_paid: newPaid,
+            amount_paid: newAmountPaid,
+            payment_status: newPaymentStatus,
+            refund_status: newRefundStatus,
+          })
+          .eq("id", a.ticket.id)
+      } else {
+        const newAmountPaid = (a.ticket.amount_paid ?? 0) + a.amount
+        const newStatus = derivePaymentStatus(newAmountPaid, a.ticket.sell_price ?? 0)
+        await supabase
+          .from("tickets")
+          .update({ amount_paid: newAmountPaid, payment_status: newStatus })
+          .eq("id", a.ticket.id)
+      }
     }
 
     setLoading(false)
@@ -167,13 +192,13 @@ export default function AllocationModal({ isOpen, onClose, payment, clientName, 
               <button type="button" onClick={() => setMode("distribute")} className={cardCls}>
                 <h3 className="text-sm font-semibold text-gray-900 mb-1">Distribute Evenly</h3>
                 <p className="text-xs text-gray-500">
-                  Splits {fmt(available)} equally across {eligibleTickets.length} unpaid/partial ticket{eligibleTickets.length === 1 ? "" : "s"}
+                  Splits {fmt(available)} equally across {eligibleTickets.filter((t) => t.kind === "fare").length} unpaid/partial ticket{eligibleTickets.filter((t) => t.kind === "fare").length === 1 ? "" : "s"}
                 </p>
               </button>
               <button type="button" onClick={() => setMode("select")} className={cardCls}>
                 <h3 className="text-sm font-semibold text-gray-900 mb-1">Select Tickets</h3>
                 <p className="text-xs text-gray-500">
-                  Pick specific tickets — fills oldest first until the amount runs out
+                  Pick specific tickets — fills oldest first. Includes tickets with a refund still owed to this client
                 </p>
               </button>
               <button type="button" onClick={onClose} className={cardCls}>
@@ -187,7 +212,7 @@ export default function AllocationModal({ isOpen, onClose, payment, clientName, 
 
           {mode === "distribute" && (
             <div className="space-y-3">
-              {eligibleTickets.length === 0 ? (
+              {allocations.length === 0 ? (
                 <p className="text-sm text-gray-400">No unpaid or partial tickets to allocate to.</p>
               ) : (
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
@@ -223,7 +248,7 @@ export default function AllocationModal({ isOpen, onClose, payment, clientName, 
           {mode === "select" && (
             <div className="space-y-3">
               {eligibleTickets.length === 0 ? (
-                <p className="text-sm text-gray-400">No unpaid or partial tickets to allocate to.</p>
+                <p className="text-sm text-gray-400">No unpaid/partial tickets or open refunds to allocate to.</p>
               ) : (
                 <div className="border border-gray-200 rounded-lg overflow-hidden">
                   <table className="w-full text-sm">
@@ -233,6 +258,7 @@ export default function AllocationModal({ isOpen, onClose, payment, clientName, 
                         <th className="px-3 py-2 font-medium">Passenger</th>
                         <th className="px-3 py-2 font-medium">Route</th>
                         <th className="px-3 py-2 font-medium">Travel Date</th>
+                        <th className="px-3 py-2 font-medium">Purpose</th>
                         <th className="px-3 py-2 font-medium text-right">Outstanding</th>
                         <th className="px-3 py-2 font-medium text-right">Allocating</th>
                       </tr>
@@ -253,6 +279,15 @@ export default function AllocationModal({ isOpen, onClose, payment, clientName, 
                             <td className="px-3 py-2 text-gray-700">{ticket.passenger_name}</td>
                             <td className="px-3 py-2 text-gray-600">{ticket.route ?? "—"}</td>
                             <td className="px-3 py-2 text-gray-600">{fmtDate(ticket.travel_date)}</td>
+                            <td className="px-3 py-2">
+                              <span
+                                className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                                  ticket.kind === "refund" ? "bg-orange-100 text-orange-700" : "bg-blue-100 text-blue-700"
+                                }`}
+                              >
+                                {ticket.kind === "refund" ? "Refund owed" : "Fare"}
+                              </span>
+                            </td>
                             <td className="px-3 py-2 text-right tabular-nums text-gray-600">{fmt(ticket.outstanding)}</td>
                             <td className="px-3 py-2 text-right tabular-nums font-medium text-blue-700">
                               {allocation ? fmt(allocation.amount) : "—"}

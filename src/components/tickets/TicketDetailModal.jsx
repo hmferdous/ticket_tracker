@@ -16,6 +16,7 @@ function paymentSideLabel(type) {
     case "void_fee_client": return "Void Fee (Client)"
     case "void_fee_supplier": return "Void Fee (Supplier)"
     case "client_refund": return "Client Refund"
+    case "supplier_refund": return "Supplier Refund"
     default: return type
   }
 }
@@ -40,13 +41,30 @@ export default function TicketDetailModal({ isOpen, onClose, ticket, tickets, on
 
   const fetchHistory = async () => {
     setLoadingHistory(true)
-    const { data } = await supabase
-      .from("ticket_payments")
-      .select("id, allocated_amount, type, payments(id, amount, channel, trx_id, payment_date, type, notes)")
-      .eq("ticket_id", ticket.id)
-      .order("created_at", { ascending: false })
+    const [{ data: viaJunction }, { data: viaDirect }] = await Promise.all([
+      supabase
+        .from("ticket_payments")
+        .select("id, allocated_amount, type, payments(id, amount, channel, trx_id, payment_date, type, notes)")
+        .eq("ticket_id", ticket.id),
+      // supplier_refund payments link straight to the ticket via payments.ticket_id
+      // instead of a ticket_payments row, so they need a separate fetch.
+      supabase
+        .from("payments")
+        .select("id, amount, channel, trx_id, payment_date, type, notes")
+        .eq("ticket_id", ticket.id)
+        .eq("type", "supplier_refund"),
+    ])
     setLoadingHistory(false)
-    setHistory(data ?? [])
+    const direct = (viaDirect ?? []).map((p) => ({
+      id: `payment-${p.id}`,
+      allocated_amount: p.amount,
+      type: p.type,
+      payments: p,
+    }))
+    const merged = [...(viaJunction ?? []), ...direct].sort((a, b) =>
+      (b.payments?.payment_date ?? "").localeCompare(a.payments?.payment_date ?? "")
+    )
+    setHistory(merged)
   }
 
   if (!isOpen || !ticket) return null

@@ -1,20 +1,32 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
+import { useAuth } from "../../context/AuthContext"
+import { fetchChannels } from "../../lib/channels"
+import { deriveRefundStatus } from "../../lib/refunds"
 
 const MODE_CONFIG = {
   initiate: { title: "Initiate refund", confirmLabel: "Start refund" },
   edit: { title: "Edit refund terms", confirmLabel: "Save changes" },
-  supplier: { title: "Record supplier refund", confirmLabel: "Record received" },
-  client: { title: "Record client refund", confirmLabel: "Record paid" },
+  supplier: { title: "Record supplier refund", confirmLabel: "Record receipt" },
+  client: { title: "Record client refund", confirmLabel: "Record payment" },
   edit_supplier_actual: { title: "Edit Supplier Refund Received", confirmLabel: "Save changes" },
   edit_client_actual: { title: "Edit Client Refund Paid", confirmLabel: "Save changes" },
 }
 
+function derivePaymentStatus(amountPaid, sellPrice) {
+  if (amountPaid <= 0) return "unpaid"
+  if (amountPaid >= sellPrice) return "paid"
+  return "partial"
+}
+
 export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) {
+  const { agent } = useAuth()
   const [receivable, setReceivable] = useState("")
   const [payable, setPayable] = useState("")
   const [notes, setNotes] = useState("")
   const [amount, setAmount] = useState("")
+  const [channelId, setChannelId] = useState("")
+  const [channels, setChannels] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -28,9 +40,11 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
         mode === "edit_client_actual" && ticket?.refund_paid != null ? String(ticket.refund_paid) :
         ""
       )
+      setChannelId("")
       setError("")
+      if (agent?.id) fetchChannels(agent.id).then(({ data }) => setChannels(data ?? []))
     }
-  }, [isOpen, ticket, mode])
+  }, [isOpen, ticket, mode, agent?.id])
 
   if (!isOpen) return null
 
@@ -45,124 +59,185 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
     e.preventDefault()
     setError("")
 
-    let updates
-
     if (mode === "initiate") {
       const refundReceivable = receivable !== "" ? parseFloat(receivable) : null
       const refundPayable = payable !== "" ? parseFloat(payable) : null
-      updates = {
-        refund_status: "initiated",
-        refund_receivable: refundReceivable,
-        refund_payable: refundPayable,
-        refund_notes: notes.trim() || null,
-      }
-    } else if (mode === "edit") {
-      updates = {
-        refund_receivable: receivable !== "" ? parseFloat(receivable) : null,
-        refund_payable: payable !== "" ? parseFloat(payable) : null,
-        refund_notes: notes.trim() || null,
-      }
-    } else if (mode === "supplier") {
-      const value = parseFloat(amount)
-      if (isNaN(value)) {
-        setError("Enter a valid amount")
-        return
-      }
-      updates = {
-        refund_received: value,
-        refund_status: ticket.refund_paid != null ? "closed" : "supplier_refunded",
-      }
-    } else if (mode === "client") {
-      const value = parseFloat(amount)
-      if (isNaN(value)) {
-        setError("Enter a valid amount")
-        return
-      }
-      updates = {
-        refund_paid: value,
-        refund_status: ticket.refund_received != null ? "closed" : "client_refunded",
-      }
-    } else if (mode === "edit_supplier_actual") {
-      const value = parseFloat(amount)
-      if (isNaN(value)) {
-        setError("Enter a valid amount")
-        return
-      }
-      updates = { refund_received: value }
-    } else if (mode === "edit_client_actual") {
-      const value = parseFloat(amount)
-      if (isNaN(value)) {
-        setError("Enter a valid amount")
-        return
-      }
-      updates = { refund_paid: value }
+      setLoading(true)
+      const { data, error } = await supabase
+        .from("tickets")
+        .update({
+          refund_status: "initiated",
+          refund_receivable: refundReceivable,
+          refund_payable: refundPayable,
+          refund_notes: notes.trim() || null,
+        })
+        .eq("id", ticket.id)
+        .select(`*, clients(name), suppliers(name)`)
+        .single()
+      setLoading(false)
+      if (error) { setError(error.message); return }
+      onSaved(data)
+      onClose()
+      return
     }
 
-    setLoading(true)
+    if (mode === "edit") {
+      const newReceivable = receivable !== "" ? parseFloat(receivable) : null
+      const newPayable = payable !== "" ? parseFloat(payable) : null
+      setLoading(true)
+      const { data, error } = await supabase
+        .from("tickets")
+        .update({
+          refund_receivable: newReceivable,
+          refund_payable: newPayable,
+          refund_notes: notes.trim() || null,
+          refund_status: deriveRefundStatus(newReceivable, newPayable, ticket.refund_received, ticket.refund_paid),
+        })
+        .eq("id", ticket.id)
+        .select(`*, clients(name), suppliers(name)`)
+        .single()
+      setLoading(false)
+      if (error) { setError(error.message); return }
+      onSaved(data)
+      onClose()
+      return
+    }
 
-    // Keep any linked payment record (from Log Transaction) in sync with a corrected actual amount
-    if (mode === "edit_supplier_actual") {
-      const { error: prErr } = await supabase
+    if (mode === "supplier") {
+      const value = parseFloat(amount)
+      if (isNaN(value) || value <= 0) { setError("Enter a valid amount"); return }
+      if (!ticket.supplier_id) { setError("This ticket has no supplier linked"); return }
+
+      setLoading(true)
+      const selectedChannel = channels.find((c) => c.id === channelId)
+      const today = new Date().toISOString().split("T")[0]
+
+      const { error: payErr } = await supabase.from("payments").insert({
+        agent_id: agent.id,
+        supplier_id: ticket.supplier_id,
+        ticket_id: ticket.id,
+        type: "supplier_refund",
+        amount: value,
+        unallocated_amount: 0,
+        channel: selectedChannel?.name ?? null,
+        channel_id: channelId || null,
+        payment_date: today,
+      })
+      if (payErr) { setLoading(false); setError(payErr.message); return }
+
+      const newReceived = (ticket.refund_received ?? 0) + value
+      const newStatus = deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, newReceived, ticket.refund_paid)
+
+      const { data, error } = await supabase
+        .from("tickets")
+        .update({ refund_received: newReceived, refund_status: newStatus })
+        .eq("id", ticket.id)
+        .select(`*, clients(name), suppliers(name)`)
+        .single()
+
+      setLoading(false)
+      if (error) { setError(error.message); return }
+      onSaved(data)
+      onClose()
+      return
+    }
+
+    if (mode === "client") {
+      const value = parseFloat(amount)
+      if (isNaN(value) || value <= 0) { setError("Enter a valid amount"); return }
+      if (!ticket.client_id) { setError("This ticket has no client linked"); return }
+
+      setLoading(true)
+      const selectedChannel = channels.find((c) => c.id === channelId)
+      const today = new Date().toISOString().split("T")[0]
+
+      const { data: payRow, error: payErr } = await supabase
         .from("payments")
-        .update({ amount: updates.refund_received })
-        .eq("ticket_id", ticket.id)
-        .eq("type", "supplier_refund")
-      if (prErr) { setLoading(false); setError(prErr.message); return }
+        .insert({
+          agent_id: agent.id,
+          client_id: ticket.client_id,
+          type: "client_refund",
+          amount: value,
+          unallocated_amount: 0,
+          channel: selectedChannel?.name ?? null,
+          channel_id: channelId || null,
+          payment_date: today,
+        })
+        .select("id")
+        .single()
+      if (payErr) { setLoading(false); setError(payErr.message); return }
+
+      const { error: tpErr } = await supabase.from("ticket_payments").insert({
+        payment_id: payRow.id,
+        ticket_id: ticket.id,
+        allocated_amount: -value,
+        type: "client_refund",
+      })
+      if (tpErr) { setLoading(false); setError(tpErr.message); return }
+
+      const newPaid = (ticket.refund_paid ?? 0) + value
+      const newAmountPaid = Math.max(0, (ticket.amount_paid ?? 0) - value)
+      const newPaymentStatus = derivePaymentStatus(newAmountPaid, ticket.sell_price ?? 0)
+      const newRefundStatus = deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, ticket.refund_received, newPaid)
+
+      const { data, error } = await supabase
+        .from("tickets")
+        .update({
+          refund_paid: newPaid,
+          amount_paid: newAmountPaid,
+          payment_status: newPaymentStatus,
+          refund_status: newRefundStatus,
+        })
+        .eq("id", ticket.id)
+        .select(`*, clients(name), suppliers(name)`)
+        .single()
+
+      setLoading(false)
+      if (error) { setError(error.message); return }
+      onSaved(data)
+      onClose()
+      return
+    }
+
+    if (mode === "edit_supplier_actual") {
+      const value = parseFloat(amount)
+      if (isNaN(value)) { setError("Enter a valid amount"); return }
+      setLoading(true)
+      const { data, error } = await supabase
+        .from("tickets")
+        .update({
+          refund_received: value,
+          refund_status: deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, value, ticket.refund_paid),
+        })
+        .eq("id", ticket.id)
+        .select(`*, clients(name), suppliers(name)`)
+        .single()
+      setLoading(false)
+      if (error) { setError(error.message); return }
+      onSaved(data)
+      onClose()
+      return
     }
 
     if (mode === "edit_client_actual") {
-      const { data: linkedTps, error: findErr } = await supabase
-        .from("ticket_payments")
-        .select("id, payment_id, allocated_amount")
-        .eq("ticket_id", ticket.id)
-        .eq("type", "client_refund")
-      if (findErr) { setLoading(false); setError(findErr.message); return }
-
-      const linkedTp = linkedTps?.[0]
-      if (linkedTp) {
-        const oldAmount = -(linkedTp.allocated_amount ?? 0)
-        const newValue = updates.refund_paid
-        const newAmountPaid = (ticket.amount_paid ?? 0) + oldAmount - newValue
-
-        if (newAmountPaid < 0) {
-          setLoading(false)
-          setError(`That would leave the ticket's paid amount negative. The most this can be is ${((ticket.amount_paid ?? 0) + oldAmount).toLocaleString("en-BD")}.`)
-          return
-        }
-
-        const newStatus = newAmountPaid <= 0 ? "unpaid" : newAmountPaid >= (ticket.sell_price ?? 0) ? "paid" : "partial"
-
-        const { error: tpErr } = await supabase
-          .from("ticket_payments")
-          .update({ allocated_amount: -newValue })
-          .eq("id", linkedTp.id)
-        if (tpErr) { setLoading(false); setError(tpErr.message); return }
-
-        const { error: pErr } = await supabase
-          .from("payments")
-          .update({ amount: newValue })
-          .eq("id", linkedTp.payment_id)
-        if (pErr) { setLoading(false); setError(pErr.message); return }
-
-        updates.amount_paid = newAmountPaid
-        updates.payment_status = newStatus
-      }
-    }
-
-    const { data, error } = await supabase
-      .from("tickets")
-      .update(updates)
-      .eq("id", ticket.id)
-      .select(`*, clients(name), suppliers(name)`)
-      .single()
-
-    setLoading(false)
-    if (error) {
-      setError(error.message)
+      const value = parseFloat(amount)
+      if (isNaN(value)) { setError("Enter a valid amount"); return }
+      setLoading(true)
+      const { data, error } = await supabase
+        .from("tickets")
+        .update({
+          refund_paid: value,
+          refund_status: deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, ticket.refund_received, value),
+        })
+        .eq("id", ticket.id)
+        .select(`*, clients(name), suppliers(name)`)
+        .single()
+      setLoading(false)
+      if (error) { setError(error.message); return }
+      onSaved(data)
+      onClose()
       return
     }
-    onSaved(data)
-    onClose()
   }
 
   const config = MODE_CONFIG[mode] ?? MODE_CONFIG.initiate
@@ -227,9 +302,73 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
               </>
             )}
 
-            {(mode === "supplier" || mode === "edit_supplier_actual") && (
+            {mode === "supplier" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount received from supplier</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className={inputCls}
+                  />
+                  {ticket.refund_receivable != null && (
+                    <p className="mt-1 text-xs text-gray-400">
+                      Expected: {Number(ticket.refund_receivable).toLocaleString("en-BD")}
+                      {(ticket.refund_received ?? 0) > 0 && ` · Received so far: ${Number(ticket.refund_received).toLocaleString("en-BD")}`}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Channel</label>
+                  <select value={channelId} onChange={(e) => setChannelId(e.target.value)} className={inputCls}>
+                    <option value="">— Select —</option>
+                    {channels.map((ch) => (
+                      <option key={ch.id} value={ch.id}>{ch.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {mode === "client" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Amount paid to client</label>
+                  <input
+                    type="number"
+                    required
+                    step="0.01"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className={inputCls}
+                  />
+                  {ticket.refund_payable != null && (
+                    <p className="mt-1 text-xs text-gray-400">
+                      Agreed: {Number(ticket.refund_payable).toLocaleString("en-BD")}
+                      {(ticket.refund_paid ?? 0) > 0 && ` · Paid so far: ${Number(ticket.refund_paid).toLocaleString("en-BD")}`}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Channel</label>
+                  <select value={channelId} onChange={(e) => setChannelId(e.target.value)} className={inputCls}>
+                    <option value="">— Select —</option>
+                    {channels.map((ch) => (
+                      <option key={ch.id} value={ch.id}>{ch.name}</option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
+
+            {mode === "edit_supplier_actual" && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amount received from supplier</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Total received from supplier</label>
                 <input
                   type="number"
                   required
@@ -239,15 +378,15 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
                   placeholder="0.00"
                   className={inputCls}
                 />
-                {ticket.refund_receivable != null && (
-                  <p className="mt-1 text-xs text-gray-400">Expected: {Number(ticket.refund_receivable).toLocaleString("en-BD")}</p>
-                )}
+                <p className="mt-1 text-xs text-gray-400">
+                  Overrides the running total directly — doesn't change any individual refund receipt already logged.
+                </p>
               </div>
             )}
 
-            {(mode === "client" || mode === "edit_client_actual") && (
+            {mode === "edit_client_actual" && (
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Amount paid to client</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Total paid to client</label>
                 <input
                   type="number"
                   required
@@ -257,9 +396,9 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
                   placeholder="0.00"
                   className={inputCls}
                 />
-                {ticket.refund_payable != null && (
-                  <p className="mt-1 text-xs text-gray-400">Agreed: {Number(ticket.refund_payable).toLocaleString("en-BD")}</p>
-                )}
+                <p className="mt-1 text-xs text-gray-400">
+                  Overrides the running total directly — doesn't change any individual refund payment already logged.
+                </p>
               </div>
             )}
           </form>

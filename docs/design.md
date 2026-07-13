@@ -91,7 +91,7 @@ On save:
   - Refund: status not void, not reissued, refund_status is null
   - Reissue: status not void, not reissued, refund_status not initiated
   - Record Payment: payment_status not paid and status not void
-  - Record Supplier Refund / Record Client Refund: shown once a refund is initiated, independently per side (whichever of refund_received / refund_paid is still null)
+  - Record Supplier Refund / Record Client Refund: shown independently per side whenever refund_status is set and not closed — available repeatedly, not gated on the other side or on existing progress on this side (label switches to "Add Supplier Refund Receipt" / "Add Client Refund Payment" once that side already has some progress)
   - Edit Refund Terms: shown whenever a refund exists (refund_status not null), including after settlement
   - Edit Refund Received / Edit Refund Paid: shown per side once that side's actual amount has been recorded, for correcting typos
   - Edit Reissue Details: shown on reissue child tickets (is_reissue = true), not void
@@ -125,18 +125,26 @@ On save:
 
 ## Refund Flow UI
 - Initiated from row level action on ticket list
-- Step 1 modal: enter refund_receivable, refund_payable, and an optional Notes field (saved to its own refund_notes column)
-- Step 2: when supplier sends — Record Supplier Refund action updates refund_received
-- Step 3: when paying client — Record Client Refund action updates refund_paid
+- Step 1 modal: enter refund_receivable, refund_payable, and an optional Notes field (saved to its own refund_notes column) — these are the agreed targets, set once
+- Step 2: Record Supplier Refund action — creates a real, channel-tracked payment and adds the amount to the ticket's cumulative refund_received. Repeatable — a refund can be settled across multiple partial receipts
+- Step 3: Record Client Refund action — creates a real, channel-tracked payment and adds the amount to the ticket's cumulative refund_paid (and subtracts it from amount_paid, floored at 0). Also repeatable
+- refund_status is derived after every recording action by comparing cumulative refund_received/refund_paid against the refund_receivable/refund_payable targets (see database.md's Refund Architecture) — never manually set past initiation
 - Refund margin shown at all times: refund_received - refund_payable
-- Edit Refund Terms action (available whenever a refund exists, including after settlement): reopens the same modal pre-filled with the current refund_receivable / refund_payable / refund_notes. Updates only those fields — never refund_status, refund_received, or refund_paid.
-- Edit Refund Received / Edit Refund Paid actions (available once that actual amount has been recorded): reopens the same modal pre-filled with the current refund_received / refund_paid, for correcting a typo in the real amount. Updates that field — never refund_status — and also syncs any linked payment record from Log Transaction (payments.amount for supplier_refund via ticket_id; the ticket_payments allocation, amount_paid, and payment_status for client_refund), so a correction from either side keeps both in sync. The client_refund sync is blocked with a validation error if it would drive amount_paid negative.
+- Edit Refund Terms action (available whenever a refund exists, including after settlement): reopens the same modal pre-filled with the current refund_receivable / refund_payable / refund_notes. Updates those fields and recomputes refund_status against the new targets — never touches refund_received or refund_paid
+- Edit Refund Received / Edit Refund Paid actions (available once that side's cumulative total is > 0): reopens the same modal pre-filled with the current running total, for overriding the total directly (e.g. to correct a typo across one or more receipts). This is a blunt override — it does NOT reverse-sync the individual payment/ticket_payments rows that fed into that total. To correct one specific receipt, edit that payment via ViewPaymentModal instead
+
+## Refund-Aware Allocation (Netting)
+- AllocationModal (client bulk payments) and SupplierAllocationModal (supplier bulk payments) both offer a second allocation target alongside normal outstanding fare/purchase price: any ticket with an open refund and a positive remaining balance on that side
+- Covers the "netting" case — an incoming bulk client payment covering one ticket's fare while implicitly settling a refund owed on a different ticket for the same client (or the supplier-side mirror: an outgoing bulk supplier payment that nets off a refund the supplier owes)
+- "Select Tickets" mode shows a Purpose badge per row — "Fare" (blue) or "Refund owed" (orange) — so it's clear which kind each allocation settles
+- "Distribute Evenly" mode only ever splits across fare-kind tickets; refund-kind tickets are select-only
+- Refund-kind allocations create a ticket_payments row (negative allocated_amount, type=client_refund or supplier_refund) and update the ticket's refund_received/refund_paid + refund_status exactly like a standalone refund receipt would, just funded from this bulk payment instead of a separate one
 
 ## Payment Allocation UX
 - Triggered immediately after logging a client_payment or supplier_payment (from Payments page or client/supplier detail)
 - Three options presented:
-  1. Distribute evenly — splits payment equally across all pending tickets for that client/supplier
-  2. Select tickets — agent picks specific tickets, system fills oldest first until money runs out, last ticket may be partial
+  1. Distribute evenly — splits payment equally across all pending fare tickets for that client/supplier
+  2. Select tickets — agent picks specific tickets (fare or refund purpose, see "Refund-Aware Allocation"), system fills oldest first until money runs out, last ticket may be partial
   3. Skip — full amount sits as unallocated credit on client/supplier account
 - Unallocated credit shown clearly on client/supplier profile
 - Settle button on client page allows agent to allocate remaining credit at any time
@@ -152,15 +160,15 @@ On save:
 - Client Payment extras: collapsible "Forward to supplier" section — supplier dropdown, amount (auto-fills from payment amount), channel, trx_id, "Different amount to supplier" toggle
 - Client/Supplier Refund extras: optional "Link to Ticket" searchable dropdown filtered by selected entity
 - On save for client_payment/supplier_payment: AllocationModal triggered immediately
-- On save for refunds: refreshes payments list
+- On save for refunds: refreshes payments list. If linked to a ticket that has an open refund on file, also advances that ticket's cumulative refund_received/refund_paid and recomputes refund_status the same way RefundModal's row actions do — a plain fare-refund link (no open refund on file) only adjusts amount_paid, same as before
 
 ## Payment Details / Edit Modal (ViewPaymentModal)
 - Opened via "View" (Payments page) or "View / Edit" (Client/Supplier Detail payment history) row action, for any payment type
 - Read-only view by default; "Edit" button switches the amount/channel/trx_id/notes/payment_date fields into inputs, "Cancel" reverts, "Save changes" commits
 - Amount editing rules by type:
   - client_payment / supplier_payment: unallocated_amount adjusts by the same delta as amount — can't reduce amount below the already-allocated portion
-  - client_refund linked to a ticket: also updates that ticket's ticket_payments allocation and recomputes the ticket's amount_paid / payment_status; blocked with a validation error (not clamped) if the result would go negative
-  - supplier_refund linked to a ticket (via payments.ticket_id): also updates that ticket's refund_received
+  - client_refund linked to a ticket: the amount delta shifts that ticket's ticket_payments allocation, amount_paid (opposite direction), and refund_paid (same direction), recomputing payment_status/refund_status; blocked with a validation error (not clamped) if amount_paid or refund_paid would go negative
+  - supplier_refund linked to a ticket (via payments.ticket_id): the amount delta shifts that ticket's refund_received, recomputing refund_status; blocked with a validation error if refund_received would go negative
   - client_refund not linked, or supplier_refund not linked: only the payment row updates — a note explains this doesn't cascade to any ticket
 - "Allocated to Tickets" list always shown read-only below, same as the original view
 
@@ -273,5 +281,5 @@ On save:
   - Original ticket margin
   - All child reissue margins
   - Chain net margin total
-- Shows full payment history — all payment IDs that contributed, date, amount, channel
+- Shows full payment history — all payment IDs that contributed, date, amount, channel. Merges two sources: ticket_payments rows (client/supplier/client_refund/supplier_refund/void_fee_*) and, separately, any supplier_refund payments linked via payments.ticket_id directly (these don't have a ticket_payments row), sorted together by date
 - Shows refund status and amounts if applicable

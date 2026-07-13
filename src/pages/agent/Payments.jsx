@@ -196,14 +196,20 @@ export default function Payments() {
     if (payment.client_id) {
       const { data } = await supabase
         .from("tickets")
-        .select("id, passenger_name, route, travel_date, issue_date, sell_price, amount_paid, payment_status, created_at")
+        .select(
+          "id, passenger_name, route, travel_date, issue_date, sell_price, amount_paid, payment_status, created_at, " +
+            "refund_status, refund_receivable, refund_received, refund_payable, refund_paid"
+        )
         .eq("client_id", payment.client_id)
         .eq("agent_id", agent.id)
       setAllocationTarget({ kind: "client", payment, tickets: data ?? [], name: payment.clients?.name })
     } else if (payment.supplier_id) {
       const { data } = await supabase
         .from("tickets")
-        .select("id, passenger_name, route, travel_date, issue_date, purchase_price, ticket_payments(allocated_amount, type), created_at")
+        .select(
+          "id, passenger_name, route, travel_date, issue_date, purchase_price, ticket_payments(allocated_amount, type), created_at, " +
+            "refund_status, refund_receivable, refund_received, refund_payable, refund_paid"
+        )
         .eq("supplier_id", payment.supplier_id)
         .eq("agent_id", agent.id)
       const withSupplierPaid = (data ?? []).map((t) => ({

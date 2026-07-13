@@ -313,12 +313,15 @@ export default function Dashboard() {
   // stays visible regardless of which side settled first.
   const refundStats = useMemo(() => ({
     openCount: tickets.filter((t) => t.refund_status != null && t.refund_status !== "closed").length,
+    // Remaining balance, not "untouched" — refund_received/refund_paid are
+    // cumulative totals now, so a partial receipt still leaves a remainder
+    // that should keep counting here, not just an all-or-nothing null check.
     awaitingFromSupplier: tickets
-      .filter((t) => t.refund_status != null && t.refund_received == null)
-      .reduce((sum, t) => sum + (t.refund_receivable ?? 0), 0),
+      .filter((t) => t.refund_status != null)
+      .reduce((sum, t) => sum + Math.max((t.refund_receivable ?? 0) - (t.refund_received ?? 0), 0), 0),
     owedToClients: tickets
-      .filter((t) => t.refund_status != null && t.refund_paid == null)
-      .reduce((sum, t) => sum + (t.refund_payable ?? 0), 0),
+      .filter((t) => t.refund_status != null)
+      .reduce((sum, t) => sum + Math.max((t.refund_payable ?? 0) - (t.refund_paid ?? 0), 0), 0),
     netMargin: tickets
       .filter((t) => t.refund_status === "closed")
       .reduce((sum, t) => sum + ((t.refund_received ?? 0) - (t.refund_payable ?? 0)), 0),

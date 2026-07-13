@@ -24,9 +24,11 @@ function getRowActions(ticket) {
   if (ticket.payment_status !== "paid" && notVoid) actions.push("record_payment")
   if (ticket.is_reissue && notVoid) actions.push("edit_reissue_details")
 
+  // Both sides settle independently and can take multiple installments —
+  // no ordering dependency, and stays available (to add more) until closed.
   if (ticket.refund_status && ticket.refund_status !== "closed") {
-    if (ticket.refund_received == null) actions.push("record_supplier_refund")
-    if (ticket.refund_received != null && ticket.refund_paid == null) actions.push("record_client_refund")
+    actions.push("record_supplier_refund")
+    actions.push("record_client_refund")
   }
   if (ticket.refund_status) {
     actions.push("edit_refund_terms")
@@ -523,9 +525,17 @@ export default function Tickets() {
       case "record_payment":
         return { label: "Record Payment", cls: "text-green-600", onClick: () => openRecordPayment(ticket) }
       case "record_supplier_refund":
-        return { label: "Record Supplier Refund", cls: "text-purple-600", onClick: () => openRefund(ticket, "supplier") }
+        return {
+          label: (ticket.refund_received ?? 0) > 0 ? "Add Supplier Refund Receipt" : "Record Supplier Refund",
+          cls: "text-purple-600",
+          onClick: () => openRefund(ticket, "supplier"),
+        }
       case "record_client_refund":
-        return { label: "Record Client Refund", cls: "text-purple-600", onClick: () => openRefund(ticket, "client") }
+        return {
+          label: (ticket.refund_paid ?? 0) > 0 ? "Add Client Refund Payment" : "Record Client Refund",
+          cls: "text-purple-600",
+          onClick: () => openRefund(ticket, "client"),
+        }
       case "edit_refund_terms":
         return { label: "Edit Refund Terms", cls: "text-purple-600", onClick: () => openRefund(ticket, "edit") }
       case "edit_supplier_refund_received":

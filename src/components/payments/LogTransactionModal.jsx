@@ -5,6 +5,7 @@ import { useAuth } from "../../context/AuthContext"
 import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
 import { createClient, createSupplier } from "../tickets/TicketModal"
 import { fetchChannels } from "../../lib/channels"
+import { deriveRefundStatus } from "../../lib/refunds"
 
 const TYPE_CARDS = [
   { value: "client_payment", label: "Client Payment", direction: "IN", icon: Wallet },
@@ -76,7 +77,7 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
   const fetchTicketsForClient = useCallback(async (clientId) => {
     const { data } = await supabase
       .from("tickets")
-      .select("id, passenger_name, route, amount_paid, sell_price")
+      .select("id, passenger_name, route, amount_paid, sell_price, refund_received, refund_paid, refund_payable, refund_receivable, refund_status")
       .eq("agent_id", agent.id)
       .eq("client_id", clientId)
       .order("created_at", { ascending: false })
@@ -263,12 +264,19 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
         if (tpErr) { setError(tpErr.message); setLoading(false); return }
 
         if (ticket) {
-          const newAmountPaid = (ticket.amount_paid ?? 0) - amount
+          const newAmountPaid = Math.max(0, (ticket.amount_paid ?? 0) - amount)
           const newStatus = derivePaymentStatus(newAmountPaid, ticket.sell_price ?? 0)
-          await supabase
-            .from("tickets")
-            .update({ amount_paid: newAmountPaid, payment_status: newStatus })
-            .eq("id", form.ticket_id)
+          const updates = { amount_paid: newAmountPaid, payment_status: newStatus }
+
+          // Only advance the formal refund tracking if this ticket actually has
+          // an open refund on file — otherwise this is just money handed back
+          // against the ticket's fare, not a refund settlement.
+          if (ticket.refund_status != null && ticket.refund_status !== "closed") {
+            updates.refund_paid = (ticket.refund_paid ?? 0) + amount
+            updates.refund_status = deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, ticket.refund_received, updates.refund_paid)
+          }
+
+          await supabase.from("tickets").update(updates).eq("id", form.ticket_id)
         }
       }
 
@@ -305,13 +313,16 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
 
       if (form.ticket_id) {
         const ticket = tickets.find((t) => t.id === form.ticket_id)
-        const refundStatus = ticket?.refund_paid != null ? "closed" : "supplier_refunded"
 
-        const { error: tErr } = await supabase
-          .from("tickets")
-          .update({ refund_received: amount, refund_status: refundStatus })
-          .eq("id", form.ticket_id)
-        if (tErr) { setError(tErr.message); setLoading(false); return }
+        if (ticket && ticket.refund_status != null && ticket.refund_status !== "closed") {
+          const newReceived = (ticket.refund_received ?? 0) + amount
+          const newRefundStatus = deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, newReceived, ticket.refund_paid)
+          const { error: tErr } = await supabase
+            .from("tickets")
+            .update({ refund_received: newReceived, refund_status: newRefundStatus })
+            .eq("id", form.ticket_id)
+          if (tErr) { setError(tErr.message); setLoading(false); return }
+        }
       }
 
       setLoading(false)

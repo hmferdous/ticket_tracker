@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
+import { createPortal } from "react-dom"
 import { useNavigate, useParams } from "react-router-dom"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
@@ -70,12 +71,47 @@ function derivePaymentStatus(amountPaid, total) {
 }
 
 function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
+  const btnRef = useRef(null)
+  const [menuPos, setMenuPos] = useState({ top: 0, right: 0 })
+
+  // Rendered into a portal and positioned from the button's own bounding
+  // rect (flipping above when there's no room below) instead of relying on
+  // `absolute` + `top-full` inside the table — that clips or gets cut off
+  // for a row near the bottom of the table (notably the last row, or a
+  // single-row table), since the menu would otherwise be constrained by the
+  // table's own overflow container.
+  useEffect(() => {
+    if (!isOpen) return
+    const close = () => onClose()
+    window.addEventListener("scroll", close, true)
+    window.addEventListener("resize", close)
+    return () => {
+      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("resize", close)
+    }
+  }, [isOpen, onClose])
+
   if (items.length === 0) return <span className="text-gray-300 text-xs">—</span>
+
+  const handleToggle = () => {
+    if (!isOpen && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect()
+      const spaceBelow = window.innerHeight - rect.bottom
+      const menuHeight = items.length * 36 + 8
+      setMenuPos({
+        top: spaceBelow >= menuHeight ? rect.bottom + 4 : rect.top - menuHeight - 4,
+        right: window.innerWidth - rect.right,
+      })
+    }
+    onToggle()
+  }
+
   return (
-    <div className="relative inline-block text-left">
+    <div className="inline-block">
       <button
+        ref={btnRef}
         type="button"
-        onClick={onToggle}
+        onClick={handleToggle}
         className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
         aria-label="Row actions"
       >
@@ -85,10 +121,13 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
           <circle cx="12" cy="19" r="1.5" />
         </svg>
       </button>
-      {isOpen && (
+      {isOpen && createPortal(
         <>
-          <div className="fixed inset-0 z-10" onClick={onClose} />
-          <div className="absolute right-0 top-full z-20 mt-1 w-44 bg-white rounded-lg shadow-lg border border-gray-100 py-1">
+          <div className="fixed inset-0 z-40" onClick={onClose} />
+          <div
+            className="fixed z-50 w-44 bg-white rounded-lg shadow-lg border border-gray-100 py-1"
+            style={{ top: menuPos.top, right: menuPos.right }}
+          >
             {items.map((item) => (
               <button
                 key={item.key}
@@ -103,7 +142,8 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
               </button>
             ))}
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )

@@ -313,7 +313,7 @@ RLS policy: agent can only access rows where agent_id matches their own agents.i
 - Chips are computed, sentence-case badges (not bracketed status tags), shown via small pills:
   - Payment: Unpaid (red), Partial (yellow), Paid (green)
   - Flight: Upcoming (blue), Flying today (purple), Return pending (orange), Flown (gray)
-  - Lifecycle: Void (gray), Reissued (orange, on the parent), Reissue (blue, on the child), Refund (yellow, refund_status = initiated), Refunded (red, refund_status = closed)
+  - Lifecycle: Void (gray), Reissued (orange, on the parent), Reissue (blue, on the child), Refund (yellow, refund_status is set and not closed — covers initiated/supplier_refunded/client_refunded as one chip, since all three are "still in progress" from the agent's point of view), Refunded (red, refund_status = closed)
 - A ticket can show multiple chips at once (e.g. Partial + Upcoming + Reissue)
 
 ## Rules

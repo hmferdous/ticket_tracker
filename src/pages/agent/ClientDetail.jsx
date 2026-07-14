@@ -82,7 +82,7 @@ function computeTicketChips(ticket) {
   if (ticket.is_void) chips.push({ label: "Void", cls: "bg-gray-100 text-gray-500" })
   if (ticket.status === "reissued") chips.push({ label: "Reissued", cls: "bg-orange-100 text-orange-700" })
   if (ticket.is_reissue) chips.push({ label: "Reissue", cls: "bg-blue-100 text-blue-700" })
-  if (ticket.refund_status === "initiated") chips.push({ label: "Refund", cls: "bg-yellow-100 text-yellow-700" })
+  if (ticket.refund_status != null && ticket.refund_status !== "closed") chips.push({ label: "Refund", cls: "bg-yellow-100 text-yellow-700" })
   if (ticket.refund_status === "closed") chips.push({ label: "Refunded", cls: "bg-red-100 text-red-700" })
 
   return chips

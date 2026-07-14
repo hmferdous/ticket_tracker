@@ -101,7 +101,7 @@ function computeChips(ticket) {
   if (ticket.is_reissue) {
     chips.push({ label: "Reissue", cls: "bg-blue-100 text-blue-700" })
   }
-  if (ticket.refund_status === "initiated") {
+  if (ticket.refund_status != null && ticket.refund_status !== "closed") {
     chips.push({ label: "Refund", cls: "bg-yellow-100 text-yellow-700" })
   }
   if (ticket.refund_status === "closed") {

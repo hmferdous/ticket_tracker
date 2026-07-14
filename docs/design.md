@@ -80,7 +80,7 @@ On save:
 - Computed sentence-case chip badges per ticket (small pills, not bracketed tags), multiple can show at once:
   - Payment: Unpaid (red), Partial (yellow), Paid (green)
   - Flight: Upcoming (blue), Flying today (purple), Return pending (orange), Flown (gray)
-  - Lifecycle: Void (gray), Reissued (orange, on parent), Reissue (blue, on child), Refund (yellow, refund initiated), Refunded (red, refund closed)
+  - Lifecycle: Void (gray), Reissued (orange, on parent), Reissue (blue, on child), Refund (yellow, refund_status is set and not closed — initiated/supplier_refunded/client_refunded all show the same chip, since they're all "still in progress"), Refunded (red, refund_status = closed)
 - Outstanding amount shown per ticket row
 
 ## Row Level Actions on Ticket List

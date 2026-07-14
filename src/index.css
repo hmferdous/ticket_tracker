@@ -4,3 +4,28 @@
    prefers-color-scheme-only behavior — .dark is applied to <html> by
    ThemeContext based on the user's Light/Dark/System preference. */
 @custom-variant dark (&:where(.dark, .dark *));
+
+/* Tells the browser which palette to render its own native UI in — the
+   date/time picker icon and popup, select dropdown arrow, scrollbars,
+   checkbox/radio controls. None of that is styleable via our own dark:
+   classes since it's drawn by the browser, not the page; without this it
+   defaults to light regardless of our theme, e.g. a black calendar icon
+   on a dark input. */
+:root {
+  color-scheme: light;
+}
+:root.dark {
+  color-scheme: dark;
+}
+
+/* color-scheme alone doesn't reliably darken the native <select> popup
+   panel across browsers/OSes (it worked for the date-picker calendar and
+   scrollbars, but Chromium was still rendering the open option list as a
+   white panel while inheriting our dark: text color into it — white text
+   on a white panel). option background/color are among the few properties
+   browsers actually honor on <option>, so set them directly instead of
+   relying on color-scheme for this specific case. */
+:root.dark select option {
+  background-color: var(--color-gray-900);
+  color: var(--color-gray-100);
+}

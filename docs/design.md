@@ -40,6 +40,8 @@ jsPDF + jspdf-autotable for PDF generation (ledger reports)
 - Known gaps fixed after the initial retrofit (watch for recurrences of both patterns elsewhere):
   - All text/number/date `<input>`, `<select>`, and `<textarea>` elements need an explicit `text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500` — without it, form controls have no set text/placeholder color, so they inherit the default (near-black) color and become illegible against a dark background. Every `inputCls` constant and inline form-field className across the app now carries this; any new form field must too.
   - The Tickets/Clients/Suppliers list-table row hover used `hover:bg-slate-50` (Tailwind's `slate` scale, not `gray`) with no `dark:` counterpart at all — it was missed by the dark-mode retrofit because that pass only targeted the `gray` scale. Fixed to `hover:bg-slate-50 dark:hover:bg-gray-800`. If a future row/list adds a bare `slate-*` utility, it needs its own explicit `dark:` variant — it won't be caught by the `gray`-scale convention above.
+  - Native browser-rendered form controls (the date/time picker icon and popup, `<select>`'s dropdown arrow, scrollbars, checkbox/radio) ignore our `dark:` classes entirely — they're drawn by the browser, not the page, and default to a light-theme rendering (e.g. a solid black calendar icon) regardless of the input's own background. Fixed globally in `src/index.css` via the CSS `color-scheme` property, toggled off the same `.dark` class ThemeContext already manages: `:root { color-scheme: light; }` / `:root.dark { color-scheme: dark; }`. No per-input changes needed — this covers every native control app-wide.
+  - `color-scheme` fixed the date picker and scrollbars but was not enough on its own for the open `<select>` option-list panel — browser support for `color-scheme` on that specific popup is inconsistent, and it was observed rendering as a white panel with our `dark:text-gray-100` (inherited onto `<option>`) still applied, i.e. white text on white. `background-color`/`color` are among the few properties browsers do honor directly on `<option>`, so `src/index.css` also sets them explicitly: `:root.dark select option { background-color: var(--color-gray-900); color: var(--color-gray-100); }`.
 
 ## AppLayout Actions Slot
 - AppLayout accepts an `actions` prop rendered as a flex row in the page header (top right)
@@ -99,7 +101,7 @@ On save:
 - Issue Date is the first column, followed by Travel Date, then Passenger, Route, etc.
 - Computed sentence-case chip badges per ticket (small pills, not bracketed tags), multiple can show at once:
   - Payment: Unpaid (red), Partial (yellow), Paid (green)
-  - Flight: Upcoming (blue), Flying today (purple), Return pending (orange), Flown (gray)
+  - Flight: Upcoming (blue), Flying tomorrow (indigo), Flying today (purple), Return pending (orange), Flown (gray) — mutually exclusive, one flight chip per ticket based on travel_date vs today/tomorrow (both computed as local-midnight-derived date strings, same convention throughout)
   - Lifecycle: Void (gray), Reissued (orange, on parent), Reissue (blue, on child), Refund (yellow, refund_status is set and not closed — initiated/supplier_refunded/client_refunded all show the same chip, since they're all "still in progress"), Refunded (red, refund_status = closed)
 - Outstanding amount shown per ticket row
 

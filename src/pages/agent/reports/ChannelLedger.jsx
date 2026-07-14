@@ -31,15 +31,15 @@ function supplierIdLabel(num) {
 function typeBadge(type) {
   switch (type) {
     case "client_payment":
-      return { label: "Client Payment", cls: "bg-green-100 text-green-700" }
+      return { label: "Client Payment", cls: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" }
     case "supplier_payment":
-      return { label: "Supplier Payment", cls: "bg-red-100 text-red-700" }
+      return { label: "Supplier Payment", cls: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" }
     case "client_refund":
-      return { label: "Client Refund", cls: "bg-blue-100 text-blue-700" }
+      return { label: "Client Refund", cls: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" }
     case "supplier_refund":
-      return { label: "Supplier Refund", cls: "bg-orange-100 text-orange-700" }
+      return { label: "Supplier Refund", cls: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400" }
     default:
-      return { label: type ?? "—", cls: "bg-gray-100 text-gray-600" }
+      return { label: type ?? "—", cls: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400" }
   }
 }
 
@@ -50,22 +50,22 @@ function isInflow(type) {
 function PartyCell({ payment }) {
   const isClientSide = payment.type === "client_payment" || payment.type === "client_refund"
   const party = isClientSide ? payment.clients : payment.suppliers
-  if (!party) return <span className="text-gray-300">—</span>
+  if (!party) return <span className="text-gray-300 dark:text-gray-600">—</span>
   const label = isClientSide ? clientIdLabel(party.client_id_number) : supplierIdLabel(party.supplier_id_number)
-  const cls = isClientSide ? "bg-blue-50 text-blue-700" : "bg-purple-50 text-purple-700"
+  const cls = isClientSide ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400" : "bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400"
   return (
     <div className="flex items-center gap-2">
       <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold tracking-wide ${cls}`}>{label}</span>
-      <span className="text-gray-700">{party.name}</span>
+      <span className="text-gray-700 dark:text-gray-300">{party.name}</span>
     </div>
   )
 }
 
 function StatChip({ label, value, accent }) {
   return (
-    <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-full text-sm">
-      <span className="text-gray-400 text-xs font-medium uppercase tracking-wide">{label}</span>
-      <span className={`font-semibold tabular-nums ${accent ?? "text-gray-900"}`}>{fmt(value)}</span>
+    <div className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-full text-sm">
+      <span className="text-gray-400 dark:text-gray-500 text-xs font-medium uppercase tracking-wide">{label}</span>
+      <span className={`font-semibold tabular-nums ${accent ?? "text-gray-900 dark:text-gray-100"}`}>{fmt(value)}</span>
     </div>
   )
 }
@@ -76,7 +76,7 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); onToggle() }}
-        className="p-1 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        className="p-1 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         aria-label="Channel actions"
       >
         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
@@ -88,13 +88,13 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
       {isOpen && (
         <>
           <div className="fixed inset-0 z-10" onClick={(e) => { e.stopPropagation(); onClose() }} />
-          <div className="absolute right-0 top-full z-20 mt-1 w-36 bg-white rounded-lg shadow-lg border border-gray-100 py-1">
+          <div className="absolute right-0 top-full z-20 mt-1 w-36 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-100 dark:border-gray-800 py-1">
             {items.map((item) => (
               <button
                 key={item.key}
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onClose(); item.onClick() }}
-                className={`block w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 transition-colors ${item.cls}`}
+                className={`block w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${item.cls}`}
               >
                 {item.label}
               </button>
@@ -109,11 +109,11 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
 function ChannelCard({ channel, balance, stats, isSelected, isMenuOpen, onSelect, onToggleMenu, onCloseMenu, onEdit, onToggleArchive }) {
   const menuItems = channel
     ? [
-        { key: "edit", label: "Edit", cls: "text-gray-700", onClick: onEdit },
+        { key: "edit", label: "Edit", cls: "text-gray-700 dark:text-gray-300", onClick: onEdit },
         {
           key: "archive",
           label: channel.is_active ? "Archive" : "Restore",
-          cls: channel.is_active ? "text-red-500" : "text-green-600",
+          cls: channel.is_active ? "text-red-500 dark:text-red-400" : "text-green-600 dark:text-green-400",
           onClick: onToggleArchive,
         },
       ]
@@ -121,8 +121,8 @@ function ChannelCard({ channel, balance, stats, isSelected, isMenuOpen, onSelect
 
   return (
     <div
-      className={`relative text-left bg-white border rounded-xl p-4 transition-colors ${
-        isSelected ? "border-blue-500 ring-2 ring-blue-100" : "border-gray-200 hover:border-gray-300"
+      className={`relative text-left bg-white dark:bg-gray-900 border rounded-xl p-4 transition-colors ${
+        isSelected ? "border-blue-500 ring-2 ring-blue-100" : "border-gray-200 dark:border-gray-800 hover:border-gray-300 dark:hover:border-gray-700"
       } ${channel && !channel.is_active ? "opacity-60" : ""}`}
     >
       {channel && (
@@ -131,15 +131,15 @@ function ChannelCard({ channel, balance, stats, isSelected, isMenuOpen, onSelect
         </div>
       )}
       <button onClick={onSelect} className="w-full text-left">
-        <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1 pr-6">
+        <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1 pr-6">
           {channel ? channel.name : NO_CHANNEL_LABEL}
         </p>
-        <p className={`text-lg font-semibold tabular-nums ${balance >= 0 ? "text-gray-900" : "text-red-600"}`}>
+        <p className={`text-lg font-semibold tabular-nums ${balance >= 0 ? "text-gray-900 dark:text-gray-100" : "text-red-600 dark:text-red-400"}`}>
           {fmt(balance)} BDT
         </p>
-        <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-400">
-          <span className="text-green-600">+{fmt(stats.periodIn)}</span>
-          <span className="text-red-600">-{fmt(stats.periodOut)}</span>
+        <div className="flex items-center gap-2 mt-1 text-[11px] text-gray-400 dark:text-gray-500">
+          <span className="text-green-600 dark:text-green-400">+{fmt(stats.periodIn)}</span>
+          <span className="text-red-600 dark:text-red-400">-{fmt(stats.periodOut)}</span>
           <span>· {stats.count} txn{stats.count !== 1 ? "s" : ""}</span>
         </div>
       </button>
@@ -284,7 +284,7 @@ export default function ChannelLedger() {
   const activeChannels = channels.filter((c) => c.is_active)
   const archivedChannels = channels.filter((c) => !c.is_active)
 
-  const inputCls = "px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+  const inputCls = "px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 
   const selectedLabel = selectedChannel
     ? selectedChannel === NO_CHANNEL_KEY
@@ -326,25 +326,25 @@ export default function ChannelLedger() {
     >
       <div className="max-w-screen-xl mx-auto px-6 py-8">
         {error && (
-          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
             {error}
           </div>
         )}
 
         {/* Filter bar */}
-        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 mb-4">
           <div className="flex flex-wrap items-end gap-3">
             <div className="w-36">
-              <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">From</label>
               <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} className={`w-full ${inputCls}`} />
             </div>
             <div className="w-36">
-              <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">To</label>
               <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} className={`w-full ${inputCls}`} />
             </div>
             <button
               onClick={clearFilters}
-              className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               Clear filters
             </button>
@@ -352,20 +352,20 @@ export default function ChannelLedger() {
         </div>
 
         {loading ? (
-          <div className="py-20 text-center text-sm text-gray-400">Loading channel data…</div>
+          <div className="py-20 text-center text-sm text-gray-400 dark:text-gray-500">Loading channel data…</div>
         ) : (
           <>
             {/* Grand totals */}
             <div className="flex flex-wrap gap-3 mb-4">
-              <StatChip label="Total In" value={grandTotals.periodIn} accent="text-green-600" />
-              <StatChip label="Total Out" value={grandTotals.periodOut} accent="text-red-600" />
+              <StatChip label="Total In" value={grandTotals.periodIn} accent="text-green-600 dark:text-green-400" />
+              <StatChip label="Total Out" value={grandTotals.periodOut} accent="text-red-600 dark:text-red-400" />
               <StatChip
                 label="Net Balance"
                 value={grandTotals.startingBalance + grandTotals.openingBalance + grandTotals.periodIn - grandTotals.periodOut}
                 accent={
                   grandTotals.startingBalance + grandTotals.openingBalance + grandTotals.periodIn - grandTotals.periodOut >= 0
-                    ? "text-green-600"
-                    : "text-red-600"
+                    ? "text-green-600 dark:text-green-400"
+                    : "text-red-600 dark:text-red-400"
                 }
               />
             </div>
@@ -380,7 +380,7 @@ export default function ChannelLedger() {
               <div className="mb-6">
                 <button
                   onClick={() => setShowArchived((v) => !v)}
-                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
+                  className="text-xs text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors"
                 >
                   {showArchived ? "Hide" : "Show"} archived channels ({archivedChannels.length})
                 </button>
@@ -393,46 +393,46 @@ export default function ChannelLedger() {
             )}
 
             {/* Drill-down transaction list */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-                <span className="text-sm font-medium text-gray-600">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-800">
+                <span className="text-sm font-medium text-gray-600 dark:text-gray-400">
                   {selectedLabel ? `${selectedLabel} Transactions` : "All Transactions"}
                 </span>
-                <span className="text-xs text-gray-400">{filteredEntries.length} entries</span>
+                <span className="text-xs text-gray-400 dark:text-gray-500">{filteredEntries.length} entries</span>
               </div>
 
               {filteredEntries.length === 0 ? (
-                <div className="py-16 text-center text-sm text-gray-400">No transactions in this period.</div>
+                <div className="py-16 text-center text-sm text-gray-400 dark:text-gray-500">No transactions in this period.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50 text-left">
-                        <th className="px-4 py-3 font-medium text-gray-500">Date</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Type</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Party</th>
-                        {!selectedChannel && <th className="px-4 py-3 font-medium text-gray-500">Channel</th>}
-                        <th className="px-4 py-3 font-medium text-gray-500">Trx ID</th>
-                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Amount (BDT)</th>
+                      <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-left">
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Date</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Type</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Party</th>
+                        {!selectedChannel && <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Channel</th>}
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Trx ID</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 text-right">Amount (BDT)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {filteredEntries.map((p) => {
                         const badge = typeBadge(p.type)
                         const inflow = isInflow(p.type)
                         const c = resolveChannel(p)
                         return (
-                          <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                            <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(p.payment_date)}</td>
+                          <tr key={p.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">{fmtDate(p.payment_date)}</td>
                             <td className="px-4 py-3">
                               <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${badge.cls}`}>
                                 {badge.label}
                               </span>
                             </td>
                             <td className="px-4 py-3"><PartyCell payment={p} /></td>
-                            {!selectedChannel && <td className="px-4 py-3 text-gray-600">{c?.name ?? NO_CHANNEL_LABEL}</td>}
-                            <td className="px-4 py-3 text-gray-500">{p.trx_id ?? "—"}</td>
-                            <td className={`px-4 py-3 text-right tabular-nums font-medium ${inflow ? "text-green-600" : "text-red-600"}`}>
+                            {!selectedChannel && <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{c?.name ?? NO_CHANNEL_LABEL}</td>}
+                            <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{p.trx_id ?? "—"}</td>
+                            <td className={`px-4 py-3 text-right tabular-nums font-medium ${inflow ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                               {inflow ? "+" : "-"}{fmt(p.amount)}
                             </td>
                           </tr>

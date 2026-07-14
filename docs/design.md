@@ -22,6 +22,22 @@ jsPDF + jspdf-autotable for PDF generation (ledger reports)
 - Sidebar is collapsible to a narrow icon-only rail (w-16, vs w-60 expanded) — toggle button (chevron) sits next to the logo. Preference persists in localStorage (`sidebar_collapsed`), read on mount so it doesn't flash open before applying. Collapsed state shows icons only with native `title` tooltips; clicking Reports while collapsed expands the sidebar first (opens the group) rather than trying to fit a submenu flyout in a 64px rail. AppLayout's content margin (`ml-16`/`ml-60`) tracks the same state, owned by AppLayout and passed down to Sidebar as props
 - Admin pages: separate layout with admin sidebar (not collapsible — smaller, rarely-used panel, out of scope for this)
 
+## Dark Mode
+- Theme model: `theme` is the stored preference (`light` | `dark` | `system`), `resolvedTheme` is the actually-applied value (`light` | `dark`) after resolving `system` against `window.matchMedia("(prefers-color-scheme: dark)")`. Implemented in `src/context/ThemeContext.jsx` (`ThemeProvider`/`useTheme`, same createContext/Provider/hook shape as `AuthContext`), wrapping the app in `main.jsx` outside `AuthProvider`.
+- Persisted to `localStorage` under key `theme`. A live `matchMedia` `change` listener keeps `resolvedTheme` in sync if the OS theme changes while `system` is selected.
+- Tailwind v4 dark variant is class-based, not just OS-preference-based: `src/index.css` declares `@custom-variant dark (&:where(.dark, .dark *));` right after `@import "tailwindcss";`. `ThemeContext` toggles the `.dark` class on `document.documentElement`.
+- FOUC prevention: `index.html` has an inline `<script>` in `<head>`, run before React mounts, that reads `localStorage.getItem("theme")` and synchronously applies/removes `.dark` on `<html>` — mirrors `ThemeContext`'s logic so the two never disagree.
+- Toggle placements (per "standard SaaS" request — both sidebar and Settings):
+  - `ThemeToggleCompact` (`src/components/ui/ThemeToggle.jsx`): icon-only button in the agent sidebar footer (and admin sidebar footer) that cycles Light → Dark → System on click; icon reflects the selected mode (sun/moon/monitor), not the resolved theme.
+  - `ThemeToggleFull`: three-way segmented control (Light / Dark / System) in an "Appearance" section on the Settings page.
+- Color-mapping convention used for the retrofit (light → dark):
+  - Page canvas (`min-h-screen bg-gray-50`) → `dark:bg-gray-950` (darkest layer)
+  - Card/surface (`bg-white`) → `dark:bg-gray-900`
+  - Nested sections / table headers / hover backgrounds (`bg-gray-50`, `bg-gray-100`) → `dark:bg-gray-800`
+  - Borders/dividers shift roughly 4-5 steps lighter (e.g. `border-gray-200` → `dark:border-gray-800`), body/label text shifts similarly (`text-gray-700` → `dark:text-gray-300`, `text-gray-900` → `dark:text-gray-100`)
+  - Colored status badges/banners (`bg-{color}-50/100` + `text-{color}-600/700`) → opacity-based dark backgrounds (`dark:bg-{color}-900/20` or `/30`) + `dark:text-{color}-400`, never solid dark-mode color fills
+  - Where a `bg-gray-50` element also has `hover:bg-gray-100` (e.g. collapsible section headers), the hover dark shade is bumped to `dark:hover:bg-gray-700` (one step lighter than the base `dark:bg-gray-800`) so hover still reads as a visible state change
+
 ## AppLayout Actions Slot
 - AppLayout accepts an `actions` prop rendered as a flex row in the page header (top right)
 - Used for page-level primary actions: "+ Add ticket", "+ Log Transaction", "View Ledger", "Hide/Show amounts", etc.

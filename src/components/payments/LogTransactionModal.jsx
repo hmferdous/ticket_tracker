@@ -41,7 +41,7 @@ function derivePaymentStatus(amountPaid, sellPrice) {
 }
 
 const inputCls =
-  "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+  "w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 
 export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
   const { agent } = useAuth()
@@ -345,13 +345,13 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6" onMouseDown={handleBackdrop}>
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 px-4 py-6" onMouseDown={handleBackdrop}>
+      <div className="w-full max-w-2xl bg-white dark:bg-gray-900 rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
             {step === 1 ? "Log Transaction" : TYPE_LABELS[type]}
           </h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close">
+          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors" aria-label="Close">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -360,7 +360,7 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
 
         <div className="overflow-y-auto flex-1 px-6 py-5">
           {error && (
-            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
+            <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">{error}</div>
           )}
 
           {step === 1 && (
@@ -370,17 +370,17 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
                   key={value}
                   type="button"
                   onClick={() => handleSelectType(value)}
-                  className="flex items-center gap-4 text-left border border-gray-200 rounded-xl p-5 hover:border-blue-300 hover:bg-blue-50/40 transition-colors"
+                  className="flex items-center gap-4 text-left border border-gray-200 dark:border-gray-800 rounded-xl p-5 hover:border-blue-300 hover:bg-blue-50/40 transition-colors"
                 >
-                  <div className="flex-shrink-0 w-11 h-11 rounded-full bg-gray-100 flex items-center justify-center">
-                    <Icon className="w-5 h-5 text-gray-600" />
+                  <div className="flex-shrink-0 w-11 h-11 rounded-full bg-gray-100 dark:bg-gray-800 flex items-center justify-center">
+                    <Icon className="w-5 h-5 text-gray-600 dark:text-gray-400" />
                   </div>
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-gray-900">{label}</p>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{label}</p>
                   </div>
                   <span
                     className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${
-                      direction === "IN" ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+                      direction === "IN" ? "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" : "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
                     }`}
                   >
                     {direction}
@@ -394,8 +394,8 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
             <form id="log-transaction-form" onSubmit={handleSubmit} className="space-y-3">
               {type === "client_payment" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Client <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Client <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <SearchableEntityDropdown
                     entities={clients}
@@ -411,8 +411,8 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
 
               {type === "supplier_payment" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Supplier <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Supplier <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <SearchableEntityDropdown
                     entities={suppliers}
@@ -428,8 +428,8 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
 
               {type === "client_refund" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Client <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Client <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <SearchableEntityDropdown
                     entities={clients}
@@ -445,8 +445,8 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
 
               {type === "supplier_refund" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Supplier <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Supplier <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <SearchableEntityDropdown
                     entities={suppliers}
@@ -462,8 +462,8 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Amount <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Amount <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <input
                     type="number"
@@ -477,14 +477,14 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Date</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Date</label>
                   <input type="date" value={form.payment_date} onChange={set("payment_date")} className={inputCls} />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Channel</label>
                   <select value={form.channel_id} onChange={set("channel_id")} className={inputCls}>
                     <option value="">— Select —</option>
                     {channels.map((ch) => (
@@ -493,7 +493,7 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Transaction ID</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Transaction ID</label>
                   <input
                     type="text"
                     value={form.trx_id}
@@ -505,7 +505,7 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
                 <input
                   type="text"
                   value={form.notes}
@@ -518,7 +518,7 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
 
               {type === "client_refund" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Link to Ticket (optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Link to Ticket (optional)</label>
                   <SearchableEntityDropdown
                     entities={ticketOptions}
                     value={form.ticket_id}
@@ -531,7 +531,7 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
 
               {type === "supplier_refund" && (
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Link to Ticket (optional)</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Link to Ticket (optional)</label>
                   <SearchableEntityDropdown
                     entities={ticketOptions}
                     value={form.ticket_id}
@@ -546,11 +546,11 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
         </div>
 
         {step === 2 && (
-          <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+          <div className="flex gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-800">
             <button
               type="button"
               onClick={handleBack}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               Back
             </button>

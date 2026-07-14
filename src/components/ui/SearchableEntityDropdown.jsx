@@ -154,7 +154,7 @@ export default function SearchableEntityDropdown({
   }
 
   const inputCls =
-    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    "w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 
   return (
     <div ref={containerRef} className="relative">
@@ -169,15 +169,15 @@ export default function SearchableEntityDropdown({
         autoComplete="off"
       />
       {isOpen && totalItems > 0 && (
-        <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-52 overflow-y-auto">
+        <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-lg max-h-52 overflow-y-auto">
           <ul ref={listRef}>
             {extraOption && (
               <li
                 onMouseDown={handleExtra}
-                className={`px-3 py-2 text-sm cursor-pointer border-b border-gray-100 ${
+                className={`px-3 py-2 text-sm cursor-pointer border-b border-gray-100 dark:border-gray-800 ${
                   highlighted === 0
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-blue-600 hover:bg-blue-50"
+                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400"
+                    : "text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20"
                 }`}
               >
                 {extraOption.label}
@@ -191,8 +191,8 @@ export default function SearchableEntityDropdown({
                   onMouseDown={() => handleSelect(entity)}
                   className={`px-3 py-2 text-sm cursor-pointer ${
                     idx === highlighted
-                      ? "bg-blue-50 text-blue-700"
-                      : "text-gray-700 hover:bg-gray-50"
+                      ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400"
+                      : "text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800"
                   }`}
                 >
                   {labelFor(entity)}
@@ -202,14 +202,14 @@ export default function SearchableEntityDropdown({
             {showAdd && (
               <li
                 onMouseDown={handleAdd}
-                className={`px-3 py-2 text-sm cursor-pointer border-t border-gray-100 ${
+                className={`px-3 py-2 text-sm cursor-pointer border-t border-gray-100 dark:border-gray-800 ${
                   highlighted === totalItems - 1
-                    ? "bg-blue-50 text-blue-700"
-                    : "text-gray-500 hover:bg-gray-50"
+                    ? "bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400"
+                    : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
                 }`}
               >
                 Add new:{" "}
-                <span className="font-medium text-gray-700">{query.trim()}</span>
+                <span className="font-medium text-gray-700 dark:text-gray-300">{query.trim()}</span>
               </li>
             )}
           </ul>

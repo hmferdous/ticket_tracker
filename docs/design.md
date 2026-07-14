@@ -101,7 +101,7 @@ On save:
 - Issue Date is the first column, followed by Travel Date, then Passenger, Route, etc.
 - Computed sentence-case chip badges per ticket (small pills, not bracketed tags), multiple can show at once:
   - Payment: Unpaid (red), Partial (yellow), Paid (green)
-  - Flight: Upcoming (blue), Flying today (purple), Return pending (orange), Flown (gray)
+  - Flight: Upcoming (blue), Flying tomorrow (indigo), Flying today (purple), Return pending (orange), Flown (gray) — mutually exclusive, one flight chip per ticket based on travel_date vs today/tomorrow (both computed as local-midnight-derived date strings, same convention throughout)
   - Lifecycle: Void (gray), Reissued (orange, on parent), Reissue (blue, on child), Refund (yellow, refund_status is set and not closed — initiated/supplier_refunded/client_refunded all show the same chip, since they're all "still in progress"), Refunded (red, refund_status = closed)
 - Outstanding amount shown per ticket row
 

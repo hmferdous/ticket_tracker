@@ -50,6 +50,7 @@ const STATUS_CHIP_OPTIONS = [
   "Partial",
   "Paid",
   "Upcoming",
+  "Flying tomorrow",
   "Flying today",
   "Flown",
   "Return pending",
@@ -69,6 +70,9 @@ function Badge({ label, className }) {
 
 function computeChips(ticket) {
   const today = new Date().toISOString().split("T")[0]
+  const tomorrowDate = new Date()
+  tomorrowDate.setDate(tomorrowDate.getDate() + 1)
+  const tomorrow = tomorrowDate.toISOString().split("T")[0]
   const chips = []
 
   // Payment chips
@@ -82,10 +86,12 @@ function computeChips(ticket) {
 
   // Flight chips — based on travel_date and return_date
   if (ticket.travel_date) {
-    if (ticket.travel_date > today) {
-      chips.push({ label: "Upcoming", cls: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" })
-    } else if (ticket.travel_date === today) {
+    if (ticket.travel_date === today) {
       chips.push({ label: "Flying today", cls: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400" })
+    } else if (ticket.travel_date === tomorrow) {
+      chips.push({ label: "Flying tomorrow", cls: "bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400" })
+    } else if (ticket.travel_date > today) {
+      chips.push({ label: "Upcoming", cls: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" })
     } else if (ticket.return_date && ticket.return_date >= today) {
       chips.push({ label: "Return pending", cls: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400" })
     } else {

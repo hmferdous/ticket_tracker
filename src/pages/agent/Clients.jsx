@@ -220,13 +220,13 @@ export default function Clients() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name, phone, ID…"
-              className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
           <select
             value={outstandingFilter}
             onChange={(e) => setOutstandingFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
           >
             <option value="all">All clients</option>
             <option value="outstanding">Has outstanding</option>
@@ -278,7 +278,7 @@ export default function Clients() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {filteredClients.map((client) => (
-                    <tr key={client.id} className="hover:bg-slate-50 transition-colors">
+                    <tr key={client.id} className="hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">
                       <td className="px-5 py-3.5">
                         <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 text-xs font-semibold tracking-wide">
                           {clientIdLabel(client.client_id_number)}

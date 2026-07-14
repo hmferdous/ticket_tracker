@@ -674,7 +674,7 @@ export default function Tickets() {
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 placeholder="Passenger, PNR, route…"
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div className="w-52">
@@ -710,7 +710,7 @@ export default function Tickets() {
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div className="w-36">
@@ -719,7 +719,7 @@ export default function Tickets() {
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <button
@@ -797,7 +797,7 @@ export default function Tickets() {
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                       : <span className="text-gray-300 dark:text-gray-600">—</span>
                     return (
-                      <tr key={ticket.id} className="hover:bg-slate-50 transition-colors">
+                      <tr key={ticket.id} className="hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">
                         <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{fmtDate(ticket.issue_date)}</td>
                         <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{fmtDate(ticket.travel_date)}</td>
                         <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">{ticket.pnr?.toUpperCase() || "—"}</span></td>
@@ -882,7 +882,7 @@ export default function Tickets() {
                       : <span className="text-gray-300 dark:text-gray-600">—</span>
                     const detailOutstanding = !ticket.is_void ? clientOutstanding(ticket) : 0
                     return (
-                      <tr key={ticket.id} className="hover:bg-slate-50 transition-colors">
+                      <tr key={ticket.id} className="hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">
                         <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{fmtD(ticket.issue_date)}</td>
                         <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{fmtD(ticket.travel_date)}</td>
                         <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">{ticket.pnr?.toUpperCase() || "—"}</span></td>
@@ -971,7 +971,7 @@ export default function Tickets() {
                 <select
                   value={pageSize}
                   onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded-md text-xs text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   {PAGE_SIZE_OPTIONS.map((n) => (
                     <option key={n} value={n}>{n}</option>

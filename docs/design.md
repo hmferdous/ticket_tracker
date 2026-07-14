@@ -37,6 +37,9 @@ jsPDF + jspdf-autotable for PDF generation (ledger reports)
   - Borders/dividers shift roughly 4-5 steps lighter (e.g. `border-gray-200` → `dark:border-gray-800`), body/label text shifts similarly (`text-gray-700` → `dark:text-gray-300`, `text-gray-900` → `dark:text-gray-100`)
   - Colored status badges/banners (`bg-{color}-50/100` + `text-{color}-600/700`) → opacity-based dark backgrounds (`dark:bg-{color}-900/20` or `/30`) + `dark:text-{color}-400`, never solid dark-mode color fills
   - Where a `bg-gray-50` element also has `hover:bg-gray-100` (e.g. collapsible section headers), the hover dark shade is bumped to `dark:hover:bg-gray-700` (one step lighter than the base `dark:bg-gray-800`) so hover still reads as a visible state change
+- Known gaps fixed after the initial retrofit (watch for recurrences of both patterns elsewhere):
+  - All text/number/date `<input>`, `<select>`, and `<textarea>` elements need an explicit `text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500` — without it, form controls have no set text/placeholder color, so they inherit the default (near-black) color and become illegible against a dark background. Every `inputCls` constant and inline form-field className across the app now carries this; any new form field must too.
+  - The Tickets/Clients/Suppliers list-table row hover used `hover:bg-slate-50` (Tailwind's `slate` scale, not `gray`) with no `dark:` counterpart at all — it was missed by the dark-mode retrofit because that pass only targeted the `gray` scale. Fixed to `hover:bg-slate-50 dark:hover:bg-gray-800`. If a future row/list adds a bare `slate-*` utility, it needs its own explicit `dark:` variant — it won't be caught by the `gray`-scale convention above.
 
 ## AppLayout Actions Slot
 - AppLayout accepts an `actions` prop rendered as a flex row in the page header (top right)

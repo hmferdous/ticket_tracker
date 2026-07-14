@@ -159,7 +159,7 @@ export default function DocumentsTab({ entityType, entityId, agentId }) {
           <select
             value={selectedType}
             onChange={(e) => setSelectedType(e.target.value)}
-            className="text-sm border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-600 dark:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="text-sm border border-gray-300 dark:border-gray-700 rounded-lg px-2 py-1.5 text-gray-600 dark:text-gray-400 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             {DOC_TYPES.map((t) => <option key={t}>{t}</option>)}
           </select>

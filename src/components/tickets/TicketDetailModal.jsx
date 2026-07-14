@@ -11,6 +11,13 @@ function fmtDate(d) {
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
 }
 
+// Matches the ticket list chip: only the terminal state gets its own label —
+// initiated/supplier_refunded/client_refunded are all still "in progress"
+// from the agent's point of view, so they all just read "Refund".
+function refundStatusLabel(status) {
+  return status === "closed" ? "Refunded" : "Refund"
+}
+
 function paymentSideLabel(type) {
   switch (type) {
     case "void_fee_client": return "Void Fee (Client)"
@@ -207,7 +214,7 @@ export default function TicketDetailModal({ isOpen, onClose, ticket, tickets, on
             <div>
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Refund</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                <Field label="Refund Status" value={ticket.refund_status} />
+                <Field label="Refund Status" value={refundStatusLabel(ticket.refund_status)} />
                 <Field label="Expected from Supplier" value={fmt(ticket.refund_receivable)} />
                 <Field label="Received from Supplier" value={fmt(ticket.refund_received)} />
                 <Field label="Agreed to pay Client" value={fmt(ticket.refund_payable)} />

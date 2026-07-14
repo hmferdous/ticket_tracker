@@ -153,6 +153,7 @@ On save:
 
 ## Payment Allocation UX
 - Triggered immediately after logging a client_payment or supplier_payment (from Payments page or client/supplier detail)
+- Also triggered from the ticket list's "Record Payment" action, but only if the amount typed exceeds that ticket's outstanding — the excess is left unallocated and this modal opens automatically to distribute it across the client's other tickets; entering an amount at or below outstanding never opens it (nothing left over)
 - Three options presented:
   1. Distribute evenly — splits payment equally across all pending fare tickets for that client/supplier
   2. Select tickets — agent picks specific tickets (fare or refund purpose, see "Refund-Aware Allocation"), system fills oldest first until money runs out, last ticket may be partial

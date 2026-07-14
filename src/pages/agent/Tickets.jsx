@@ -8,6 +8,7 @@ import RefundModal from "../../components/tickets/RefundModal"
 import ReissueModal from "../../components/tickets/ReissueModal"
 import EditReissueModal from "../../components/tickets/EditReissueModal"
 import RecordPaymentModal from "../../components/tickets/RecordPaymentModal"
+import AllocationModal from "../../components/clients/AllocationModal"
 import TicketDetailModal from "../../components/tickets/TicketDetailModal"
 import AppLayout from "../../components/layout/AppLayout"
 import { AIRLINES } from "../../lib/airlines"
@@ -326,6 +327,7 @@ export default function Tickets() {
   const [reissuingTicket, setReissuingTicket] = useState(null)
   const [reissueEditTicket, setReissueEditTicket] = useState(null)
   const [recordPaymentTicket, setRecordPaymentTicket] = useState(null)
+  const [allocationTarget, setAllocationTarget] = useState(null) // { payment, tickets, clientName }
   const [viewingTicket, setViewingTicket] = useState(null)
   const [openActionMenuId, setOpenActionMenuId] = useState(null)
 
@@ -497,6 +499,30 @@ export default function Tickets() {
       setTickets((prev) => prev.filter((t) => t.id !== id))
       setConfirmDeleteId(null)
     }
+  }
+
+  const openAllocateForClient = async (payment, clientId, clientName) => {
+    const { data } = await supabase
+      .from("tickets")
+      .select(
+        "id, passenger_name, route, travel_date, issue_date, sell_price, amount_paid, payment_status, created_at, " +
+          "refund_status, refund_receivable, refund_received, refund_payable, refund_paid"
+      )
+      .eq("client_id", clientId)
+      .eq("agent_id", agent.id)
+    setAllocationTarget({ payment, tickets: data ?? [], clientName })
+  }
+
+  const handleRecordPaymentSaved = (updatedTicket, payment) => {
+    handleSaved(updatedTicket)
+    if ((payment?.unallocated_amount ?? 0) > 0) {
+      openAllocateForClient(payment, updatedTicket.client_id, updatedTicket.clients?.name)
+    }
+  }
+
+  const handleAllocationClose = () => {
+    setAllocationTarget(null)
+    fetchTickets()
   }
 
   const handleCancelRefund = async (ticket) => {
@@ -1016,7 +1042,16 @@ export default function Tickets() {
         isOpen={!!recordPaymentTicket}
         onClose={() => setRecordPaymentTicket(null)}
         ticket={recordPaymentTicket}
-        onSaved={handleSaved}
+        onSaved={handleRecordPaymentSaved}
+      />
+
+      <AllocationModal
+        isOpen={!!allocationTarget}
+        onClose={handleAllocationClose}
+        payment={allocationTarget?.payment}
+        clientName={allocationTarget?.clientName}
+        tickets={allocationTarget?.tickets ?? []}
+        onAllocated={handleAllocationClose}
       />
 
       <TicketDetailModal

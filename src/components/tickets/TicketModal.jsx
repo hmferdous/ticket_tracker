@@ -5,6 +5,13 @@ import { AIRLINES } from "../../lib/airlines"
 import SearchableDropdown from "../ui/SearchableDropdown"
 import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
 import { fetchChannels } from "../../lib/channels"
+import { clientEffectiveTarget } from "../../lib/refunds"
+
+function derivePaymentStatus(amountPaid, target) {
+  if (amountPaid <= 0) return "unpaid"
+  if (amountPaid >= target) return "paid"
+  return "partial"
+}
 
 export async function createClient(supabase, agentId, name, extra = {}) {
   const { data, error } = await supabase
@@ -231,6 +238,15 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
           allocated_amount: clientAmount,
           type: "client",
         })
+
+        const newAmountPaid = (savedTicket.amount_paid ?? 0) + clientAmount
+        const newPaymentStatus = derivePaymentStatus(newAmountPaid, clientEffectiveTarget(savedTicket))
+        await supabase
+          .from("tickets")
+          .update({ amount_paid: newAmountPaid, payment_status: newPaymentStatus })
+          .eq("id", savedTicket.id)
+        savedTicket.amount_paid = newAmountPaid
+        savedTicket.payment_status = newPaymentStatus
       }
     }
 

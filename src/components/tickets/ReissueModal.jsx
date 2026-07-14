@@ -5,6 +5,13 @@ import { AIRLINES } from "../../lib/airlines"
 import SearchableDropdown from "../ui/SearchableDropdown"
 import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
 import { fetchChannels } from "../../lib/channels"
+import { clientEffectiveTarget } from "../../lib/refunds"
+
+function derivePaymentStatus(amountPaid, target) {
+  if (amountPaid <= 0) return "unpaid"
+  if (amountPaid >= target) return "paid"
+  return "partial"
+}
 
 const AIRLINE_OPTIONS = AIRLINES.map((a) => ({
   value: a.code,
@@ -181,7 +188,7 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
           client_id: child.client_id,
           type: "client_payment",
           amount: clientAmount,
-          unallocated_amount: clientAmount,
+          unallocated_amount: 0,
           channel: selectedChannel?.name ?? null,
           channel_id: clientPay.channel_id || null,
           trx_id: clientPay.trx_id.trim() || null,
@@ -198,6 +205,15 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
           allocated_amount: clientAmount,
           type: "client",
         })
+
+        const newAmountPaid = (child.amount_paid ?? 0) + clientAmount
+        const newPaymentStatus = derivePaymentStatus(newAmountPaid, clientEffectiveTarget(child))
+        await supabase
+          .from("tickets")
+          .update({ amount_paid: newAmountPaid, payment_status: newPaymentStatus })
+          .eq("id", child.id)
+        child.amount_paid = newAmountPaid
+        child.payment_status = newPaymentStatus
       }
     }
 

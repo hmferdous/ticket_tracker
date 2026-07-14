@@ -58,6 +58,13 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
 
     const selectedChannel = channels.find((c) => c.id === form.channel_id)
 
+    // Cap what actually applies to this ticket at its outstanding — any
+    // excess spills into unallocated credit on the payment, same as a bulk
+    // payment logged via Log Transaction, instead of silently overpaying
+    // this one ticket with no trace of where the extra went.
+    const allocatedAmount = Math.min(amount, outstanding)
+    const excess = amount - allocatedAmount
+
     const { data: payRow, error: payErr } = await supabase
       .from("payments")
       .insert({
@@ -65,14 +72,14 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
         client_id: ticket.client_id,
         type: "client_payment",
         amount,
-        unallocated_amount: 0,
+        unallocated_amount: excess,
         channel: selectedChannel?.name ?? null,
         channel_id: form.channel_id || null,
         trx_id: form.trx_id.trim() || null,
         notes: form.notes.trim() || null,
         payment_date: form.payment_date || new Date().toISOString().split("T")[0],
       })
-      .select("id")
+      .select("id, amount, unallocated_amount")
       .single()
 
     if (payErr) {
@@ -81,20 +88,22 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
       return
     }
 
-    const { error: tpErr } = await supabase.from("ticket_payments").insert({
-      payment_id: payRow.id,
-      ticket_id: ticket.id,
-      allocated_amount: amount,
-      type: "client",
-    })
+    if (allocatedAmount > 0) {
+      const { error: tpErr } = await supabase.from("ticket_payments").insert({
+        payment_id: payRow.id,
+        ticket_id: ticket.id,
+        allocated_amount: allocatedAmount,
+        type: "client",
+      })
 
-    if (tpErr) {
-      setError(tpErr.message)
-      setLoading(false)
-      return
+      if (tpErr) {
+        setError(tpErr.message)
+        setLoading(false)
+        return
+      }
     }
 
-    const newAmountPaid = (ticket.amount_paid ?? 0) + amount
+    const newAmountPaid = (ticket.amount_paid ?? 0) + allocatedAmount
     const newPaymentStatus = derivePaymentStatus(newAmountPaid, clientEffectiveTarget(ticket))
     const updates = { amount_paid: newAmountPaid, payment_status: newPaymentStatus }
 
@@ -123,7 +132,7 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
       setError(updateErr.message)
       return
     }
-    onSaved(updated)
+    onSaved(updated, payRow)
     onClose()
   }
 
@@ -184,6 +193,11 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
                 placeholder="0.00"
                 className={inputCls}
               />
+              {parseFloat(form.amount) > outstanding && (
+                <p className="mt-1 text-xs text-orange-600">
+                  → {(parseFloat(form.amount) - outstanding).toLocaleString("en-BD")} more than outstanding — the extra will be left as unallocated credit, and you'll be prompted to distribute it
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>

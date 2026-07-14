@@ -123,6 +123,7 @@ payment_channels:
 4. Each allocation inserts a row in ticket_payments and reduces unallocated_amount
 5. ticket.payment_status updates based on new amount_paid vs sell_price
 6. Multiple payments can contribute to one ticket — all are reported, no single owner
+7. Record Payment (ticket row action) follows the same rule even though it targets one specific ticket: the amount typed is capped at that ticket's outstanding — only the capped portion is allocated and added to amount_paid, and any excess is left as unallocated_amount on the payment row, which immediately triggers the same AllocationModal used everywhere else so the excess can be distributed across the client's other tickets or left as credit. Prevents silently overpaying one ticket with no trace of where the extra went
 
 ### Inline Payment (Ticket Form)
 - Collapsible optional section at bottom of ticket modal

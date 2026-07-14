@@ -298,7 +298,11 @@ function fmtMargin(n) {
 
 function computeNetMargin(ticket) {
   const ticketMargin = (ticket.sell_price ?? 0) - (ticket.purchase_price ?? 0)
-  const refundMargin = (ticket.refund_received ?? 0) - (ticket.refund_payable ?? 0)
+  // Booked/agreed basis, matching ticket_margin's own accrual nature — uses
+  // refund_receivable (what the supplier agreed to) rather than refund_received
+  // (what's actually landed so far), so this reflects the deal's true
+  // economics instead of fluctuating with how far collection has progressed.
+  const refundMargin = (ticket.refund_receivable ?? 0) - (ticket.refund_payable ?? 0)
   const voidFeeMargin = (ticket.void_fee_collected ?? 0) - (ticket.void_fee_paid ?? 0)
   return ticketMargin + refundMargin + voidFeeMargin
 }

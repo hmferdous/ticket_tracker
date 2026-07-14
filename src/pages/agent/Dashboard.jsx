@@ -16,7 +16,11 @@ function fmtDate(d) {
 
 function ticketNetMargin(t) {
   const ticketMargin = (t.sell_price ?? 0) - (t.purchase_price ?? 0)
-  const refundMargin = (t.refund_received ?? 0) - (t.refund_payable ?? 0)
+  // Booked/agreed basis, matching ticket_margin's own accrual nature — uses
+  // refund_receivable (what the supplier agreed to) rather than refund_received
+  // (what's actually landed so far), so this reflects the deal's true
+  // economics instead of fluctuating with how far collection has progressed.
+  const refundMargin = (t.refund_receivable ?? 0) - (t.refund_payable ?? 0)
   const voidFeeMargin = (t.void_fee_collected ?? 0) - (t.void_fee_paid ?? 0)
   return ticketMargin + refundMargin + voidFeeMargin
 }
@@ -331,7 +335,7 @@ export default function Dashboard() {
       .reduce((sum, t) => sum + clientOwedBack(t), 0),
     netMargin: tickets
       .filter((t) => t.refund_status === "closed")
-      .reduce((sum, t) => sum + ((t.refund_received ?? 0) - (t.refund_payable ?? 0)), 0),
+      .reduce((sum, t) => sum + ((t.refund_receivable ?? 0) - (t.refund_payable ?? 0)), 0),
   }), [tickets])
 
   // Ticket-level refund_paid, not the payments table — a client refund

@@ -41,7 +41,7 @@ Never disable RLS on any table
 
 ### Per Ticket
 - ticket_margin = sell_price - purchase_price
-- refund_margin = refund_received - refund_payable
+- refund_margin = refund_receivable - refund_payable — booked/agreed basis, matching ticket_margin's own accrual nature (sell_price/purchase_price are booked values too, not amounts actually collected/paid). Uses refund_receivable (what the supplier agreed to), not refund_received (what's actually landed so far) — otherwise net_margin would fluctuate purely with how far supplier-side collection has progressed rather than reflecting the deal's real economics, even though the agreed terms haven't changed
 - void_fee_margin = void_fee_collected - void_fee_paid
 - net_margin = ticket_margin + refund_margin + void_fee_margin
 
@@ -218,7 +218,7 @@ Every refund recording action creates a real, channel-tracked payment row (not j
 3. Supplier sends money, one or more times — refund_received accumulates; refund_status recomputes to supplier_refunded once it meets refund_receivable
 4. Client side settles either direction: if the client had already paid more than the new net target, you hand cash back via Record Client Refund; if they still owe (most commonly a credit booking that hadn't been paid at all), they pay the reduced amount via a normal Record Payment. refund_status recomputes to client_refunded once `clientRefundNet(ticket) === 0`, regardless of which direction settled it
 5. Both sides settled (or one/both sides has no target at all) — refund_status → closed
-6. refund_margin auto-calculated at all times = refund_received - refund_payable
+6. refund_margin auto-calculated at all times = refund_receivable - refund_payable (see "Margin Calculations" — booked/agreed basis, not tied to how much has actually landed from the supplier yet)
 7. Agent can settle the client side before the supplier side, and either side can be a partial/multi-installment settlement — the two sides are tracked and derived fully independently
 8. Row actions for recording supplier/client refunds stay available for as long as refund_status is set and not closed — not gated on the other side, and not gated on this side already having some progress (label switches from "Record ..." to "Add ..." once there's existing progress on that side)
 

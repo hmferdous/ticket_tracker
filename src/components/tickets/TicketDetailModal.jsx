@@ -74,9 +74,13 @@ export default function TicketDetailModal({ isOpen, onClose, ticket, tickets, on
   }
 
   const ticketMargin = (ticket.sell_price ?? 0) - (ticket.purchase_price ?? 0)
+  // Booked/agreed basis — uses refund_receivable (what the supplier agreed
+  // to) rather than refund_received (what's actually landed so far), same
+  // as ticket_margin uses sell_price/purchase_price rather than amounts
+  // actually collected/paid.
   const refundMargin =
-    ticket.refund_received != null && ticket.refund_payable != null
-      ? ticket.refund_received - ticket.refund_payable
+    ticket.refund_receivable != null && ticket.refund_payable != null
+      ? ticket.refund_receivable - ticket.refund_payable
       : null
   const voidFeeMargin =
     ticket.void_fee_collected != null || ticket.void_fee_paid != null

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "../../lib/supabase"
-import { deriveRefundStatus } from "../../lib/refunds"
+import { deriveRefundStatus, clientOwedBack } from "../../lib/refunds"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -74,8 +74,8 @@ export default function AllocationModal({ isOpen, onClose, payment, clientName, 
       .filter((t) => t.payment_status === "unpaid" || t.payment_status === "partial")
       .map((t) => ({ ...t, kind: "fare", outstanding: (t.sell_price ?? 0) - (t.amount_paid ?? 0) }))
     const refund = tickets
-      .filter((t) => t.refund_status != null && (t.refund_payable ?? 0) - (t.refund_paid ?? 0) > 0)
-      .map((t) => ({ ...t, kind: "refund", outstanding: (t.refund_payable ?? 0) - (t.refund_paid ?? 0) }))
+      .filter((t) => t.refund_status != null && clientOwedBack(t) > 0)
+      .map((t) => ({ ...t, kind: "refund", outstanding: clientOwedBack(t) }))
     return [...fare, ...refund].sort((a, b) => (a.issue_date || a.created_at || "").localeCompare(b.issue_date || b.created_at || ""))
   }, [tickets])
 

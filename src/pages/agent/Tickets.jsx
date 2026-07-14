@@ -35,6 +35,7 @@ function getRowActions(ticket) {
     actions.push("edit_refund_terms")
     if (ticket.refund_received != null) actions.push("edit_supplier_refund_received")
     if (ticket.refund_paid != null) actions.push("edit_client_refund_paid")
+    actions.push("cancel_refund")
   }
 
   actions.push("view")
@@ -498,6 +499,43 @@ export default function Tickets() {
     }
   }
 
+  const handleCancelRefund = async (ticket) => {
+    setError("")
+
+    // Only safe to fully wipe the refund if nothing real has actually moved
+    // yet — a blunt "Edit Refund Received/Paid" override doesn't count (no
+    // payment behind it), but a real supplier_refund/client_refund payment
+    // does, and cancelling out from under it would leave that payment
+    // orphaned with no corresponding refund on the ticket.
+    const [{ data: standalone }, { data: allocated }] = await Promise.all([
+      supabase.from("payments").select("id").eq("ticket_id", ticket.id).eq("type", "supplier_refund"),
+      supabase.from("ticket_payments").select("id").eq("ticket_id", ticket.id).in("type", ["client_refund", "supplier_refund"]),
+    ])
+    if ((standalone?.length ?? 0) > 0 || (allocated?.length ?? 0) > 0) {
+      setError("This refund has real payments recorded against it — delete those first (from the ticket's payment history or the Payments page), then cancel the refund.")
+      return
+    }
+
+    if (!window.confirm("Cancel this refund? This clears the refund terms and returns the ticket to normal.")) return
+
+    const { data, error } = await supabase
+      .from("tickets")
+      .update({
+        refund_status: null,
+        refund_receivable: null,
+        refund_received: null,
+        refund_payable: null,
+        refund_paid: null,
+        refund_notes: null,
+      })
+      .eq("id", ticket.id)
+      .select(`*, clients(name), suppliers(name)`)
+      .single()
+
+    if (error) { setError(error.message); return }
+    handleSaved(data)
+  }
+
   const openVoid = (ticket) => setVoidingTicket(ticket)
   const openRefund = (ticket, mode) => setRefundModal({ ticket, mode })
   const openReissue = (ticket) => setReissuingTicket(ticket)
@@ -547,6 +585,8 @@ export default function Tickets() {
         return { label: "Edit Refund Received", cls: "text-purple-600", onClick: () => openRefund(ticket, "edit_supplier_actual") }
       case "edit_client_refund_paid":
         return { label: "Edit Refund Paid", cls: "text-purple-600", onClick: () => openRefund(ticket, "edit_client_actual") }
+      case "cancel_refund":
+        return { label: "Cancel Refund", cls: "text-red-600", onClick: () => handleCancelRefund(ticket) }
       case "view":
         return { label: "View", cls: "text-gray-600", onClick: () => openView(ticket) }
       default:

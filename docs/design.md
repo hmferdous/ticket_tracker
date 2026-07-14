@@ -94,6 +94,7 @@ On save:
   - Record Supplier Refund / Record Client Refund: shown independently per side whenever refund_status is set and not closed — available repeatedly, not gated on the other side or on existing progress on this side (label switches to "Add Supplier Refund Receipt" / "Add Client Refund Payment" once that side already has some progress)
   - Edit Refund Terms: shown whenever a refund exists (refund_status not null), including after settlement
   - Edit Refund Received / Edit Refund Paid: shown per side once that side's actual amount has been recorded, for correcting typos
+  - Cancel Refund: shown whenever a refund exists (refund_status not null), including after settlement — see "Cancelling a Refund" below
   - Edit Reissue Details: shown on reissue child tickets (is_reissue = true), not void
 - Actions that aren't applicable are omitted from the menu entirely, never shown disabled
 - Suppliers list also uses the same hamburger-menu pattern for row actions
@@ -135,6 +136,13 @@ On save:
 - Refund margin shown at all times: refund_receivable - refund_payable (booked/agreed basis — see database.md's Margin Calculations)
 - Edit Refund Terms action (available whenever a refund exists, including after settlement): reopens the same modal pre-filled with the current refund_receivable / refund_payable / refund_notes (same live preview as Step 1). Updates those fields and recomputes refund_status against the new targets — never touches refund_received or refund_paid
 - Edit Refund Received / Edit Refund Paid actions (available once that side's cumulative total is > 0): reopens the same modal pre-filled with the current running total, for overriding the total directly (e.g. to correct a typo across one or more receipts). This is a blunt override — it does NOT reverse-sync the individual payment/ticket_payments rows that fed into that total, and (client side) does NOT adjust amount_paid — refund_paid is purely an audit counter now, not what determines settlement. To correct one specific receipt, edit that payment via ViewPaymentModal instead
+
+## Cancelling a Refund
+- There was previously no way back to "no refund at all" once initiated — refund_status only ever moves between initiated/supplier_refunded/client_refunded/closed, never back to null on its own, even if the terms are edited down to 0
+- "Cancel Refund" row action (shown whenever a refund exists, any state): first checks whether any real payment has actually been recorded against the ticket (a standalone supplier_refund payment, or a client_refund/supplier_refund ticket_payments row from a direct recording or netted allocation)
+  - If any exist: blocked with an inline error directing you to delete those payments first (from the ticket's payment history or the Payments page) — deleting them already correctly reverses their effect via the shared payment-reversal logic, at which point Cancel Refund becomes available
+  - If none exist: confirms, then wipes refund_status/refund_receivable/refund_received/refund_payable/refund_paid/refund_notes all back to null — the ticket becomes indistinguishable from one that never had a refund
+- A blunt "Edit Refund Received/Paid" override with no real payment behind it doesn't block cancellation — those numbers just clear along with everything else, same as if they'd never been entered
 
 ## Refund-Aware Allocation (Netting)
 - AllocationModal (client bulk payments) and SupplierAllocationModal (supplier bulk payments) both offer a second allocation target alongside normal outstanding fare/purchase price: any ticket with an open refund and a positive remaining balance on that side

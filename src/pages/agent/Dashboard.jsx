@@ -399,7 +399,7 @@ export default function Dashboard() {
           {/* Welcome */}
           {agent && (
             <div className="mb-5">
-              <p className="text-2xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
+              <p className="text-3xl font-semibold text-gray-900 dark:text-gray-100 tracking-tight">
                 {(() => {
                   const h = new Date().getHours()
                   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"

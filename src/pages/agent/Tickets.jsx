@@ -789,7 +789,9 @@ export default function Tickets() {
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Flight Date</th>
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">PNR</th>
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Ticket No.</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Route</th>
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Passenger</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Client</th>
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-right">Sell</th>
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-right">Outstanding</th>
                     <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Status</th>
@@ -808,7 +810,9 @@ export default function Tickets() {
                         <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{fmtDate(ticket.travel_date)}</td>
                         <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">{ticket.pnr?.toUpperCase() || "—"}</span></td>
                         <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">{ticket.ticket_number || "—"}</span></td>
+                        <td className="px-4 py-3"><span className="font-mono text-xs text-gray-500 dark:text-gray-400">{ticket.route || "—"}</span></td>
                         <td className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100">{ticket.passenger_name}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{ticket.clients?.name ?? <span className="text-gray-300 dark:text-gray-600">—</span>}</td>
                         <td className="px-4 py-3 text-sm text-right tabular-nums font-medium text-gray-700 dark:text-gray-300">{fmt(ticket.sell_price)}</td>
                         <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${outstanding > 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                           {outstanding > 0 ? fmt(outstanding) : "—"}

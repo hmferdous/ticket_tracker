@@ -104,6 +104,7 @@ On save:
   - Flight: Upcoming (blue), Flying tomorrow (indigo), Flying today (purple), Return pending (orange), Flown (gray) — mutually exclusive, one flight chip per ticket based on travel_date vs today/tomorrow (both computed as local-midnight-derived date strings, same convention throughout)
   - Lifecycle: Void (gray), Reissued (orange, on parent), Reissue (blue, on child), Refund (yellow, refund_status is set and not closed — initiated/supplier_refunded/client_refunded all show the same chip, since they're all "still in progress"), Refunded (red, refund_status = closed)
 - Outstanding amount shown per ticket row
+- Compact/Detailed view toggle (defaults to Compact): Compact columns are Issue Date, Flight Date, PNR, Ticket No., Route, Passenger, Client, Sell, Outstanding, Status, Actions — a trimmed subset of Detailed's full column set (which additionally has Carrier, Supplier, Purchase, Margin, Net, Paid, Narration)
 
 ## Row Level Actions on Ticket List
 - Actions are grouped behind a hamburger-menu button per row (not inline buttons) — opens a dropdown, closes on outside click

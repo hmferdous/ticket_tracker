@@ -9,6 +9,7 @@ import TicketDetailModal from "../../components/tickets/TicketDetailModal"
 import ViewPaymentModal from "../../components/payments/ViewPaymentModal"
 import DocumentsTab from "../../components/ui/DocumentsTab"
 import AppLayout from "../../components/layout/AppLayout"
+import { reverseTicketPaymentRow, TICKET_REVERSAL_FIELDS } from "../../lib/paymentReversal"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -136,6 +137,7 @@ export default function SupplierDetail() {
   const [allocationTarget, setAllocationTarget] = useState(null)
   const [openActionMenuId, setOpenActionMenuId] = useState(null)
   const [viewingPayment, setViewingPayment] = useState(null)
+  const [deletingPaymentId, setDeletingPaymentId] = useState(null)
 
   useEffect(() => {
     if (agent?.id && id) fetchAll()
@@ -249,6 +251,53 @@ export default function SupplierDetail() {
 
   const handleAllocationClose = () => {
     setAllocationTarget(null)
+    fetchAll()
+  }
+
+  const handleDeletePayment = async (paymentId) => {
+    if (deletingPaymentId) return
+
+    const { data: tps } = await supabase
+      .from("ticket_payments")
+      .select("id, ticket_id, allocated_amount, type")
+      .eq("payment_id", paymentId)
+
+    const ticketIds = new Set((tps ?? []).map((tp) => tp.ticket_id))
+    let ticketsById = new Map()
+    if (ticketIds.size > 0) {
+      const { data: tickets } = await supabase
+        .from("tickets")
+        .select(TICKET_REVERSAL_FIELDS)
+        .in("id", Array.from(ticketIds))
+      ticketsById = new Map((tickets ?? []).map((t) => [t.id, t]))
+    }
+
+    const reversals = (tps ?? [])
+      .map((tp) => ({ tp, ticket: ticketsById.get(tp.ticket_id) }))
+      .filter((r) => r.ticket)
+      .map((r) => ({ ...r, ...reverseTicketPaymentRow(r.ticket, r.tp) }))
+
+    const warning = reversals.some((r) => r.clamped)
+      ? "\n\nWarning: one or more linked tickets already had their running total edited lower than what this payment contributed — the reversal will floor at 0 instead of going negative, which may not fully undo this payment's effect."
+      : ""
+    if (!window.confirm(`Delete this payment? This cannot be undone.${warning}`)) return
+
+    setDeletingPaymentId(paymentId)
+
+    for (const r of reversals) {
+      if (Object.keys(r.updates).length > 0) {
+        await supabase.from("tickets").update(r.updates).eq("id", r.tp.ticket_id)
+      }
+    }
+
+    if ((tps ?? []).length > 0) {
+      await supabase.from("ticket_payments").delete().eq("payment_id", paymentId)
+    }
+
+    const { error } = await supabase.from("payments").delete().eq("id", paymentId)
+    setDeletingPaymentId(null)
+    if (error) { setError(error.message); return }
+
     fetchAll()
   }
 
@@ -483,6 +532,7 @@ export default function SupplierDetail() {
                                 ...((payment.unallocated_amount ?? 0) > 0
                                   ? [{ key: "allocate", label: "Allocate", cls: "text-blue-600", onClick: () => openAllocate(payment) }]
                                   : []),
+                                { key: "delete", label: "Delete", cls: "text-red-500", onClick: () => handleDeletePayment(payment.id) },
                               ]}
                             />
                           </td>

@@ -7,6 +7,7 @@ import SupplierAllocationModal from "../../components/suppliers/SupplierAllocati
 import ViewPaymentModal from "../../components/payments/ViewPaymentModal"
 import LogTransactionModal from "../../components/payments/LogTransactionModal"
 import { fetchChannels } from "../../lib/channels"
+import { reverseTicketPaymentRow, reverseStandaloneSupplierRefund, TICKET_REVERSAL_FIELDS } from "../../lib/paymentReversal"
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 200]
 
@@ -119,6 +120,7 @@ export default function Payments() {
   const [allocationTarget, setAllocationTarget] = useState(null) // { kind: 'client'|'supplier', payment, tickets, name }
   const [allocatingId, setAllocatingId] = useState(null)
   const [showLogTransaction, setShowLogTransaction] = useState(false)
+  const [deletingId, setDeletingId] = useState(null)
 
   useEffect(() => {
     if (agent?.id) {
@@ -225,6 +227,64 @@ export default function Payments() {
 
   const handleAllocationClose = () => {
     setAllocationTarget(null)
+    fetchPayments()
+  }
+
+  const handleDeletePayment = async (payment) => {
+    const { data: tps } = await supabase
+      .from("ticket_payments")
+      .select("id, ticket_id, allocated_amount, type")
+      .eq("payment_id", payment.id)
+
+    const isStandaloneSupplierRefund = payment.type === "supplier_refund" && payment.ticket_id && (tps ?? []).length === 0
+
+    const ticketIds = new Set((tps ?? []).map((tp) => tp.ticket_id))
+    if (isStandaloneSupplierRefund) ticketIds.add(payment.ticket_id)
+
+    let ticketsById = new Map()
+    if (ticketIds.size > 0) {
+      const { data: tickets } = await supabase
+        .from("tickets")
+        .select(TICKET_REVERSAL_FIELDS)
+        .in("id", Array.from(ticketIds))
+      ticketsById = new Map((tickets ?? []).map((t) => [t.id, t]))
+    }
+
+    const reversals = (tps ?? [])
+      .map((tp) => ({ tp, ticket: ticketsById.get(tp.ticket_id) }))
+      .filter((r) => r.ticket)
+      .map((r) => ({ ...r, ...reverseTicketPaymentRow(r.ticket, r.tp) }))
+
+    let standaloneReversal = null
+    if (isStandaloneSupplierRefund) {
+      const ticket = ticketsById.get(payment.ticket_id)
+      if (ticket) standaloneReversal = reverseStandaloneSupplierRefund(ticket, payment)
+    }
+
+    const anyClamped = reversals.some((r) => r.clamped) || standaloneReversal?.clamped
+    const warning = anyClamped
+      ? "\n\nWarning: one or more linked tickets already had their running total edited lower than what this payment contributed — the reversal will floor at 0 instead of going negative, which may not fully undo this payment's effect."
+      : ""
+    if (!window.confirm(`Delete this payment? This cannot be undone.${warning}`)) return
+
+    setDeletingId(payment.id)
+
+    for (const r of reversals) {
+      if (Object.keys(r.updates).length > 0) {
+        await supabase.from("tickets").update(r.updates).eq("id", r.tp.ticket_id)
+      }
+    }
+    if (standaloneReversal) {
+      await supabase.from("tickets").update(standaloneReversal.updates).eq("id", payment.ticket_id)
+    }
+
+    if ((tps ?? []).length > 0) {
+      await supabase.from("ticket_payments").delete().eq("payment_id", payment.id)
+    }
+
+    const { error } = await supabase.from("payments").delete().eq("id", payment.id)
+    setDeletingId(null)
+    if (error) { setError(error.message); return }
     fetchPayments()
   }
 
@@ -396,6 +456,13 @@ export default function Payments() {
                               className="text-gray-600 hover:text-gray-900 font-medium transition-colors"
                             >
                               View
+                            </button>
+                            <button
+                              onClick={() => handleDeletePayment(payment)}
+                              disabled={deletingId === payment.id}
+                              className="text-red-500 hover:text-red-700 font-medium transition-colors disabled:opacity-50"
+                            >
+                              {deletingId === payment.id ? "…" : "Delete"}
                             </button>
                           </div>
                         </td>

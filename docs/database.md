@@ -143,6 +143,12 @@ payment_channels:
 - supplier_refund linked to a ticket (via payments.ticket_id): amount edit is delta-based — the delta shifts the ticket's refund_received and recomputes refund_status via deriveRefundStatus; blocked if it would drive refund_received negative
 - Editing a ticket's refund_received/refund_paid directly (RefundModal's "Edit Refund Received"/"Edit Refund Paid" row actions) is a blunt override of the running total — it does NOT reverse-sync the individual payments/ticket_payments rows that fed into it (there's no reliable way to redistribute a single overridden total back across multiple prior receipts). Use it only to correct the running total itself, not to edit an individual receipt — edit the individual payment via ViewPaymentModal for that
 
+### Deleting a Logged Payment (Payments Page, Client Detail, Supplier Detail)
+- Every row can be deleted, regardless of type, from the Payments page; Client Detail and Supplier Detail's Payment History tabs also have a Delete action (scoped to client_payment / supplier_payment rows respectively). All three share the same reversal logic — `src/lib/paymentReversal.js` (`reverseTicketPaymentRow`, `reverseStandaloneSupplierRefund`, `TICKET_REVERSAL_FIELDS`) — rather than each page reimplementing it, since a second independent copy is exactly the kind of split-brain gap that's bitten this codebase before. See "Deleting a Payment" in design.md for the exact per-type reversal rules
+- Reversal branches on ticket_payments.type (not payments.type), since one payment can span ticket_payments rows of different types
+- All reversals floor at 0 — if a running total was already lowered below what this payment contributed, the reversal clamps rather than going negative, and the confirm dialog warns when this will happen
+- Not wrapped in a DB transaction — a failure partway through a multi-ticket reversal can leave it partially reversed, same limitation as everywhere else in this codebase
+
 ### Forward to Supplier (Passthrough Payment)
 - When logging a client payment, agent can optionally forward all or part to a supplier in the same action
 - System creates two separate payment rows — one client_payment, one supplier_payment

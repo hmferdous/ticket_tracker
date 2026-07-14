@@ -162,6 +162,21 @@ On save:
 - On save for client_payment/supplier_payment: AllocationModal triggered immediately
 - On save for refunds: refreshes payments list. If linked to a ticket that has an open refund on file, also advances that ticket's cumulative refund_received/refund_paid and recomputes refund_status the same way RefundModal's row actions do — a plain fare-refund link (no open refund on file) only adjusts amount_paid, same as before
 
+## Deleting a Payment (Payments Page, Client Detail, Supplier Detail)
+- Three entry points share the same reversal logic (`src/lib/paymentReversal.js` — `reverseTicketPaymentRow`, `reverseStandaloneSupplierRefund`), so they can't drift apart the way the old duplicated Client Detail version once did:
+  - Payments page: every row (any type) has a "Delete" action alongside View/Allocate
+  - Client Detail's Payment History tab: "Delete" in the row's action menu (client_payment rows only — this tab only ever lists client_payment payments, client_refund isn't shown there)
+  - Supplier Detail's Payment History tab: same, "Delete" in the row's action menu (supplier_payment rows only)
+- Reverses every linked ticket_payments row before deleting it, branching by that row's type — not payments.type, since one payment can allocate across ticket_payments rows of different types:
+  - client / supplier: client reverses amount_paid + payment_status; supplier reverses nothing (supplierAmountPaid is derived live from ticket_payments, so it self-corrects once the row is gone)
+  - client_refund: reverses amount_paid (adds back), refund_paid (subtracts), recomputes payment_status and refund_status
+  - supplier_refund (netted via SupplierAllocationModal): reverses refund_received, recomputes refund_status
+  - void_fee_client / void_fee_supplier: nulls out void_fee_collected / void_fee_paid (single-value fields, never counted in amount_paid to begin with)
+- A standalone supplier_refund payment (linked via payments.ticket_id, no ticket_payments row — see RefundModal/LogTransactionModal) reverses refund_received directly against that ticket. Only reachable from the Payments page today, since neither detail page ever lists supplier_refund/client_refund payments (both are filtered to plain client_payment/supplier_payment only)
+- All reversals floor at 0 rather than go negative. If a running total was already edited down below what this payment contributed (e.g. via "Edit Refund Paid"), the confirm dialog warns that the reversal will floor-clamp rather than fully undo the payment
+- Forward-to-Supplier pairs are NOT linked in the schema — deleting one side never touches the other
+- Not atomic (sequential calls, no DB transaction) — consistent with the rest of the app
+
 ## Payment Details / Edit Modal (ViewPaymentModal)
 - Opened via "View" (Payments page) or "View / Edit" (Client/Supplier Detail payment history) row action, for any payment type
 - Read-only view by default; "Edit" button switches the amount/channel/trx_id/notes/payment_date fields into inputs, "Cancel" reverts, "Save changes" commits
@@ -209,7 +224,7 @@ On save:
 - Header actions: Edit | View Ledger | Log Payment
 - "View Ledger" navigates to /reports/client-ledger?clientId=<uuid> (or supplier equivalent) and auto-generates the statement
 - Three tabs: Tickets | Payment History | Documents
-- Payment History tab row actions: View / Edit (opens ViewPaymentModal), Allocate (if unallocated_amount > 0), Delete (client side only — reverses any ticket_payments allocations first)
+- Payment History tab row actions: View / Edit (opens ViewPaymentModal), Allocate (if unallocated_amount > 0), Delete — same on both Client and Supplier Detail (see "Deleting a Payment" below for the full reversal rules)
 - Documents tab: shows uploaded document cards (type badge, filename, date); Open button generates a 1-hour signed URL; Delete removes from storage and DB; Upload button with type selector at the bottom; maximum 5 documents per entity
 
 ## Document Upload System

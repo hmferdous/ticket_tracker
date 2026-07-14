@@ -127,9 +127,10 @@ payment_channels:
 ### Inline Payment (Ticket Form)
 - Collapsible optional section at bottom of ticket modal
 - Works for all ticket types — walk-in passenger or trade client
-- If filled: creates payment row + ticket_payments allocation row on ticket save
+- If filled: creates payment row + ticket_payments allocation row on ticket save, then updates the ticket's own amount_paid/payment_status (additively — `(current amount_paid ?? 0) + this amount`, so re-using the section on an edit to log a further payment adds to the running total rather than overwriting it). Target is clientEffectiveTarget (sell_price, reduced by refund_payable if a refund happens to be active), matching every other payment-recording surface
 - If left empty: ticket saves with payment_status = unpaid
 - Paid in full checkbox disables the amount field and live-reflects the current sell_price; on save, uses the actual sell_price value
+- Same pattern and fix applies to ReissueModal's inline client payment on the new child ticket (also sets unallocated_amount = 0 on the payment row, not the full amount — the full amount is allocated to the child ticket in the same action, so nothing should be left showing as unallocated)
 
 ### Log Transaction Modal (Payments Page)
 - 2-step modal: type selector → type-specific form

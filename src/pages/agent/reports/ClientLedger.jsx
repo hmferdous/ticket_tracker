@@ -17,19 +17,19 @@ function fmtDate(d) {
 
 function SummaryCard({ label, value, accent }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-4">
-      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">{label}</p>
-      <p className={`text-xl font-semibold tabular-nums ${accent ?? "text-gray-900"}`}>{value}</p>
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4">
+      <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">{label}</p>
+      <p className={`text-xl font-semibold tabular-nums ${accent ?? "text-gray-900 dark:text-gray-100"}`}>{value}</p>
     </div>
   )
 }
 
 function typeBadge(type) {
   switch (type) {
-    case "invoice":   return "bg-blue-100 text-blue-700"
-    case "payment":   return "bg-green-100 text-green-700"
-    case "refund":    return "bg-red-100 text-red-700"
-    default:          return "bg-gray-100 text-gray-600"
+    case "invoice":   return "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400"
+    case "payment":   return "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400"
+    case "refund":    return "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400"
+    default:          return "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400"
   }
 }
 
@@ -218,17 +218,17 @@ export default function ClientLedger() {
     }, 0)
   }
 
-  const inputCls = "px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+  const inputCls = "px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
 
   return (
     <AppLayout title="Client Ledger">
       <div className="max-w-screen-xl mx-auto px-6 py-8">
 
         {/* Controls */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 mb-6">
           <div className="flex flex-wrap items-end gap-3">
             <div className="w-64">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Client</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Client</label>
               <select
                 value={clientId}
                 onChange={(e) => { setClientId(e.target.value); setGenerated(false) }}
@@ -243,11 +243,11 @@ export default function ClientLedger() {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">From</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">From</label>
               <input type="date" value={dateFrom} onChange={(e) => { setDateFrom(e.target.value); setGenerated(false) }} className={inputCls} />
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-500 mb-1">To</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">To</label>
               <input type="date" value={dateTo} onChange={(e) => { setDateTo(e.target.value); setGenerated(false) }} className={inputCls} />
             </div>
             <button
@@ -258,7 +258,7 @@ export default function ClientLedger() {
               {loading ? "Loading…" : "Generate"}
             </button>
           </div>
-          {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
+          {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
         </div>
 
         {generated && (
@@ -266,10 +266,10 @@ export default function ClientLedger() {
             {/* Entity header */}
             <div className="flex items-start justify-between mb-4">
               <div>
-                <h2 className="text-lg font-semibold text-gray-900">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
                   {selectedClient?.name ?? "Client"}
                 </h2>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-gray-500 dark:text-gray-400">
                   Statement of Account
                   {dateFrom || dateTo
                     ? ` · ${dateFrom ? fmtDate(dateFrom) : "—"} to ${dateTo ? fmtDate(dateTo) : "—"}`
@@ -288,60 +288,60 @@ export default function ClientLedger() {
             {/* Summary cards */}
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-6">
               <SummaryCard label="Total Invoiced" value={`${fmt(summary.totalInvoiced)} BDT`} />
-              <SummaryCard label="Total Received" value={`${fmt(summary.totalReceived)} BDT`} accent="text-green-600" />
-              <SummaryCard label="Total Refunded" value={`${fmt(summary.totalRefunded)} BDT`} accent="text-red-600" />
+              <SummaryCard label="Total Received" value={`${fmt(summary.totalReceived)} BDT`} accent="text-green-600 dark:text-green-400" />
+              <SummaryCard label="Total Refunded" value={`${fmt(summary.totalRefunded)} BDT`} accent="text-red-600 dark:text-red-400" />
               <SummaryCard
                 label="Net Due"
                 value={`${fmt(summary.netDue)} BDT`}
-                accent={summary.netDue > 0 ? "text-yellow-600" : "text-green-600"}
+                accent={summary.netDue > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-green-600 dark:text-green-400"}
               />
-              <SummaryCard label="Unallocated Credit" value={`${fmt(summary.unallocated)} BDT`} accent="text-blue-600" />
+              <SummaryCard label="Unallocated Credit" value={`${fmt(summary.unallocated)} BDT`} accent="text-blue-600 dark:text-blue-400" />
             </div>
 
             {/* Ledger table */}
-            <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
               {openingBalance !== null && (
-                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 border-b border-gray-200">
-                  <span className="text-sm font-medium text-gray-600">Opening Balance</span>
-                  <span className={`text-sm font-semibold tabular-nums ${openingBalance > 0 ? "text-yellow-600" : openingBalance < 0 ? "text-green-600" : "text-gray-500"}`}>
+                <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 border-b border-gray-200 dark:border-gray-800">
+                  <span className="text-sm font-medium text-gray-600 dark:text-gray-400">Opening Balance</span>
+                  <span className={`text-sm font-semibold tabular-nums ${openingBalance > 0 ? "text-yellow-600 dark:text-yellow-400" : openingBalance < 0 ? "text-green-600 dark:text-green-400" : "text-gray-500 dark:text-gray-400"}`}>
                     {fmt(Math.abs(openingBalance))} BDT {openingBalance > 0 ? "Dr" : openingBalance < 0 ? "Cr" : ""}
                   </span>
                 </div>
               )}
 
               {periodEntries.length === 0 ? (
-                <div className="py-16 text-center text-sm text-gray-400">No transactions in this period.</div>
+                <div className="py-16 text-center text-sm text-gray-400 dark:text-gray-500">No transactions in this period.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50 text-left">
-                        <th className="px-4 py-3 font-medium text-gray-500">Date</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Type</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Description</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Ref. Issue Date</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Trx ID</th>
-                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Debit (BDT)</th>
-                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Credit (BDT)</th>
+                      <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-left">
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Date</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Type</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Description</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Ref. Issue Date</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Trx ID</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 text-right">Debit (BDT)</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 text-right">Credit (BDT)</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {periodEntries.map((entry, i) => (
-                        <tr key={i} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 text-gray-600 whitespace-nowrap">{fmtDate(entry.date)}</td>
+                        <tr key={i} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400 whitespace-nowrap">{fmtDate(entry.date)}</td>
                           <td className="px-4 py-3">
                             <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${typeBadge(entry.type)}`}>
                               {entry.type === "invoice" ? "Invoice" : entry.type === "payment" ? "Payment" : "Refund"}
                             </span>
                           </td>
-                          <td className="px-4 py-3 text-gray-700">{entry.description}</td>
-                          <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(entry.refIssueDate)}</td>
-                          <td className="px-4 py-3 text-gray-500">{entry.trxId ?? <span className="text-gray-200">—</span>}</td>
-                          <td className="px-4 py-3 text-right tabular-nums text-red-600 font-medium">
-                            {entry.debit != null ? fmt(entry.debit) : <span className="text-gray-200">—</span>}
+                          <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{entry.description}</td>
+                          <td className="px-4 py-3 text-gray-500 dark:text-gray-400 whitespace-nowrap">{fmtDate(entry.refIssueDate)}</td>
+                          <td className="px-4 py-3 text-gray-500 dark:text-gray-400">{entry.trxId ?? <span className="text-gray-200 dark:text-gray-700">—</span>}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-red-600 dark:text-red-400 font-medium">
+                            {entry.debit != null ? fmt(entry.debit) : <span className="text-gray-200 dark:text-gray-700">—</span>}
                           </td>
-                          <td className="px-4 py-3 text-right tabular-nums text-green-600 font-medium">
-                            {entry.credit != null ? fmt(entry.credit) : <span className="text-gray-200">—</span>}
+                          <td className="px-4 py-3 text-right tabular-nums text-green-600 dark:text-green-400 font-medium">
+                            {entry.credit != null ? fmt(entry.credit) : <span className="text-gray-200 dark:text-gray-700">—</span>}
                           </td>
                         </tr>
                       ))}

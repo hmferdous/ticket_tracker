@@ -73,41 +73,41 @@ function computeChips(ticket) {
 
   // Payment chips
   if (ticket.payment_status === "unpaid") {
-    chips.push({ label: "Unpaid", cls: "bg-red-100 text-red-700" })
+    chips.push({ label: "Unpaid", cls: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" })
   } else if (ticket.payment_status === "partial") {
-    chips.push({ label: "Partial", cls: "bg-yellow-100 text-yellow-700" })
+    chips.push({ label: "Partial", cls: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400" })
   } else if (ticket.payment_status === "paid") {
-    chips.push({ label: "Paid", cls: "bg-green-100 text-green-700" })
+    chips.push({ label: "Paid", cls: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" })
   }
 
   // Flight chips — based on travel_date and return_date
   if (ticket.travel_date) {
     if (ticket.travel_date > today) {
-      chips.push({ label: "Upcoming", cls: "bg-blue-100 text-blue-700" })
+      chips.push({ label: "Upcoming", cls: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" })
     } else if (ticket.travel_date === today) {
-      chips.push({ label: "Flying today", cls: "bg-purple-100 text-purple-700" })
+      chips.push({ label: "Flying today", cls: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400" })
     } else if (ticket.return_date && ticket.return_date >= today) {
-      chips.push({ label: "Return pending", cls: "bg-orange-100 text-orange-700" })
+      chips.push({ label: "Return pending", cls: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400" })
     } else {
-      chips.push({ label: "Flown", cls: "bg-gray-100 text-gray-500" })
+      chips.push({ label: "Flown", cls: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400" })
     }
   }
 
   // Lifecycle chips
   if (ticket.is_void) {
-    chips.push({ label: "Void", cls: "bg-gray-100 text-gray-500" })
+    chips.push({ label: "Void", cls: "bg-gray-100 dark:bg-gray-800 text-gray-500 dark:text-gray-400" })
   }
   if (ticket.status === "reissued") {
-    chips.push({ label: "Reissued", cls: "bg-orange-100 text-orange-700" })
+    chips.push({ label: "Reissued", cls: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400" })
   }
   if (ticket.is_reissue) {
-    chips.push({ label: "Reissue", cls: "bg-blue-100 text-blue-700" })
+    chips.push({ label: "Reissue", cls: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" })
   }
   if (ticket.refund_status != null && ticket.refund_status !== "closed") {
-    chips.push({ label: "Refund", cls: "bg-yellow-100 text-yellow-700" })
+    chips.push({ label: "Refund", cls: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400" })
   }
   if (ticket.refund_status === "closed") {
-    chips.push({ label: "Refunded", cls: "bg-red-100 text-red-700" })
+    chips.push({ label: "Refunded", cls: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" })
   }
 
   return chips
@@ -115,7 +115,7 @@ function computeChips(ticket) {
 
 function TicketChips({ ticket }) {
   const chips = computeChips(ticket)
-  if (chips.length === 0) return <span className="text-gray-300 text-xs">—</span>
+  if (chips.length === 0) return <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
   return (
     <div className="flex flex-wrap gap-1">
       {chips.map((chip, i) => (
@@ -173,12 +173,12 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder }) {
         onClick={handleToggle}
         className={`w-full flex items-center justify-between px-3 py-2 border rounded-lg text-sm text-left transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent ${
           selected.length > 0
-            ? "border-blue-400 bg-blue-50 text-blue-700"
-            : "border-gray-300 bg-white text-gray-500 hover:border-gray-400"
+            ? "border-blue-400 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400"
+            : "border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-500 dark:text-gray-400 hover:border-gray-400"
         }`}
       >
         <span className="truncate">{label}</span>
-        <svg className="w-3.5 h-3.5 ml-2 shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <svg className="w-3.5 h-3.5 ml-2 shrink-0 text-gray-400 dark:text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
         </svg>
       </button>
@@ -187,14 +187,14 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder }) {
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <div
             ref={menuRef}
-            className="fixed z-50 bg-white border border-gray-200 rounded-xl shadow-xl py-1 overflow-auto max-h-64"
+            className="fixed z-50 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-xl py-1 overflow-auto max-h-64"
             style={{ top: menuPos.top, left: menuPos.left, width: menuPos.width }}
           >
             {selected.length > 0 && (
               <button
                 type="button"
                 onClick={() => { onChange([]); setOpen(false) }}
-                className="flex w-full items-center px-4 py-2 text-xs text-red-500 hover:bg-gray-50 transition-colors border-b border-gray-100"
+                className="flex w-full items-center px-4 py-2 text-xs text-red-500 dark:text-red-400 hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border-b border-gray-100 dark:border-gray-800"
               >
                 Clear selection
               </button>
@@ -202,15 +202,15 @@ function MultiSelectDropdown({ options, selected, onChange, placeholder }) {
             {options.map((opt) => (
               <label
                 key={opt.value}
-                className="flex items-center gap-2.5 px-4 py-2 text-sm hover:bg-gray-50 cursor-pointer"
+                className="flex items-center gap-2.5 px-4 py-2 text-sm hover:bg-gray-50 dark:hover:bg-gray-800 cursor-pointer"
               >
                 <input
                   type="checkbox"
                   checked={selected.includes(opt.value)}
                   onChange={() => toggle(opt.value)}
-                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400 focus:ring-blue-500"
                 />
-                <span className="text-gray-700">{opt.label}</span>
+                <span className="text-gray-700 dark:text-gray-300">{opt.label}</span>
               </label>
             ))}
           </div>
@@ -255,7 +255,7 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
         ref={btnRef}
         type="button"
         onClick={handleToggle}
-        className="p-1.5 rounded-md text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+        className="p-1.5 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         aria-label="Row actions"
       >
         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
@@ -266,7 +266,7 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
         <>
           <div className="fixed inset-0 z-40" onClick={onClose} />
           <div
-            className="fixed z-50 w-48 bg-white rounded-xl shadow-xl border border-gray-200 py-1 overflow-hidden"
+            className="fixed z-50 w-48 bg-white dark:bg-gray-900 rounded-xl shadow-xl border border-gray-200 dark:border-gray-800 py-1 overflow-hidden"
             style={{ top: menuPos.top, right: menuPos.right }}
           >
             {items.map((item) => (
@@ -274,7 +274,7 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
                 key={item.key}
                 type="button"
                 onClick={() => { onClose(); item.onClick() }}
-                className={`flex w-full items-center text-left px-4 py-2.5 text-sm font-medium hover:bg-gray-50 transition-colors ${item.cls}`}
+                className={`flex w-full items-center text-left px-4 py-2.5 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${item.cls}`}
               >
                 {item.label}
               </button>
@@ -584,37 +584,37 @@ export default function Tickets() {
   const actionConfig = (action, ticket) => {
     switch (action) {
       case "void":
-        return { label: "Void", cls: "text-red-600", onClick: () => openVoid(ticket) }
+        return { label: "Void", cls: "text-red-600 dark:text-red-400", onClick: () => openVoid(ticket) }
       case "refund":
-        return { label: "Refund", cls: "text-purple-600", onClick: () => openRefund(ticket, "initiate") }
+        return { label: "Refund", cls: "text-purple-600 dark:text-purple-400", onClick: () => openRefund(ticket, "initiate") }
       case "reissue":
-        return { label: "Reissue", cls: "text-orange-600", onClick: () => openReissue(ticket) }
+        return { label: "Reissue", cls: "text-orange-600 dark:text-orange-400", onClick: () => openReissue(ticket) }
       case "edit_reissue_details":
-        return { label: "Edit Reissue Details", cls: "text-orange-600", onClick: () => openReissueEdit(ticket) }
+        return { label: "Edit Reissue Details", cls: "text-orange-600 dark:text-orange-400", onClick: () => openReissueEdit(ticket) }
       case "record_payment":
-        return { label: "Record Payment", cls: "text-green-600", onClick: () => openRecordPayment(ticket) }
+        return { label: "Record Payment", cls: "text-green-600 dark:text-green-400", onClick: () => openRecordPayment(ticket) }
       case "record_supplier_refund":
         return {
           label: (ticket.refund_received ?? 0) > 0 ? "Add Supplier Refund Receipt" : "Record Supplier Refund",
-          cls: "text-purple-600",
+          cls: "text-purple-600 dark:text-purple-400",
           onClick: () => openRefund(ticket, "supplier"),
         }
       case "record_client_refund":
         return {
           label: (ticket.refund_paid ?? 0) > 0 ? "Add Client Refund Payment" : "Record Client Refund",
-          cls: "text-purple-600",
+          cls: "text-purple-600 dark:text-purple-400",
           onClick: () => openRefund(ticket, "client"),
         }
       case "edit_refund_terms":
-        return { label: "Edit Refund Terms", cls: "text-purple-600", onClick: () => openRefund(ticket, "edit") }
+        return { label: "Edit Refund Terms", cls: "text-purple-600 dark:text-purple-400", onClick: () => openRefund(ticket, "edit") }
       case "edit_supplier_refund_received":
-        return { label: "Edit Refund Received", cls: "text-purple-600", onClick: () => openRefund(ticket, "edit_supplier_actual") }
+        return { label: "Edit Refund Received", cls: "text-purple-600 dark:text-purple-400", onClick: () => openRefund(ticket, "edit_supplier_actual") }
       case "edit_client_refund_paid":
-        return { label: "Edit Refund Paid", cls: "text-purple-600", onClick: () => openRefund(ticket, "edit_client_actual") }
+        return { label: "Edit Refund Paid", cls: "text-purple-600 dark:text-purple-400", onClick: () => openRefund(ticket, "edit_client_actual") }
       case "cancel_refund":
-        return { label: "Cancel Refund", cls: "text-red-600", onClick: () => handleCancelRefund(ticket) }
+        return { label: "Cancel Refund", cls: "text-red-600 dark:text-red-400", onClick: () => handleCancelRefund(ticket) }
       case "view":
-        return { label: "View", cls: "text-gray-600", onClick: () => openView(ticket) }
+        return { label: "View", cls: "text-gray-600 dark:text-gray-400", onClick: () => openView(ticket) }
       default:
         return null
     }
@@ -627,7 +627,7 @@ export default function Tickets() {
         <>
           <button
             onClick={() => setCompact((v) => !v)}
-            className="flex items-center gap-2 bg-white hover:bg-gray-50 text-gray-600 text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 transition-colors"
+            className="flex items-center gap-2 bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 text-sm font-medium px-3 py-2 rounded-lg border border-gray-200 dark:border-gray-800 transition-colors"
             title={compact ? "Switch to detailed view" : "Switch to compact view"}
           >
             {compact ? (
@@ -660,25 +660,25 @@ export default function Tickets() {
     >
       <div className="max-w-screen-xl mx-auto px-6 py-8">
         {error && (
-          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+          <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
             {error}
           </div>
         )}
 
-        <div className="bg-white border border-gray-200 rounded-xl p-4 mb-4">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-4 mb-4">
           <div className="flex flex-wrap items-end gap-3">
             <div className="flex-1 min-w-[180px]">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Search</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Search</label>
               <input
                 type="text"
                 value={searchText}
                 onChange={(e) => setSearchText(e.target.value)}
                 placeholder="Passenger, PNR, route…"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div className="w-52">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Airline</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Airline</label>
               <MultiSelectDropdown
                 options={airlineOptions}
                 selected={airlineFilters}
@@ -687,7 +687,7 @@ export default function Tickets() {
               />
             </div>
             <div className="w-44">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Client</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Client</label>
               <MultiSelectDropdown
                 options={clientOptions}
                 selected={clientFilters}
@@ -696,7 +696,7 @@ export default function Tickets() {
               />
             </div>
             <div className="w-44">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Supplier</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Supplier</label>
               <MultiSelectDropdown
                 options={supplierOptions}
                 selected={supplierFilters}
@@ -705,26 +705,26 @@ export default function Tickets() {
               />
             </div>
             <div className="w-36">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Issue date from</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Issue date from</label>
               <input
                 type="date"
                 value={dateFrom}
                 onChange={(e) => setDateFrom(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div className="w-36">
-              <label className="block text-xs font-medium text-gray-500 mb-1">Issue date to</label>
+              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Issue date to</label>
               <input
                 type="date"
                 value={dateTo}
                 onChange={(e) => setDateTo(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <button
               onClick={clearFilters}
-              className="text-sm text-gray-500 hover:text-gray-700 px-3 py-2 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              className="text-sm text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 px-3 py-2 border border-gray-200 dark:border-gray-800 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               Clear filters
             </button>
@@ -740,7 +740,7 @@ export default function Tickets() {
                   className={`px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
                     active
                       ? "bg-blue-600 text-white border-blue-600"
-                      : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"
+                      : "bg-white dark:bg-gray-900 text-gray-600 dark:text-gray-400 border-gray-200 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800"
                   }`}
                 >
                   {chip}
@@ -750,25 +750,25 @@ export default function Tickets() {
           </div>
         </div>
 
-        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+        <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
           {loading ? (
-            <div className="py-20 text-center text-sm text-gray-400">Loading tickets…</div>
+            <div className="py-20 text-center text-sm text-gray-400 dark:text-gray-500">Loading tickets…</div>
           ) : tickets.length === 0 ? (
             <div className="py-20 text-center">
-              <p className="text-gray-400 text-sm">No tickets yet.</p>
+              <p className="text-gray-400 dark:text-gray-500 text-sm">No tickets yet.</p>
               <button
                 onClick={openAdd}
-                className="mt-3 text-blue-600 hover:underline text-sm font-medium"
+                className="mt-3 text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium"
               >
                 Add your first ticket
               </button>
             </div>
           ) : filteredTickets.length === 0 ? (
             <div className="py-20 text-center">
-              <p className="text-gray-400 text-sm">No tickets match the current filters.</p>
+              <p className="text-gray-400 dark:text-gray-500 text-sm">No tickets match the current filters.</p>
               <button
                 onClick={clearFilters}
-                className="mt-3 text-blue-600 hover:underline text-sm font-medium"
+                className="mt-3 text-blue-600 dark:text-blue-400 hover:underline text-sm font-medium"
               >
                 Clear filters
               </button>
@@ -778,33 +778,33 @@ export default function Tickets() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm whitespace-nowrap">
                 <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50 text-left">
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Issue Date</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Flight Date</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">PNR</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Ticket No.</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Passenger</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Sell</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Outstanding</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Status</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Actions</th>
+                  <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-left">
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Issue Date</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Flight Date</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">PNR</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Ticket No.</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Passenger</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-right">Sell</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-right">Outstanding</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Status</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {pagedTickets.map((ticket) => {
                     const outstanding = !ticket.is_void ? clientOutstanding(ticket) : 0
                     const fmtDate = (d) => d
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-                      : <span className="text-gray-300">—</span>
+                      : <span className="text-gray-300 dark:text-gray-600">—</span>
                     return (
                       <tr key={ticket.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(ticket.issue_date)}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500">{fmtDate(ticket.travel_date)}</td>
-                        <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.pnr?.toUpperCase() || "—"}</span></td>
-                        <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.ticket_number || "—"}</span></td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">{ticket.passenger_name}</td>
-                        <td className="px-4 py-3 text-sm text-right tabular-nums font-medium text-gray-700">{fmt(ticket.sell_price)}</td>
-                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${outstanding > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                        <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{fmtDate(ticket.issue_date)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{fmtDate(ticket.travel_date)}</td>
+                        <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">{ticket.pnr?.toUpperCase() || "—"}</span></td>
+                        <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">{ticket.ticket_number || "—"}</span></td>
+                        <td className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100">{ticket.passenger_name}</td>
+                        <td className="px-4 py-3 text-sm text-right tabular-nums font-medium text-gray-700 dark:text-gray-300">{fmt(ticket.sell_price)}</td>
+                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${outstanding > 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                           {outstanding > 0 ? fmt(outstanding) : "—"}
                         </td>
                         <td className="px-4 py-3 whitespace-normal min-w-[100px]">
@@ -813,11 +813,11 @@ export default function Tickets() {
                         <td className="px-4 py-3 text-right">
                           {confirmDeleteId === ticket.id ? (
                             <div className="flex items-center justify-end gap-2">
-                              <span className="text-gray-500 text-xs">Delete?</span>
+                              <span className="text-gray-500 dark:text-gray-400 text-xs">Delete?</span>
                               <button onClick={() => handleDelete(ticket.id)} disabled={deleting} className="text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 px-2.5 py-1 rounded-md transition-colors">
                                 {deleting ? "…" : "Yes"}
                               </button>
-                              <button onClick={() => setConfirmDeleteId(null)} className="text-xs font-medium text-gray-600 hover:text-gray-800 px-2.5 py-1 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors">
+                              <button onClick={() => setConfirmDeleteId(null)} className="text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
                                 No
                               </button>
                             </div>
@@ -828,9 +828,9 @@ export default function Tickets() {
                                 onToggle={() => setOpenActionMenuId((id) => (id === ticket.id ? null : ticket.id))}
                                 onClose={() => setOpenActionMenuId(null)}
                                 items={[
-                                  { key: "edit", label: "Edit", cls: "text-blue-600", onClick: () => openEdit(ticket) },
+                                  { key: "edit", label: "Edit", cls: "text-blue-600 dark:text-blue-400", onClick: () => openEdit(ticket) },
                                   ...getRowActions(ticket).map((action) => { const config = actionConfig(action, ticket); return config ? { key: action, ...config } : null }).filter(Boolean),
-                                  { key: "delete", label: "Delete", cls: "text-red-600", onClick: () => setConfirmDeleteId(ticket.id) },
+                                  { key: "delete", label: "Delete", cls: "text-red-600 dark:text-red-400", onClick: () => setConfirmDeleteId(ticket.id) },
                                 ]}
                               />
                             </div>
@@ -847,28 +847,28 @@ export default function Tickets() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm whitespace-nowrap">
                 <thead>
-                  <tr className="border-b border-gray-200 bg-gray-50 text-left">
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Issue Date</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Travel Date</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">PNR</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Ticket No.</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Passenger</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Route</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Carrier</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Client</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Supplier</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Sell</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Purchase</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Margin</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Net</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Paid</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Outstanding</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Narration</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400">Status</th>
-                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 text-right">Actions</th>
+                  <tr className="border-b border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-left">
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Issue Date</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Travel Date</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">PNR</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Ticket No.</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Passenger</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Route</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Carrier</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Client</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Supplier</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-right">Sell</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-right">Purchase</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-right">Margin</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-right">Net</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-right">Paid</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-right">Outstanding</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Narration</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Status</th>
+                    <th className="px-4 py-3 text-[11px] font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 text-right">Actions</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {pagedTickets.map((ticket) => {
                     const ticketMargin = (ticket.sell_price ?? 0) - (ticket.purchase_price ?? 0)
                     const netMargin = computeNetMargin(ticket)
@@ -879,33 +879,33 @@ export default function Tickets() {
                       : null
                     const fmtD = (d) => d
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-                      : <span className="text-gray-300">—</span>
+                      : <span className="text-gray-300 dark:text-gray-600">—</span>
                     const detailOutstanding = !ticket.is_void ? clientOutstanding(ticket) : 0
                     return (
                       <tr key={ticket.id} className="hover:bg-slate-50 transition-colors">
-                        <td className="px-4 py-3 text-xs text-gray-500">{fmtD(ticket.issue_date)}</td>
-                        <td className="px-4 py-3 text-xs text-gray-500">{fmtD(ticket.travel_date)}</td>
-                        <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.pnr?.toUpperCase() || "—"}</span></td>
-                        <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.ticket_number || "—"}</span></td>
-                        <td className="px-4 py-3 text-sm font-semibold text-gray-900">{ticket.passenger_name}</td>
-                        <td className="px-4 py-3"><span className="font-mono text-xs text-gray-500">{ticket.route || "—"}</span></td>
-                        <td className="px-4 py-3 text-sm text-gray-500">{ticket.carrier || <span className="text-gray-300">—</span>}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{ticket.clients?.name ?? <span className="text-gray-300">—</span>}</td>
-                        <td className="px-4 py-3 text-sm text-gray-600">{ticket.suppliers?.name ?? <span className="text-gray-300">—</span>}</td>
-                        <td className="px-4 py-3 text-sm text-right tabular-nums font-medium text-gray-700">{fmt(ticket.sell_price)}</td>
-                        <td className="px-4 py-3 text-sm text-right tabular-nums text-gray-500">{fmt(ticket.purchase_price)}</td>
-                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${ticketMargin >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{fmtD(ticket.issue_date)}</td>
+                        <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{fmtD(ticket.travel_date)}</td>
+                        <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">{ticket.pnr?.toUpperCase() || "—"}</span></td>
+                        <td className="px-4 py-3"><span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">{ticket.ticket_number || "—"}</span></td>
+                        <td className="px-4 py-3 text-sm font-semibold text-gray-900 dark:text-gray-100">{ticket.passenger_name}</td>
+                        <td className="px-4 py-3"><span className="font-mono text-xs text-gray-500 dark:text-gray-400">{ticket.route || "—"}</span></td>
+                        <td className="px-4 py-3 text-sm text-gray-500 dark:text-gray-400">{ticket.carrier || <span className="text-gray-300 dark:text-gray-600">—</span>}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{ticket.clients?.name ?? <span className="text-gray-300 dark:text-gray-600">—</span>}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 dark:text-gray-400">{ticket.suppliers?.name ?? <span className="text-gray-300 dark:text-gray-600">—</span>}</td>
+                        <td className="px-4 py-3 text-sm text-right tabular-nums font-medium text-gray-700 dark:text-gray-300">{fmt(ticket.sell_price)}</td>
+                        <td className="px-4 py-3 text-sm text-right tabular-nums text-gray-500 dark:text-gray-400">{fmt(ticket.purchase_price)}</td>
+                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${ticketMargin >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                           {fmtMargin(ticketMargin)}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${netMargin >= 0 ? "text-emerald-600" : "text-red-600"}`}>
+                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${netMargin >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
                           {fmtMargin(netMargin)}
                         </td>
-                        <td className="px-4 py-3 text-sm text-right tabular-nums text-gray-600">{fmt(ticket.amount_paid)}</td>
-                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${detailOutstanding > 0 ? "text-red-600" : "text-emerald-600"}`}>
+                        <td className="px-4 py-3 text-sm text-right tabular-nums text-gray-600 dark:text-gray-400">{fmt(ticket.amount_paid)}</td>
+                        <td className={`px-4 py-3 text-sm text-right tabular-nums font-semibold ${detailOutstanding > 0 ? "text-red-600 dark:text-red-400" : "text-emerald-600 dark:text-emerald-400"}`}>
                           {detailOutstanding > 0 ? fmt(detailOutstanding) : "—"}
                         </td>
-                        <td className="px-4 py-3 text-xs text-gray-400 max-w-[140px] truncate">
-                          {narration ?? <span className="text-gray-300">—</span>}
+                        <td className="px-4 py-3 text-xs text-gray-400 dark:text-gray-500 max-w-[140px] truncate">
+                          {narration ?? <span className="text-gray-300 dark:text-gray-600">—</span>}
                         </td>
                         <td className="px-4 py-3 whitespace-normal min-w-[120px]">
                           <TicketChips ticket={ticket} />
@@ -913,7 +913,7 @@ export default function Tickets() {
                         <td className="px-4 py-3 text-right">
                           {confirmDeleteId === ticket.id ? (
                             <div className="flex items-center justify-end gap-2">
-                              <span className="text-gray-500 text-xs">Delete?</span>
+                              <span className="text-gray-500 dark:text-gray-400 text-xs">Delete?</span>
                               <button
                                 onClick={() => handleDelete(ticket.id)}
                                 disabled={deleting}
@@ -923,7 +923,7 @@ export default function Tickets() {
                               </button>
                               <button
                                 onClick={() => setConfirmDeleteId(null)}
-                                className="text-xs font-medium text-gray-600 hover:text-gray-800 px-2.5 py-1 rounded-md border border-gray-200 hover:bg-gray-100 transition-colors"
+                                className="text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
                               >
                                 No
                               </button>
@@ -937,14 +937,14 @@ export default function Tickets() {
                                 }
                                 onClose={() => setOpenActionMenuId(null)}
                                 items={[
-                                  { key: "edit", label: "Edit", cls: "text-blue-600", onClick: () => openEdit(ticket) },
+                                  { key: "edit", label: "Edit", cls: "text-blue-600 dark:text-blue-400", onClick: () => openEdit(ticket) },
                                   ...getRowActions(ticket)
                                     .map((action) => {
                                       const config = actionConfig(action, ticket)
                                       return config ? { key: action, ...config } : null
                                     })
                                     .filter(Boolean),
-                                  { key: "delete", label: "Delete", cls: "text-red-600", onClick: () => setConfirmDeleteId(ticket.id) },
+                                  { key: "delete", label: "Delete", cls: "text-red-600 dark:text-red-400", onClick: () => setConfirmDeleteId(ticket.id) },
                                 ]}
                               />
                             </div>
@@ -961,17 +961,17 @@ export default function Tickets() {
 
         {!loading && filteredTickets.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
-            <p className="text-xs text-gray-400">
+            <p className="text-xs text-gray-400 dark:text-gray-500">
               Showing {showingFrom}-{showingTo} of {filteredTickets.length} ticket
               {filteredTickets.length !== 1 ? "s" : ""}
             </p>
             <div className="flex items-center gap-4">
-              <label className="flex items-center gap-2 text-xs text-gray-500">
+              <label className="flex items-center gap-2 text-xs text-gray-500 dark:text-gray-400">
                 Rows per page
                 <select
                   value={pageSize}
                   onChange={(e) => setPageSize(Number(e.target.value))}
-                  className="px-2 py-1 border border-gray-300 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  className="px-2 py-1 border border-gray-300 dark:border-gray-700 rounded-md text-xs focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 >
                   {PAGE_SIZE_OPTIONS.map((n) => (
                     <option key={n} value={n}>{n}</option>
@@ -982,17 +982,17 @@ export default function Tickets() {
                 <button
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
                   disabled={safePage <= 1}
-                  className="px-2.5 py-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-white transition-colors"
+                  className="px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:hover:bg-white dark:disabled:hover:bg-gray-900 transition-colors"
                 >
                   Previous
                 </button>
-                <span className="text-xs text-gray-500">
+                <span className="text-xs text-gray-500 dark:text-gray-400">
                   Page {safePage} of {totalPages}
                 </span>
                 <button
                   onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                   disabled={safePage >= totalPages}
-                  className="px-2.5 py-1 text-xs font-medium text-gray-600 border border-gray-200 rounded-md hover:bg-gray-50 disabled:opacity-40 disabled:hover:bg-white transition-colors"
+                  className="px-2.5 py-1 text-xs font-medium text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-gray-800 rounded-md hover:bg-gray-50 dark:hover:bg-gray-800 disabled:opacity-40 disabled:hover:bg-white dark:disabled:hover:bg-gray-900 transition-colors"
                 >
                   Next
                 </button>

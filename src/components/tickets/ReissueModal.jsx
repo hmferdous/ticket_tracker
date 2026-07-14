@@ -223,17 +223,17 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
   }
 
   const inputCls =
-    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    "w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 px-4 py-6"
       onMouseDown={handleBackdrop}
     >
-      <div className="w-full max-w-2xl bg-white rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">Reissue ticket</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close">
+      <div className="w-full max-w-2xl bg-white dark:bg-gray-900 rounded-2xl shadow-xl flex flex-col max-h-[90vh]">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">Reissue ticket</h2>
+          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors" aria-label="Close">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -242,7 +242,7 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
 
         <div className="overflow-y-auto flex-1 px-6 py-5">
           {error && (
-            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -250,17 +250,17 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
           <form id="reissue-form" onSubmit={handleSubmit} className="space-y-5">
             {/* Passenger */}
             <fieldset>
-              <legend className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Passenger</legend>
+              <legend className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Passenger</legend>
               <div className="grid grid-cols-2 gap-3">
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Passenger Name <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Passenger Name <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <input type="text" required value={form.passenger_name} onChange={set("passenger_name")} className={inputCls} />
                 </div>
                 <div className="col-span-2 sm:col-span-1">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Carrier <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Carrier <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <SearchableDropdown
                     options={AIRLINE_OPTIONS}
@@ -271,12 +271,12 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Ticket Number</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Ticket Number</label>
                   <input type="text" value={form.ticket_number} onChange={set("ticket_number")} placeholder="e.g. 996-1234567890" className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    PNR <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    PNR <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <input type="text" required value={form.pnr} onChange={set("pnr")} placeholder="e.g. ABC123" className={inputCls} />
                 </div>
@@ -285,26 +285,26 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
 
             {/* Travel */}
             <fieldset>
-              <legend className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Travel</legend>
+              <legend className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Travel</legend>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Route <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Route <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <input type="text" required value={form.route} onChange={set("route")} placeholder="e.g. DAC-DXB" className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Issue Date</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Issue Date</label>
                   <input type="date" value={form.issue_date} onChange={set("issue_date")} className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
-                    Travel Date <span className="text-red-500">*</span>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Travel Date <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <input type="date" required value={form.travel_date} onChange={set("travel_date")} className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Return Date</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Return Date</label>
                   <input type="date" value={form.return_date} onChange={set("return_date")} className={inputCls} />
                 </div>
               </div>
@@ -312,10 +312,10 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
 
             {/* Links */}
             <fieldset>
-              <legend className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Links</legend>
+              <legend className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Links</legend>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Client</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Client</label>
                   <SearchableEntityDropdown
                     entities={clients}
                     value={form.client_id}
@@ -325,7 +325,7 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Supplier</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Supplier</label>
                   <SearchableEntityDropdown
                     entities={suppliers}
                     value={form.supplier_id}
@@ -339,52 +339,52 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
 
             {/* Financials */}
             <fieldset>
-              <legend className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Financials</legend>
+              <legend className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Financials</legend>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Purchase Price</label>
-                    <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 tabular-nums">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Purchase Price</label>
+                    <div className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg text-sm text-gray-900 dark:text-gray-100 tabular-nums">
                       {computedPurchasePrice.toLocaleString("en-BD")}
                     </div>
-                    <p className="mt-1 text-xs text-gray-400">Auto-computed from original + fare diff + reissue fee paid</p>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Auto-computed from original + fare diff + reissue fee paid</p>
                   </div>
-                  <div className="pl-3 border-l-2 border-gray-100">
-                    <label className="block text-sm font-medium text-gray-600 mb-1">Supplier Purchase Price</label>
+                  <div className="pl-3 border-l-2 border-gray-100 dark:border-gray-800">
+                    <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Supplier Purchase Price</label>
                     <input type="number" min="0" step="0.01" value={form.gds_price} onChange={set("gds_price")} placeholder="0.00" className={inputCls} />
-                    <p className="mt-1 text-xs text-gray-400">Informational only</p>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Informational only</p>
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Sell Price</label>
-                  <div className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-900 tabular-nums">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sell Price</label>
+                  <div className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg text-sm text-gray-900 dark:text-gray-100 tabular-nums">
                     {computedSellPrice.toLocaleString("en-BD")}
                   </div>
-                  <p className="mt-1 text-xs text-gray-400">Auto-computed from original + fare diff + reissue fee collected</p>
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Auto-computed from original + fare diff + reissue fee collected</p>
                 </div>
               </div>
             </fieldset>
 
             {/* Reissue Details */}
             <fieldset>
-              <legend className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Reissue Details</legend>
+              <legend className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Reissue Details</legend>
               <div className="grid grid-cols-3 gap-3">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Reissue Fee Collected</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Collected</label>
                   <input type="number" min="0" step="0.01" value={form.reissue_fee_collected} onChange={set("reissue_fee_collected")} placeholder="0.00" className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Reissue Fee Paid</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Paid</label>
                   <input type="number" min="0" step="0.01" value={form.reissue_fee_paid} onChange={set("reissue_fee_paid")} placeholder="0.00" className={inputCls} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Fare Difference</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fare Difference</label>
                   <input type="number" step="0.01" value={form.fare_difference} onChange={set("fare_difference")} placeholder="0.00" className={inputCls} />
                 </div>
               </div>
-              <p className="mt-3 text-sm text-gray-600">
+              <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
                 Profit From Reissue:{" "}
-                <span className={`font-medium ${reissueProfit >= 0 ? "text-green-600" : "text-red-600"}`}>
+                <span className={`font-medium ${reissueProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                   {reissueProfit.toLocaleString("en-BD")}
                 </span>
               </p>
@@ -392,19 +392,19 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
 
             {/* Notes */}
             <fieldset>
-              <legend className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-3">Notes</legend>
+              <legend className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Notes</legend>
               <textarea value={form.narration} onChange={set("narration")} placeholder="Any notes about this ticket…" rows={3} className={`${inputCls} resize-none`} />
             </fieldset>
 
             {/* Client Payment — collapsible */}
-            <div className="border border-gray-200 rounded-lg overflow-hidden">
+            <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
               <button
                 type="button"
                 onClick={() => setClientPayOpen((o) => !o)}
-                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 hover:bg-gray-100 text-sm font-medium text-gray-700 transition-colors"
+                className="w-full flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-800 hover:bg-gray-100 dark:hover:bg-gray-700 text-sm font-medium text-gray-700 dark:text-gray-300 transition-colors"
               >
                 <span>Record Payment</span>
-                <svg className={`w-4 h-4 text-gray-400 transition-transform ${clientPayOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className={`w-4 h-4 text-gray-400 dark:text-gray-500 transition-transform ${clientPayOpen ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
               </button>
@@ -412,7 +412,7 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                 <div className="px-4 py-4 space-y-3">
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount Received</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount Received</label>
                       <input
                         type="number"
                         min="0"
@@ -421,11 +421,11 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                         onChange={setC("amount")}
                         disabled={clientPay.paid_in_full}
                         placeholder="0.00"
-                        className={`${inputCls} ${clientPay.paid_in_full ? "bg-gray-50 text-gray-500" : ""}`}
+                        className={`${inputCls} ${clientPay.paid_in_full ? "bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400" : ""}`}
                       />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Payment Channel</label>
+                      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Payment Channel</label>
                       <select value={clientPay.channel_id} onChange={setC("channel_id")} className={inputCls}>
                         <option value="">— Select —</option>
                         {channels.map((ch) => (
@@ -435,15 +435,15 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                     </div>
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Transaction ID</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Transaction ID</label>
                     <input type="text" value={clientPay.trx_id} onChange={setC("trx_id")} placeholder="Reference or TrxID" className={inputCls} />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Notes</label>
                     <input type="text" value={clientPay.notes} onChange={setC("notes")} placeholder="Optional note" className={inputCls} />
                   </div>
-                  <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
-                    <input type="checkbox" checked={clientPay.paid_in_full} onChange={handlePaidInFull} className="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                  <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 cursor-pointer select-none">
+                    <input type="checkbox" checked={clientPay.paid_in_full} onChange={handlePaidInFull} className="rounded border-gray-300 dark:border-gray-700 text-blue-600 dark:text-blue-400 focus:ring-blue-500" />
                     Paid in full (fills sell price)
                   </label>
                 </div>
@@ -452,11 +452,11 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
           </form>
         </div>
 
-        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-800">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             Cancel
           </button>

@@ -40,24 +40,24 @@ function daysUntilFlight(travelDate) {
 }
 
 function paymentStatusBadge(status) {
-  if (status === "unpaid") return { label: "Unpaid", cls: "bg-red-100 text-red-700" }
-  if (status === "partial") return { label: "Partial", cls: "bg-yellow-100 text-yellow-700" }
-  if (status === "paid") return { label: "Paid", cls: "bg-green-100 text-green-700" }
-  return { label: status ?? "—", cls: "bg-gray-100 text-gray-600" }
+  if (status === "unpaid") return { label: "Unpaid", cls: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" }
+  if (status === "partial") return { label: "Partial", cls: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400" }
+  if (status === "paid") return { label: "Paid", cls: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" }
+  return { label: status ?? "—", cls: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400" }
 }
 
 function typeBadge(type) {
   switch (type) {
     case "client_payment":
-      return { label: "Client Payment", cls: "bg-green-100 text-green-700" }
+      return { label: "Client Payment", cls: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" }
     case "supplier_payment":
-      return { label: "Supplier Payment", cls: "bg-red-100 text-red-700" }
+      return { label: "Supplier Payment", cls: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" }
     case "client_refund":
-      return { label: "Client Refund", cls: "bg-blue-100 text-blue-700" }
+      return { label: "Client Refund", cls: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400" }
     case "supplier_refund":
-      return { label: "Supplier Refund", cls: "bg-orange-100 text-orange-700" }
+      return { label: "Supplier Refund", cls: "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400" }
     default:
-      return { label: type ?? "—", cls: "bg-gray-100 text-gray-600" }
+      return { label: type ?? "—", cls: "bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400" }
   }
 }
 
@@ -71,11 +71,11 @@ function Badge({ label, className }) {
 
 function StatCard({ label, value, accent, tag }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl p-5 flex flex-col">
-      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">{label}</p>
-      <p className={`text-2xl font-semibold tabular-nums flex-1 ${accent ?? "text-gray-900"}`}>{value}</p>
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 flex flex-col">
+      <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">{label}</p>
+      <p className={`text-2xl font-semibold tabular-nums flex-1 ${accent ?? "text-gray-900 dark:text-gray-100"}`}>{value}</p>
       {tag && (
-        <span className="mt-3 self-start inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-400">
+        <span className="mt-3 self-start inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500">
           {tag}
         </span>
       )}
@@ -140,55 +140,55 @@ function DashboardSkeleton() {
     <div className="max-w-screen-xl mx-auto px-6 py-8">
       <div className="flex gap-2 mb-4">
         {[0, 1, 2, 3, 4, 5, 6].map((i) => (
-          <div key={i} className="h-8 w-24 bg-gray-100 rounded-lg animate-pulse" />
+          <div key={i} className="h-8 w-24 bg-gray-100 dark:bg-gray-800 rounded-lg animate-pulse" />
         ))}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
         {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse">
-            <div className="h-3 w-24 bg-gray-200 rounded mb-3" />
-            <div className="h-7 w-20 bg-gray-100 rounded" />
+          <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 animate-pulse">
+            <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-3" />
+            <div className="h-7 w-20 bg-gray-100 dark:bg-gray-800 rounded" />
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
         {[0, 1, 2].map((i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse">
-            <div className="h-3 w-32 bg-gray-200 rounded mb-3" />
-            <div className="h-7 w-20 bg-gray-100 rounded" />
+          <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 animate-pulse">
+            <div className="h-3 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-3" />
+            <div className="h-7 w-20 bg-gray-100 dark:bg-gray-800 rounded" />
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
         {[0, 1, 2, 3, 4].map((i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse">
-            <div className="h-3 w-24 bg-gray-200 rounded mb-3" />
-            <div className="h-7 w-20 bg-gray-100 rounded" />
+          <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 animate-pulse">
+            <div className="h-3 w-24 bg-gray-200 dark:bg-gray-700 rounded mb-3" />
+            <div className="h-7 w-20 bg-gray-100 dark:bg-gray-800 rounded" />
           </div>
         ))}
       </div>
 
-      <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 animate-pulse">
-        <div className="h-4 w-32 bg-gray-200 rounded mb-4" />
+      <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 mb-6 animate-pulse">
+        <div className="h-4 w-32 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
         <div className="space-y-2">
-          <div className="h-4 bg-gray-100 rounded" />
-          <div className="h-4 bg-gray-100 rounded" />
-          <div className="h-4 bg-gray-100 rounded" />
+          <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded" />
+          <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded" />
+          <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded" />
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {[0, 1].map((i) => (
-          <div key={i} className="bg-white border border-gray-200 rounded-xl p-5 animate-pulse">
-            <div className="h-4 w-28 bg-gray-200 rounded mb-4" />
+          <div key={i} className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 animate-pulse">
+            <div className="h-4 w-28 bg-gray-200 dark:bg-gray-700 rounded mb-4" />
             <div className="space-y-2">
-              <div className="h-4 bg-gray-100 rounded" />
-              <div className="h-4 bg-gray-100 rounded" />
-              <div className="h-4 bg-gray-100 rounded" />
-              <div className="h-4 bg-gray-100 rounded" />
+              <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded" />
+              <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded" />
+              <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded" />
+              <div className="h-4 bg-gray-100 dark:bg-gray-800 rounded" />
             </div>
           </div>
         ))}
@@ -373,7 +373,7 @@ export default function Dashboard() {
       <button
         type="button"
         onClick={() => setAmountsVisible((v) => !v)}
-        className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 text-gray-600 hover:bg-gray-50 rounded-lg text-xs font-medium transition-colors"
+        className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-lg text-xs font-medium transition-colors"
       >
         {amountsVisible ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
         {amountsVisible ? "Hide amounts" : "Show amounts"}
@@ -391,7 +391,7 @@ export default function Dashboard() {
       ) : (
         <div className="max-w-screen-xl mx-auto px-6 py-8">
           {error && (
-            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
               {error}
             </div>
           )}
@@ -399,7 +399,7 @@ export default function Dashboard() {
           {/* Welcome */}
           {agent && (
             <div className="mb-5">
-              <p className="text-2xl font-extrabold text-gray-900 tracking-tight">
+              <p className="text-2xl font-extrabold text-gray-900 dark:text-gray-100 tracking-tight">
                 {(() => {
                   const h = new Date().getHours()
                   const greeting = h < 12 ? "Good morning" : h < 17 ? "Good afternoon" : "Good evening"
@@ -420,7 +420,7 @@ export default function Dashboard() {
                 className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
                   filterPreset === value
                     ? "bg-blue-600 text-white"
-                    : "border border-gray-200 text-gray-600 hover:bg-gray-50"
+                    : "border border-gray-200 dark:border-gray-800 text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800"
                 }`}
               >
                 {label}
@@ -432,14 +432,14 @@ export default function Dashboard() {
                   type="date"
                   value={customFrom}
                   onChange={(e) => setCustomFrom(e.target.value)}
-                  className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
-                <span className="text-gray-400 text-xs">to</span>
+                <span className="text-gray-400 dark:text-gray-500 text-xs">to</span>
                 <input
                   type="date"
                   value={customTo}
                   onChange={(e) => setCustomTo(e.target.value)}
-                  className="px-2 py-1.5 border border-gray-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="px-2 py-1.5 border border-gray-300 dark:border-gray-700 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             )}
@@ -449,16 +449,16 @@ export default function Dashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-4">
             <StatCard label="Total Tickets" value={fmt(periodStats.totalTickets)} />
             <StatCard label="Total Sales" value={MA(periodStats.totalRevenue)} />
-            <StatCard label="Total Collected" value={MA(totalCollected)} accent="text-green-600" />
+            <StatCard label="Total Collected" value={MA(totalCollected)} accent="text-green-600 dark:text-green-400" />
             <StatCard
               label="Total Profit"
               value={MA(periodStats.totalMargin)}
-              accent={periodStats.totalMargin >= 0 ? "text-green-600" : "text-red-600"}
+              accent={periodStats.totalMargin >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}
             />
             <StatCard
               label="Office Margin"
               value={MA(periodStats.officeMargin)}
-              accent={periodStats.officeMargin >= 0 ? "text-green-600" : "text-red-600"}
+              accent={periodStats.officeMargin >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}
             />
           </div>
 
@@ -467,19 +467,19 @@ export default function Dashboard() {
             <StatCard
               label="Collection Pending"
               value={MA(cumulativeStats.outstandingReceivable)}
-              accent={cumulativeStats.outstandingReceivable > 0 ? "text-yellow-600" : "text-gray-900"}
+              accent={cumulativeStats.outstandingReceivable > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-gray-900 dark:text-gray-100"}
               tag="All time"
             />
             <StatCard
               label="Total Payable to Suppliers"
               value={MA(cumulativeStats.totalPayableToSuppliers)}
-              accent={cumulativeStats.totalPayableToSuppliers > 0 ? "text-red-600" : "text-gray-900"}
+              accent={cumulativeStats.totalPayableToSuppliers > 0 ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"}
               tag="All time"
             />
             <StatCard
               label="Unallocated Client Credit"
               value={MA(unallocatedClientCredit)}
-              accent={unallocatedClientCredit > 0 ? "text-blue-600" : "text-gray-900"}
+              accent={unallocatedClientCredit > 0 ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"}
               tag="All time"
             />
           </div>
@@ -494,38 +494,38 @@ export default function Dashboard() {
             <StatCard
               label="Awaiting from Supplier"
               value={MA(refundStats.awaitingFromSupplier)}
-              accent={refundStats.awaitingFromSupplier > 0 ? "text-yellow-600" : "text-gray-900"}
+              accent={refundStats.awaitingFromSupplier > 0 ? "text-yellow-600 dark:text-yellow-400" : "text-gray-900 dark:text-gray-100"}
               tag="All time"
             />
             <StatCard
               label="Owed to Clients"
               value={MA(refundStats.owedToClients)}
-              accent={refundStats.owedToClients > 0 ? "text-red-600" : "text-gray-900"}
+              accent={refundStats.owedToClients > 0 ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"}
               tag="All time"
             />
             <StatCard
               label="Total Refunded to Clients"
               value={MA(totalRefundedToClients)}
-              accent={totalRefundedToClients > 0 ? "text-blue-600" : "text-gray-900"}
+              accent={totalRefundedToClients > 0 ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"}
             />
             <StatCard
               label="Refund Net Margin"
               value={MA(refundStats.netMargin)}
-              accent={refundStats.netMargin >= 0 ? "text-green-600" : "text-red-600"}
+              accent={refundStats.netMargin >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}
               tag="All time"
             />
           </div>
 
           {/* Row 4 — Needs Attention (always all tickets) */}
-          <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6">
-            <h2 className="text-base font-semibold text-gray-900 mb-4">Needs Attention</h2>
+          <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5 mb-6">
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">Needs Attention</h2>
             {needsAttention.length === 0 ? (
-              <p className="text-sm text-gray-400">No upcoming unpaid tickets</p>
+              <p className="text-sm text-gray-400 dark:text-gray-500">No upcoming unpaid tickets</p>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
-                    <tr className="text-left text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                    <tr className="text-left text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
                       <th className="py-2 pr-4 font-medium">Passenger</th>
                       <th className="py-2 pr-4 font-medium">Route</th>
                       <th className="py-2 pr-4 font-medium">Travel Date</th>
@@ -536,15 +536,15 @@ export default function Dashboard() {
                   </thead>
                   <tbody>
                     {needsAttention.map((t) => {
-                      const rowCls = t.daysUntil <= 3 ? "bg-red-50" : t.daysUntil <= 7 ? "bg-yellow-50" : ""
+                      const rowCls = t.daysUntil <= 3 ? "bg-red-50 dark:bg-red-900/20" : t.daysUntil <= 7 ? "bg-yellow-50 dark:bg-yellow-900/20" : ""
                       return (
                         <tr key={t.id} className={`border-b border-gray-50 last:border-0 ${rowCls}`}>
-                          <td className="py-2 pr-4 text-gray-900">{t.passenger_name}</td>
-                          <td className="py-2 pr-4 text-gray-600">{t.route}</td>
-                          <td className="py-2 pr-4 text-gray-600">{fmtDate(t.travel_date)}</td>
-                          <td className="py-2 pr-4 text-gray-600">{t.clients?.name ?? "—"}</td>
-                          <td className="py-2 pr-4 text-right tabular-nums text-gray-900">{M(t.outstanding)}</td>
-                          <td className="py-2 pr-4 text-right tabular-nums text-gray-900">{t.daysUntil}</td>
+                          <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">{t.passenger_name}</td>
+                          <td className="py-2 pr-4 text-gray-600 dark:text-gray-400">{t.route}</td>
+                          <td className="py-2 pr-4 text-gray-600 dark:text-gray-400">{fmtDate(t.travel_date)}</td>
+                          <td className="py-2 pr-4 text-gray-600 dark:text-gray-400">{t.clients?.name ?? "—"}</td>
+                          <td className="py-2 pr-4 text-right tabular-nums text-gray-900 dark:text-gray-100">{M(t.outstanding)}</td>
+                          <td className="py-2 pr-4 text-right tabular-nums text-gray-900 dark:text-gray-100">{t.daysUntil}</td>
                         </tr>
                       )
                     })}
@@ -556,15 +556,15 @@ export default function Dashboard() {
 
           {/* Row 4 — Recent Tickets / Recent Payments (period-filtered) */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
-              <h2 className="text-base font-semibold text-gray-900 mb-4">Recent Tickets</h2>
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+              <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Tickets</h2>
               {recentTickets.length === 0 ? (
-                <p className="text-sm text-gray-400">No tickets in this period</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">No tickets in this period</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-left text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                      <tr className="text-left text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
                         <th className="py-2 pr-4 font-medium">Passenger</th>
                         <th className="py-2 pr-4 font-medium">Route</th>
                         <th className="py-2 pr-4 font-medium">Travel Date</th>
@@ -578,11 +578,11 @@ export default function Dashboard() {
                         const badge = paymentStatusBadge(t.payment_status)
                         return (
                           <tr key={t.id} className="border-b border-gray-50 last:border-0">
-                            <td className="py-2 pr-4 text-gray-900">{t.passenger_name}</td>
-                            <td className="py-2 pr-4 text-gray-600">{t.route}</td>
-                            <td className="py-2 pr-4 text-gray-600">{fmtDate(t.travel_date)}</td>
-                            <td className="py-2 pr-4 text-right tabular-nums text-gray-900">{M(t.sell_price)}</td>
-                            <td className="py-2 pr-4 text-right tabular-nums text-gray-900">{M(ticketNetMargin(t))}</td>
+                            <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">{t.passenger_name}</td>
+                            <td className="py-2 pr-4 text-gray-600 dark:text-gray-400">{t.route}</td>
+                            <td className="py-2 pr-4 text-gray-600 dark:text-gray-400">{fmtDate(t.travel_date)}</td>
+                            <td className="py-2 pr-4 text-right tabular-nums text-gray-900 dark:text-gray-100">{M(t.sell_price)}</td>
+                            <td className="py-2 pr-4 text-right tabular-nums text-gray-900 dark:text-gray-100">{M(ticketNetMargin(t))}</td>
                             <td className="py-2 pr-4">
                               <Badge label={badge.label} className={badge.cls} />
                             </td>
@@ -595,15 +595,15 @@ export default function Dashboard() {
               )}
             </div>
 
-            <div className="bg-white border border-gray-200 rounded-xl p-5">
-              <h2 className="text-base font-semibold text-gray-900 mb-4">Recent Payments</h2>
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-5">
+              <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">Recent Payments</h2>
               {recentPayments.length === 0 ? (
-                <p className="text-sm text-gray-400">No payments in this period</p>
+                <p className="text-sm text-gray-400 dark:text-gray-500">No payments in this period</p>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="text-left text-xs text-gray-400 uppercase tracking-wide border-b border-gray-100">
+                      <tr className="text-left text-xs text-gray-400 dark:text-gray-500 uppercase tracking-wide border-b border-gray-100 dark:border-gray-800">
                         <th className="py-2 pr-4 font-medium">Date</th>
                         <th className="py-2 pr-4 font-medium">Party</th>
                         <th className="py-2 pr-4 font-medium text-right">Amount (BDT)</th>
@@ -617,10 +617,10 @@ export default function Dashboard() {
                         const party = p.clients?.name ?? p.suppliers?.name ?? "—"
                         return (
                           <tr key={p.id} className="border-b border-gray-50 last:border-0">
-                            <td className="py-2 pr-4 text-gray-600">{fmtDate(p.payment_date)}</td>
-                            <td className="py-2 pr-4 text-gray-900">{party}</td>
-                            <td className="py-2 pr-4 text-right tabular-nums text-gray-900">{M(p.amount)}</td>
-                            <td className="py-2 pr-4 text-gray-600">{p.channel ?? "—"}</td>
+                            <td className="py-2 pr-4 text-gray-600 dark:text-gray-400">{fmtDate(p.payment_date)}</td>
+                            <td className="py-2 pr-4 text-gray-900 dark:text-gray-100">{party}</td>
+                            <td className="py-2 pr-4 text-right tabular-nums text-gray-900 dark:text-gray-100">{M(p.amount)}</td>
+                            <td className="py-2 pr-4 text-gray-600 dark:text-gray-400">{p.channel ?? "—"}</td>
                             <td className="py-2 pr-4">
                               <Badge label={badge.label} className={badge.cls} />
                             </td>

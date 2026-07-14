@@ -127,37 +127,37 @@ export default function VoidConfirmModal({ isOpen, onClose, ticket, onSaved }) {
   }
 
   const inputCls =
-    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    "w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 px-4 py-6"
       onMouseDown={handleBackdrop}
     >
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl flex flex-col">
+      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-xl flex flex-col">
         <div className="px-6 py-5">
-          <h2 className="text-lg font-semibold text-gray-900 mb-2">Void this ticket?</h2>
-          <p className="text-sm text-gray-500 mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">Void this ticket?</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Mark this ticket as void? This cannot be undone.
           </p>
 
           {error && (
-            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
+            <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">
               {error}
             </div>
           )}
 
-          <p className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">
+          <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">
             Cancellation fees (optional)
           </p>
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Fee charged by supplier</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Fee charged by supplier</label>
                 <input type="number" min="0" step="0.01" value={supplierFee} onChange={(e) => setSupplierFee(e.target.value)} placeholder="0.00" className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Channel</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Channel</label>
                 <select value={supplierFeeChannelId} onChange={(e) => setSupplierFeeChannelId(e.target.value)} className={inputCls}>
                   <option value="">— Select —</option>
                   {channels.map((ch) => (
@@ -168,11 +168,11 @@ export default function VoidConfirmModal({ isOpen, onClose, ticket, onSaved }) {
             </div>
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Fee charged to client</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Fee charged to client</label>
                 <input type="number" min="0" step="0.01" value={clientFee} onChange={(e) => setClientFee(e.target.value)} placeholder="0.00" className={inputCls} />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1">Channel</label>
+                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Channel</label>
                 <select value={clientFeeChannelId} onChange={(e) => setClientFeeChannelId(e.target.value)} className={inputCls}>
                   <option value="">— Select —</option>
                   {channels.map((ch) => (
@@ -183,11 +183,11 @@ export default function VoidConfirmModal({ isOpen, onClose, ticket, onSaved }) {
             </div>
           </div>
         </div>
-        <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+        <div className="flex gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-800">
           <button
             type="button"
             onClick={onClose}
-            className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+            className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
           >
             Cancel
           </button>

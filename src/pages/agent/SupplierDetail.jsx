@@ -37,19 +37,19 @@ function Badge({ label, className }) {
 
 function TicketTagCell({ payment }) {
   const tps = payment.ticket_payments ?? []
-  if (tps.length === 0) return <span className="text-gray-300 text-xs">—</span>
+  if (tps.length === 0) return <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
   if (tps.length === 1) {
     const t = tps[0].tickets
     return (
       <div className="flex flex-col gap-0.5">
-        <span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded w-fit">{t?.pnr?.toUpperCase() ?? "—"}</span>
-        <span className="text-[11px] text-gray-400 truncate max-w-[120px]">{t?.passenger_name ?? ""}</span>
+        <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded w-fit">{t?.pnr?.toUpperCase() ?? "—"}</span>
+        <span className="text-[11px] text-gray-400 dark:text-gray-500 truncate max-w-[120px]">{t?.passenger_name ?? ""}</span>
       </div>
     )
   }
   return (
     <span
-      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 text-blue-700 cursor-default"
+      className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-400 cursor-default"
       title={tps.map((tp) => tp.tickets?.pnr?.toUpperCase() ?? "—").join(", ")}
     >
       {tps.length} tickets
@@ -58,9 +58,9 @@ function TicketTagCell({ payment }) {
 }
 
 function paymentStatusBadge(status) {
-  if (status === "unpaid") return { label: "Unpaid", cls: "bg-red-100 text-red-700" }
-  if (status === "partial") return { label: "Partial", cls: "bg-yellow-100 text-yellow-700" }
-  if (status === "paid") return { label: "Paid", cls: "bg-green-100 text-green-700" }
+  if (status === "unpaid") return { label: "Unpaid", cls: "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400" }
+  if (status === "partial") return { label: "Partial", cls: "bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400" }
+  if (status === "paid") return { label: "Paid", cls: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400" }
   return null
 }
 
@@ -91,7 +91,7 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
     }
   }, [isOpen, onClose])
 
-  if (items.length === 0) return <span className="text-gray-300 text-xs">—</span>
+  if (items.length === 0) return <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>
 
   const handleToggle = () => {
     if (!isOpen && btnRef.current) {
@@ -112,7 +112,7 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
         ref={btnRef}
         type="button"
         onClick={handleToggle}
-        className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+        className="p-1.5 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
         aria-label="Row actions"
       >
         <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
@@ -125,7 +125,7 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
         <>
           <div className="fixed inset-0 z-40" onClick={onClose} />
           <div
-            className="fixed z-50 w-44 bg-white rounded-lg shadow-lg border border-gray-100 py-1"
+            className="fixed z-50 w-44 bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-100 dark:border-gray-800 py-1"
             style={{ top: menuPos.top, right: menuPos.right }}
           >
             {items.map((item) => (
@@ -136,7 +136,7 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
                   onClose()
                   item.onClick()
                 }}
-                className={`block w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 transition-colors ${item.cls}`}
+                className={`block w-full text-left px-3 py-2 text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors ${item.cls}`}
               >
                 {item.label}
               </button>
@@ -151,9 +151,9 @@ function RowActionsMenu({ items, isOpen, onToggle, onClose }) {
 
 function StatCard({ label, value, accent, action }) {
   return (
-    <div className="bg-white border border-gray-200 rounded-xl shadow-sm px-4 py-3">
-      <p className="text-xs font-medium text-gray-400 uppercase tracking-wide">{label}</p>
-      <p className={`text-lg font-semibold mt-1 tabular-nums ${accent ?? "text-gray-900"}`}>{fmt(value)}</p>
+    <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl shadow-sm px-4 py-3">
+      <p className="text-xs font-medium text-gray-400 dark:text-gray-500 uppercase tracking-wide">{label}</p>
+      <p className={`text-lg font-semibold mt-1 tabular-nums ${accent ?? "text-gray-900 dark:text-gray-100"}`}>{fmt(value)}</p>
       {action}
     </div>
   )
@@ -356,13 +356,13 @@ export default function SupplierDetail() {
           <>
             <button
               onClick={() => setEditModalOpen(true)}
-              className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              className="px-3 py-1.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               Edit
             </button>
             <button
               onClick={() => navigate(`/reports/supplier-ledger?supplierId=${id}`)}
-              className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              className="px-3 py-1.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               View Ledger
             </button>
@@ -378,42 +378,42 @@ export default function SupplierDetail() {
     >
       <div className="max-w-5xl mx-auto px-6 py-8">
         {error && (
-          <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
+          <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">{error}</div>
         )}
 
         {loading ? (
-          <div className="py-20 text-center text-sm text-gray-400">Loading supplier…</div>
+          <div className="py-20 text-center text-sm text-gray-400 dark:text-gray-500">Loading supplier…</div>
         ) : !supplier ? (
-          <div className="py-20 text-center text-sm text-gray-400">Supplier not found.</div>
+          <div className="py-20 text-center text-sm text-gray-400 dark:text-gray-500">Supplier not found.</div>
         ) : (
           <>
             {/* Supplier details card */}
-            <div className="bg-white border border-gray-200 rounded-xl p-6 mb-6 flex items-start justify-between gap-4">
+            <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6 mb-6 flex items-start justify-between gap-4">
               <div className="flex items-start gap-4">
-                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-purple-50 text-purple-700 text-xs font-semibold tracking-wide mt-1.5">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-md bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 text-xs font-semibold tracking-wide mt-1.5">
                   {supplierIdLabel(supplier.supplier_id_number)}
                 </span>
                 <div>
-                  <h2 className="text-2xl font-semibold text-gray-900">{supplier.name}</h2>
+                  <h2 className="text-2xl font-semibold text-gray-900 dark:text-gray-100">{supplier.name}</h2>
                   <div className="mt-2 flex flex-wrap gap-x-8 gap-y-1 text-sm">
                     <p>
-                      <span className="text-gray-400">Phone:</span>{" "}
-                      <span className="text-gray-700">{supplier.phone || "—"}</span>
+                      <span className="text-gray-400 dark:text-gray-500">Phone:</span>{" "}
+                      <span className="text-gray-700 dark:text-gray-300">{supplier.phone || "—"}</span>
                     </p>
                     <p>
-                      <span className="text-gray-400">Email:</span>{" "}
-                      <span className="text-gray-700">{supplier.email || "—"}</span>
+                      <span className="text-gray-400 dark:text-gray-500">Email:</span>{" "}
+                      <span className="text-gray-700 dark:text-gray-300">{supplier.email || "—"}</span>
                     </p>
                     <p>
-                      <span className="text-gray-400">Notes:</span>{" "}
-                      <span className="text-gray-700">{supplier.notes || "—"}</span>
+                      <span className="text-gray-400 dark:text-gray-500">Notes:</span>{" "}
+                      <span className="text-gray-700 dark:text-gray-300">{supplier.notes || "—"}</span>
                     </p>
                   </div>
                 </div>
               </div>
               <button
                 onClick={() => setEditModalOpen(true)}
-                className="px-3 py-1.5 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors shrink-0"
+                className="px-3 py-1.5 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors shrink-0"
               >
                 Edit
               </button>
@@ -422,21 +422,21 @@ export default function SupplierDetail() {
             {/* Summary cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
               <StatCard label="Total Purchased" value={totalPurchased} />
-              <StatCard label="Total Paid" value={totalPaid} accent="text-green-600" />
+              <StatCard label="Total Paid" value={totalPaid} accent="text-green-600 dark:text-green-400" />
               <StatCard
                 label="Outstanding Payable"
                 value={outstandingPayable}
-                accent={outstandingPayable > 0 ? "text-red-600" : "text-gray-900"}
+                accent={outstandingPayable > 0 ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-gray-100"}
               />
               <StatCard
                 label="Unallocated"
                 value={unallocated}
-                accent={unallocated > 0 ? "text-blue-600" : "text-gray-900"}
+                accent={unallocated > 0 ? "text-blue-600 dark:text-blue-400" : "text-gray-900 dark:text-gray-100"}
                 action={
                   unallocated > 0 && (
                     <button
                       onClick={handleSettle}
-                      className="mt-2 px-2.5 py-1 bg-white border border-gray-300 text-gray-700 rounded-md text-xs font-medium hover:bg-gray-50 transition-colors"
+                      className="mt-2 px-2.5 py-1 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-md text-xs font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                     >
                       Settle
                     </button>
@@ -446,7 +446,7 @@ export default function SupplierDetail() {
             </div>
 
             {/* Tabs */}
-            <div className="flex items-center gap-1 border-b border-gray-200 mb-4">
+            <div className="flex items-center gap-1 border-b border-gray-200 dark:border-gray-800 mb-4">
               {[
                 { key: "tickets", label: "Tickets" },
                 { key: "payments", label: "Payment History" },
@@ -457,8 +457,8 @@ export default function SupplierDetail() {
                   onClick={() => setActiveTab(tab.key)}
                   className={`px-4 py-2.5 text-sm font-medium border-b-2 -mb-px transition-colors ${
                     activeTab === tab.key
-                      ? "border-blue-600 text-blue-600"
-                      : "border-transparent text-gray-500 hover:text-gray-700"
+                      ? "border-blue-600 text-blue-600 dark:text-blue-400"
+                      : "border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300"
                   }`}
                 >
                   {tab.label}
@@ -468,27 +468,27 @@ export default function SupplierDetail() {
 
             {/* Tickets tab */}
             {activeTab === "tickets" && (
-              <div className="bg-white border border-gray-200 rounded-xl overflow-x-auto">
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-x-auto">
                 {tickets.length === 0 ? (
-                  <div className="py-16 text-center text-sm text-gray-400">No tickets for this supplier yet.</div>
+                  <div className="py-16 text-center text-sm text-gray-400 dark:text-gray-500">No tickets for this supplier yet.</div>
                 ) : (
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50 text-left">
-                        <th className="px-4 py-3 font-medium text-gray-500">Passenger</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Ticket No</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">PNR</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Issue Date</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Route</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Travel Date</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Carrier</th>
-                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Purchase Price</th>
-                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Amount Paid to Supplier</th>
-                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Outstanding</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Status</th>
+                      <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-left">
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Passenger</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Ticket No</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">PNR</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Issue Date</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Route</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Travel Date</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Carrier</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 text-right">Purchase Price</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 text-right">Amount Paid to Supplier</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 text-right">Outstanding</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {tickets.map((ticket) => {
                         const outstanding = !ticket.is_void && ticket.refund_status == null
                           ? (ticket.purchase_price ?? 0) - (ticket.supplierAmountPaid ?? 0)
@@ -499,26 +499,26 @@ export default function SupplierDetail() {
                           <tr
                             key={ticket.id}
                             onClick={() => setViewingTicket(ticket)}
-                            className="hover:bg-gray-50 transition-colors cursor-pointer"
+                            className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors cursor-pointer"
                           >
-                            <td className="px-4 py-3 font-medium text-gray-900">{ticket.passenger_name}</td>
+                            <td className="px-4 py-3 font-medium text-gray-900 dark:text-gray-100">{ticket.passenger_name}</td>
                             <td className="px-4 py-3">
                               {ticket.ticket_number
-                                ? <span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.ticket_number}</span>
-                                : <span className="text-gray-300 text-xs">—</span>}
+                                ? <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">{ticket.ticket_number}</span>
+                                : <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>}
                             </td>
                             <td className="px-4 py-3">
                               {ticket.pnr
-                                ? <span className="font-mono text-xs bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">{ticket.pnr.toUpperCase()}</span>
-                                : <span className="text-gray-300 text-xs">—</span>}
+                                ? <span className="font-mono text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">{ticket.pnr.toUpperCase()}</span>
+                                : <span className="text-gray-300 dark:text-gray-600 text-xs">—</span>}
                             </td>
-                            <td className="px-4 py-3 text-gray-600">{fmtDate(ticket.issue_date)}</td>
-                            <td className="px-4 py-3 text-gray-600">{ticket.route ?? "—"}</td>
-                            <td className="px-4 py-3 text-gray-600">{fmtDate(ticket.travel_date)}</td>
-                            <td className="px-4 py-3 text-gray-600">{ticket.carrier ?? "—"}</td>
-                            <td className="px-4 py-3 text-right tabular-nums text-gray-700">{fmt(ticket.purchase_price)}</td>
-                            <td className="px-4 py-3 text-right tabular-nums text-gray-600">{fmt(ticket.supplierAmountPaid)}</td>
-                            <td className="px-4 py-3 text-right tabular-nums text-gray-600">{fmt(outstanding)}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{fmtDate(ticket.issue_date)}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{ticket.route ?? "—"}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{fmtDate(ticket.travel_date)}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{ticket.carrier ?? "—"}</td>
+                            <td className="px-4 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">{fmt(ticket.purchase_price)}</td>
+                            <td className="px-4 py-3 text-right tabular-nums text-gray-600 dark:text-gray-400">{fmt(ticket.supplierAmountPaid)}</td>
+                            <td className="px-4 py-3 text-right tabular-nums text-gray-600 dark:text-gray-400">{fmt(outstanding)}</td>
                             <td className="px-4 py-3">
                               {statusBadge ? <Badge label={statusBadge.label} className={statusBadge.cls} /> : "—"}
                             </td>
@@ -533,34 +533,34 @@ export default function SupplierDetail() {
 
             {/* Payment history tab */}
             {activeTab === "payments" && (
-              <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+              <div className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl overflow-hidden">
                 {payments.length === 0 ? (
-                  <div className="py-16 text-center text-sm text-gray-400">No payments logged for this supplier yet.</div>
+                  <div className="py-16 text-center text-sm text-gray-400 dark:text-gray-500">No payments logged for this supplier yet.</div>
                 ) : (
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-gray-100 bg-gray-50 text-left">
-                        <th className="px-4 py-3 font-medium text-gray-500">Date</th>
-                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Amount</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Ticket</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Channel</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Trx ID</th>
-                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Unallocated</th>
-                        <th className="px-4 py-3 font-medium text-gray-500">Notes</th>
-                        <th className="px-4 py-3 font-medium text-gray-500 text-right">Action</th>
+                      <tr className="border-b border-gray-100 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-left">
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Date</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 text-right">Amount</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Ticket</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Channel</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Trx ID</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 text-right">Unallocated</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400">Notes</th>
+                        <th className="px-4 py-3 font-medium text-gray-500 dark:text-gray-400 text-right">Action</th>
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-gray-100">
+                    <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {payments.map((payment) => (
-                        <tr key={payment.id} className="hover:bg-gray-50 transition-colors">
-                          <td className="px-4 py-3 text-gray-600">{fmtDate(payment.payment_date)}</td>
-                          <td className="px-4 py-3 text-right tabular-nums text-gray-700">{fmt(payment.amount)}</td>
+                        <tr key={payment.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{fmtDate(payment.payment_date)}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-gray-700 dark:text-gray-300">{fmt(payment.amount)}</td>
                           <td className="px-4 py-3"><TicketTagCell payment={payment} /></td>
-                          <td className="px-4 py-3 text-gray-600">{payment.channel ?? "—"}</td>
-                          <td className="px-4 py-3 text-gray-600">{payment.trx_id ?? "—"}</td>
-                          <td className="px-4 py-3 text-right tabular-nums text-gray-600">{fmt(payment.unallocated_amount)}</td>
-                          <td className="px-4 py-3 text-gray-400 text-xs max-w-[180px] truncate">
-                            {payment.notes ?? <span className="text-gray-200">—</span>}
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{payment.channel ?? "—"}</td>
+                          <td className="px-4 py-3 text-gray-600 dark:text-gray-400">{payment.trx_id ?? "—"}</td>
+                          <td className="px-4 py-3 text-right tabular-nums text-gray-600 dark:text-gray-400">{fmt(payment.unallocated_amount)}</td>
+                          <td className="px-4 py-3 text-gray-400 dark:text-gray-500 text-xs max-w-[180px] truncate">
+                            {payment.notes ?? <span className="text-gray-200 dark:text-gray-700">—</span>}
                           </td>
                           <td className="px-4 py-3 text-right">
                             <RowActionsMenu
@@ -568,11 +568,11 @@ export default function SupplierDetail() {
                               onToggle={() => setOpenActionMenuId((prev) => (prev === payment.id ? null : payment.id))}
                               onClose={() => setOpenActionMenuId(null)}
                               items={[
-                                { key: "view", label: "View / Edit", cls: "text-gray-600", onClick: () => setViewingPayment(payment) },
+                                { key: "view", label: "View / Edit", cls: "text-gray-600 dark:text-gray-400", onClick: () => setViewingPayment(payment) },
                                 ...((payment.unallocated_amount ?? 0) > 0
-                                  ? [{ key: "allocate", label: "Allocate", cls: "text-blue-600", onClick: () => openAllocate(payment) }]
+                                  ? [{ key: "allocate", label: "Allocate", cls: "text-blue-600 dark:text-blue-400", onClick: () => openAllocate(payment) }]
                                   : []),
-                                { key: "delete", label: "Delete", cls: "text-red-500", onClick: () => handleDeletePayment(payment.id) },
+                                { key: "delete", label: "Delete", cls: "text-red-500 dark:text-red-400", onClick: () => handleDeletePayment(payment.id) },
                               ]}
                             />
                           </td>

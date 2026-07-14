@@ -3,6 +3,7 @@ import * as XLSX from "xlsx"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import AppLayout from "../../components/layout/AppLayout"
+import { ThemeToggleFull } from "../../components/ui/ThemeToggle"
 
 const PLAN_LABELS = {
   trial: "Trial",
@@ -12,10 +13,10 @@ const PLAN_LABELS = {
 }
 
 const PLAN_BADGE_CLASSES = {
-  trial: "bg-gray-100 text-gray-700",
-  monthly: "bg-blue-100 text-blue-700",
-  semi_annual: "bg-purple-100 text-purple-700",
-  annual: "bg-green-100 text-green-700",
+  trial: "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300",
+  monthly: "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400",
+  semi_annual: "bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-400",
+  annual: "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400",
 }
 
 function fmtDate(d) {
@@ -63,7 +64,7 @@ export default function Settings() {
   if (!agent) {
     return (
       <AppLayout title="Settings">
-        <div className="px-6 py-10 text-sm text-gray-400">Loading…</div>
+        <div className="px-6 py-10 text-sm text-gray-400 dark:text-gray-500">Loading…</div>
       </AppLayout>
     )
   }
@@ -146,7 +147,7 @@ export default function Settings() {
 
   const planKey = agent.plan ?? "trial"
   const planLabel = PLAN_LABELS[planKey] ?? planKey
-  const planBadgeCls = PLAN_BADGE_CLASSES[planKey] ?? "bg-gray-100 text-gray-700"
+  const planBadgeCls = PLAN_BADGE_CLASSES[planKey] ?? "bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300"
   const expiryDate = planKey === "trial" ? agent.trial_ends_at : agent.plan_ends_at
   const expiryLabel = planKey === "trial" ? "Trial ends" : "Plan ends"
 
@@ -154,54 +155,54 @@ export default function Settings() {
     <AppLayout title="Settings">
       <div className="max-w-2xl mx-auto px-6 py-8 space-y-6">
         {/* Profile */}
-        <section className="bg-white border border-gray-200 rounded-xl p-6">
+        <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-base font-semibold text-gray-900">Profile</h2>
+            <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100">Profile</h2>
             <div className="flex items-center gap-2">
               <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${planBadgeCls}`}>
                 {planLabel}
               </span>
-              <span className="text-xs text-gray-400">
+              <span className="text-xs text-gray-400 dark:text-gray-500">
                 {expiryLabel} {fmtDate(expiryDate)}
               </span>
             </div>
           </div>
 
           {profileError && (
-            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{profileError}</div>
+            <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">{profileError}</div>
           )}
           {profileSuccess && (
-            <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">{profileSuccess}</div>
+            <div className="mb-4 px-4 py-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 rounded-lg text-sm">{profileSuccess}</div>
           )}
 
           <form onSubmit={handleSaveProfile} className="space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
               <input
                 type="text"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone</label>
               <input
                 type="text"
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
                 placeholder="01XXXXXXXXX"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
               <input
                 type="email"
                 value={user?.email ?? ""}
                 disabled
                 readOnly
-                className="w-full px-3 py-2 border border-gray-200 bg-gray-50 text-gray-500 rounded-lg text-sm"
+                className="w-full px-3 py-2 border border-gray-200 dark:border-gray-800 bg-gray-50 dark:bg-gray-800 text-gray-500 dark:text-gray-400 rounded-lg text-sm"
               />
             </div>
             <button
@@ -214,31 +215,38 @@ export default function Settings() {
           </form>
         </section>
 
+        {/* Appearance */}
+        <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-1">Appearance</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">Choose how Ticket Tracker looks on this device.</p>
+          <ThemeToggleFull />
+        </section>
+
         {/* Reminder Preferences */}
-        <section className="bg-white border border-gray-200 rounded-xl p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-4">Reminder Preferences</h2>
+        <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-4">Reminder Preferences</h2>
 
           {reminderError && (
-            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{reminderError}</div>
+            <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">{reminderError}</div>
           )}
           {reminderSuccess && (
-            <div className="mb-4 px-4 py-3 bg-green-50 border border-green-200 text-green-700 rounded-lg text-sm">{reminderSuccess}</div>
+            <div className="mb-4 px-4 py-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 text-green-700 dark:text-green-400 rounded-lg text-sm">{reminderSuccess}</div>
           )}
 
           <form onSubmit={handleSaveReminders} className="space-y-4">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-gray-700">Enable email reminders</span>
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Enable email reminders</span>
               <button
                 type="button"
                 role="switch"
                 aria-checked={reminderEnabled}
                 onClick={() => setReminderEnabled((v) => !v)}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                  reminderEnabled ? "bg-blue-600" : "bg-gray-200"
+                  reminderEnabled ? "bg-blue-600" : "bg-gray-200 dark:bg-gray-700"
                 }`}
               >
                 <span
-                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white dark:bg-gray-900 transition-transform ${
                     reminderEnabled ? "translate-x-6" : "translate-x-1"
                   }`}
                 />
@@ -249,7 +257,7 @@ export default function Settings() {
               <div className="space-y-4">
                 <div className="grid sm:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Days before flight — client payment reminder
                     </label>
                     <input
@@ -257,11 +265,11 @@ export default function Settings() {
                       min="0"
                       value={reminderDaysClient}
                       onChange={(e) => setReminderDaysClient(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Days before flight — supplier payment reminder
                     </label>
                     <input
@@ -269,18 +277,18 @@ export default function Settings() {
                       min="0"
                       value={reminderDaysSupplier}
                       onChange={(e) => setReminderDaysSupplier(e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
                   </div>
                 </div>
                 <div className="sm:w-1/2">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Send reminders at (Bangladesh time)
                   </label>
                   <select
                     value={reminderHour}
                     onChange={(e) => setReminderHour(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   >
                     {Array.from({ length: 24 }, (_, h) => {
                       const label = h === 0 ? "12:00 AM" : h < 12 ? `${h}:00 AM` : h === 12 ? "12:00 PM" : `${h - 12}:00 PM`
@@ -302,14 +310,14 @@ export default function Settings() {
         </section>
 
         {/* Data */}
-        <section className="bg-white border border-gray-200 rounded-xl p-6">
-          <h2 className="text-base font-semibold text-gray-900 mb-2">Data</h2>
-          <p className="text-sm text-gray-500 mb-4">
+        <section className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-xl p-6">
+          <h2 className="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">Data</h2>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Export all your tickets, clients, suppliers, and payments to an Excel workbook.
           </p>
 
           {exportError && (
-            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{exportError}</div>
+            <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">{exportError}</div>
           )}
 
           <button

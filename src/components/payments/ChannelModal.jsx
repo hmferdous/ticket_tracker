@@ -25,7 +25,7 @@ export default function ChannelModal({ isOpen, onClose, agentId, channel, existi
   }
 
   const inputCls =
-    "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+    "w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 
   const save = async (finalName) => {
     const balance = startingBalance !== "" ? parseFloat(startingBalance) : 0
@@ -79,11 +79,11 @@ export default function ChannelModal({ isOpen, onClose, agentId, channel, existi
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4 py-6" onMouseDown={handleBackdrop}>
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-xl flex flex-col">
-        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
-          <h2 className="text-lg font-semibold text-gray-900">{channel ? "Edit Channel" : "Add Channel"}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors" aria-label="Close">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 dark:bg-black/60 px-4 py-6" onMouseDown={handleBackdrop}>
+      <div className="w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-xl flex flex-col">
+        <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+          <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">{channel ? "Edit Channel" : "Add Channel"}</h2>
+          <button onClick={onClose} className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition-colors" aria-label="Close">
             <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
@@ -92,12 +92,12 @@ export default function ChannelModal({ isOpen, onClose, agentId, channel, existi
 
         <div className="px-6 py-5">
           {error && (
-            <div className="mb-4 px-4 py-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">{error}</div>
+            <div className="mb-4 px-4 py-3 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-700 dark:text-red-400 rounded-lg text-sm">{error}</div>
           )}
 
           {pendingSuggestion ? (
             <div className="space-y-4">
-              <p className="text-sm text-gray-700">
+              <p className="text-sm text-gray-700 dark:text-gray-300">
                 A channel named "{name.trim()}" already exists. Save this one as{" "}
                 <span className="font-semibold">"{pendingSuggestion}"</span> instead?
               </p>
@@ -105,7 +105,7 @@ export default function ChannelModal({ isOpen, onClose, agentId, channel, existi
                 <button
                   type="button"
                   onClick={() => setPendingSuggestion("")}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+                  className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
                 >
                   Change name
                 </button>
@@ -122,7 +122,7 @@ export default function ChannelModal({ isOpen, onClose, agentId, channel, existi
           ) : (
             <form id="channel-form" onSubmit={handleSubmit} className="space-y-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Channel Name</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Channel Name</label>
                 <input
                   type="text"
                   required
@@ -134,7 +134,7 @@ export default function ChannelModal({ isOpen, onClose, agentId, channel, existi
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Starting Balance</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Starting Balance</label>
                 <input
                   type="number"
                   step="0.01"
@@ -143,18 +143,18 @@ export default function ChannelModal({ isOpen, onClose, agentId, channel, existi
                   placeholder="0.00"
                   className={inputCls}
                 />
-                <p className="mt-1 text-xs text-gray-400">Optional — balance already in this wallet before you started tracking here</p>
+                <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Optional — balance already in this wallet before you started tracking here</p>
               </div>
             </form>
           )}
         </div>
 
         {!pendingSuggestion && (
-          <div className="flex gap-3 px-6 py-4 border-t border-gray-100">
+          <div className="flex gap-3 px-6 py-4 border-t border-gray-100 dark:border-gray-800">
             <button
               type="button"
               onClick={onClose}
-              className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg text-sm font-medium hover:bg-gray-50 transition-colors"
+              className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
             >
               Cancel
             </button>

@@ -37,7 +37,13 @@ export function reverseTicketPaymentRow(ticket, tp) {
         amount_paid: newAmountPaid,
         payment_status: derivePaymentStatus(newAmountPaid, ticket.sell_price ?? 0),
         refund_paid: newRefundPaid,
-        refund_status: deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, ticket.refund_received, newRefundPaid),
+        refund_status: deriveRefundStatus({
+          receivable: ticket.refund_receivable,
+          received: ticket.refund_received,
+          sellPrice: ticket.sell_price,
+          amountPaid: newAmountPaid,
+          payable: ticket.refund_payable,
+        }),
       },
     }
   }
@@ -48,7 +54,13 @@ export function reverseTicketPaymentRow(ticket, tp) {
       clamped: raw < 0,
       updates: {
         refund_received: newReceived,
-        refund_status: deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, newReceived, ticket.refund_paid),
+        refund_status: deriveRefundStatus({
+          receivable: ticket.refund_receivable,
+          received: newReceived,
+          sellPrice: ticket.sell_price,
+          amountPaid: ticket.amount_paid,
+          payable: ticket.refund_payable,
+        }),
       },
     }
   }
@@ -70,7 +82,13 @@ export function reverseStandaloneSupplierRefund(ticket, payment) {
     clamped: raw < 0,
     updates: {
       refund_received: newReceived,
-      refund_status: deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, newReceived, ticket.refund_paid),
+      refund_status: deriveRefundStatus({
+        receivable: ticket.refund_receivable,
+        received: newReceived,
+        sellPrice: ticket.sell_price,
+        amountPaid: ticket.amount_paid,
+        payable: ticket.refund_payable,
+      }),
     },
   }
 }

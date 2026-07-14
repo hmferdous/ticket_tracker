@@ -127,7 +127,13 @@ export default function SupplierAllocationModal({ isOpen, onClose, payment, supp
     for (const a of allocations) {
       if (a.ticket.kind === "refund") {
         const newReceived = (a.ticket.refund_received ?? 0) + a.amount
-        const newRefundStatus = deriveRefundStatus(a.ticket.refund_receivable, a.ticket.refund_payable, newReceived, a.ticket.refund_paid)
+        const newRefundStatus = deriveRefundStatus({
+          receivable: a.ticket.refund_receivable,
+          received: newReceived,
+          sellPrice: a.ticket.sell_price,
+          amountPaid: a.ticket.amount_paid,
+          payable: a.ticket.refund_payable,
+        })
         await supabase
           .from("tickets")
           .update({ refund_received: newReceived, refund_status: newRefundStatus })

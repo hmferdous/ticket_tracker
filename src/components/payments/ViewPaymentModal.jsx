@@ -100,7 +100,7 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
   const fetchLinkedTicket = async () => {
     const { data } = await supabase
       .from("tickets")
-      .select("id, refund_receivable, refund_payable, refund_received, refund_paid, refund_status")
+      .select("id, sell_price, amount_paid, refund_receivable, refund_payable, refund_received, refund_paid, refund_status")
       .eq("id", payment.ticket_id)
       .single()
     setLinkedTicket(data ?? null)
@@ -196,7 +196,13 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
 
       if (ticket) {
         const newStatus = derivePaymentStatus(newAmountPaid, ticket.sell_price ?? 0)
-        const newRefundStatus = deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, ticket.refund_received, newRefundPaid)
+        const newRefundStatus = deriveRefundStatus({
+          receivable: ticket.refund_receivable,
+          received: ticket.refund_received,
+          sellPrice: ticket.sell_price,
+          amountPaid: newAmountPaid,
+          payable: ticket.refund_payable,
+        })
         const { error: tErr } = await supabase
           .from("tickets")
           .update({ amount_paid: newAmountPaid, payment_status: newStatus, refund_paid: newRefundPaid, refund_status: newRefundStatus })
@@ -216,7 +222,13 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
         return
       }
 
-      const newRefundStatus = deriveRefundStatus(linkedTicket.refund_receivable, linkedTicket.refund_payable, newReceived, linkedTicket.refund_paid)
+      const newRefundStatus = deriveRefundStatus({
+        receivable: linkedTicket.refund_receivable,
+        received: newReceived,
+        sellPrice: linkedTicket.sell_price,
+        amountPaid: linkedTicket.amount_paid,
+        payable: linkedTicket.refund_payable,
+      })
       const { error: srErr } = await supabase
         .from("tickets")
         .update({ refund_received: newReceived, refund_status: newRefundStatus })

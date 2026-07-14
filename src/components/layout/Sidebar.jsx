@@ -1,6 +1,6 @@
 import { useState } from "react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
-import { LayoutDashboard, Ticket, Users, Building2, CreditCard, Settings, FileText, ChevronDown, ChevronRight } from "lucide-react"
+import { LayoutDashboard, Ticket, Users, Building2, CreditCard, Settings, FileText, ChevronDown, ChevronRight, ChevronLeft, LogOut } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
 
 const NAV_LINKS = [
@@ -18,7 +18,7 @@ const REPORT_LINKS = [
   { to: "/reports/channel-ledger", label: "Channel Ledger" },
 ]
 
-export default function Sidebar() {
+export default function Sidebar({ collapsed = false, onToggleCollapsed }) {
   const { user, signOut } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
@@ -31,27 +31,52 @@ export default function Sidebar() {
     navigate("/login")
   }
 
+  // Collapsed rail has no room for the submenu — expand first, then open it,
+  // rather than trying to fit a flyout in a 64px-wide strip.
+  const handleReportsClick = () => {
+    if (collapsed) {
+      onToggleCollapsed?.()
+      setReportsOpen(true)
+    } else {
+      setReportsOpen((o) => !o)
+    }
+  }
+
   return (
-    <aside className="fixed inset-y-0 left-0 w-60 bg-white border-r border-gray-200 flex flex-col">
-      <div className="px-6 py-5">
-        <span className="text-lg font-semibold text-gray-900">Ticket Tracker</span>
+    <aside
+      className={`fixed inset-y-0 left-0 ${collapsed ? "w-16" : "w-60"} bg-white border-r border-gray-200 flex flex-col transition-[width] duration-200`}
+    >
+      <div className={`flex items-center py-5 ${collapsed ? "justify-center px-2" : "justify-between px-6"}`}>
+        {!collapsed && <span className="text-lg font-semibold text-gray-900 truncate">Ticket Tracker</span>}
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        >
+          <ChevronLeft className={`w-4 h-4 transition-transform ${collapsed ? "rotate-180" : ""}`} />
+        </button>
       </div>
 
-      <nav className="flex-1 px-3 space-y-1">
+      <nav className="flex-1 px-3 space-y-1 overflow-y-auto overflow-x-hidden">
         {NAV_LINKS.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}
+            title={collapsed ? label : undefined}
             className={({ isActive }) =>
-              `flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border-l-4 transition-colors ${
+              `flex items-center gap-3 py-2.5 rounded-lg text-sm font-medium border-l-4 transition-colors ${
+                collapsed ? "justify-center px-2" : "px-3"
+              } ${
                 isActive
                   ? "bg-blue-50 text-blue-600 border-blue-600"
                   : "text-gray-600 border-transparent hover:bg-gray-50"
               }`
             }
           >
-            <Icon className="w-5 h-5" />
-            {label}
+            <Icon className="w-5 h-5 shrink-0" />
+            {!collapsed && label}
           </NavLink>
         ))}
 
@@ -59,22 +84,29 @@ export default function Sidebar() {
         <div>
           <button
             type="button"
-            onClick={() => setReportsOpen((o) => !o)}
-            className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium border-l-4 transition-colors ${
+            onClick={handleReportsClick}
+            title={collapsed ? "Reports" : undefined}
+            className={`w-full flex items-center gap-3 py-2.5 rounded-lg text-sm font-medium border-l-4 transition-colors ${
+              collapsed ? "justify-center px-2" : "px-3"
+            } ${
               reportsActive
                 ? "bg-blue-50 text-blue-600 border-blue-600"
                 : "text-gray-600 border-transparent hover:bg-gray-50"
             }`}
           >
-            <FileText className="w-5 h-5" />
-            <span className="flex-1 text-left">Reports</span>
-            {reportsOpen
-              ? <ChevronDown className="w-4 h-4 text-gray-400" />
-              : <ChevronRight className="w-4 h-4 text-gray-400" />
-            }
+            <FileText className="w-5 h-5 shrink-0" />
+            {!collapsed && (
+              <>
+                <span className="flex-1 text-left">Reports</span>
+                {reportsOpen
+                  ? <ChevronDown className="w-4 h-4 text-gray-400" />
+                  : <ChevronRight className="w-4 h-4 text-gray-400" />
+                }
+              </>
+            )}
           </button>
 
-          {reportsOpen && (
+          {!collapsed && reportsOpen && (
             <div className="mt-1 ml-8 space-y-0.5">
               {REPORT_LINKS.map(({ to, label }) => (
                 <NavLink
@@ -96,13 +128,15 @@ export default function Sidebar() {
         </div>
       </nav>
 
-      <div className="px-4 py-4 border-t border-gray-100">
-        <p className="text-xs text-gray-400 truncate mb-2">{user?.email}</p>
+      <div className={`py-4 border-t border-gray-100 ${collapsed ? "flex flex-col items-center px-2" : "px-4"}`}>
+        {!collapsed && <p className="text-xs text-gray-400 truncate mb-2">{user?.email}</p>}
         <button
           onClick={handleLogout}
-          className="text-sm text-red-600 hover:text-red-700 font-medium transition-colors"
+          title={collapsed ? "Logout" : undefined}
+          aria-label="Logout"
+          className={`text-sm text-red-600 hover:text-red-700 font-medium transition-colors ${collapsed ? "p-1.5 rounded-md hover:bg-red-50" : ""}`}
         >
-          Logout
+          {collapsed ? <LogOut className="w-5 h-5" /> : "Logout"}
         </button>
       </div>
     </aside>

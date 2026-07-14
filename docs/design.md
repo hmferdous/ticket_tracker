@@ -19,7 +19,8 @@ jsPDF + jspdf-autotable for PDF generation (ledger reports)
 - Sidebar links: Dashboard, Tickets, Clients, Suppliers, Payments, Reports (collapsible group), Settings
 - Reports group expands/collapses on click; auto-expands when any /reports/* route is active
 - Reports sub-links: Client Ledger, Supplier Ledger, Channel Ledger
-- Admin pages: separate layout with admin sidebar
+- Sidebar is collapsible to a narrow icon-only rail (w-16, vs w-60 expanded) — toggle button (chevron) sits next to the logo. Preference persists in localStorage (`sidebar_collapsed`), read on mount so it doesn't flash open before applying. Collapsed state shows icons only with native `title` tooltips; clicking Reports while collapsed expands the sidebar first (opens the group) rather than trying to fit a submenu flyout in a 64px rail. AppLayout's content margin (`ml-16`/`ml-60`) tracks the same state, owned by AppLayout and passed down to Sidebar as props
+- Admin pages: separate layout with admin sidebar (not collapsible — smaller, rarely-used panel, out of scope for this)
 
 ## AppLayout Actions Slot
 - AppLayout accepts an `actions` prop rendered as a flex row in the page header (top right)

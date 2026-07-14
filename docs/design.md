@@ -237,6 +237,7 @@ On save:
 - "View Ledger" navigates to /reports/client-ledger?clientId=<uuid> (or supplier equivalent) and auto-generates the statement
 - Three tabs: Tickets | Payment History | Documents
 - Payment History tab row actions: View / Edit (opens ViewPaymentModal), Allocate (if unallocated_amount > 0), Delete — same on both Client and Supplier Detail (see "Deleting a Payment" below for the full reversal rules)
+- The row action menu (kebab) is portal-rendered and positions itself from the button's own bounding rect, flipping above when there isn't room below — matches the Tickets list's row action menu. Fixes the menu clipping/disappearing for the last row of the table (or a single-row table), which the earlier `absolute` + `top-full` positioning was prone to
 - Documents tab: shows uploaded document cards (type badge, filename, date); Open button generates a 1-hour signed URL; Delete removes from storage and DB; Upload button with type selector at the bottom; maximum 5 documents per entity
 
 ## Document Upload System

@@ -17,3 +17,15 @@
 :root.dark {
   color-scheme: dark;
 }
+
+/* color-scheme alone doesn't reliably darken the native <select> popup
+   panel across browsers/OSes (it worked for the date-picker calendar and
+   scrollbars, but Chromium was still rendering the open option list as a
+   white panel while inheriting our dark: text color into it — white text
+   on a white panel). option background/color are among the few properties
+   browsers actually honor on <option>, so set them directly instead of
+   relying on color-scheme for this specific case. */
+:root.dark select option {
+  background-color: var(--color-gray-900);
+  color: var(--color-gray-100);
+}

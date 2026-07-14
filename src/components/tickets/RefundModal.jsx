@@ -2,7 +2,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { fetchChannels } from "../../lib/channels"
-import { deriveRefundStatus } from "../../lib/refunds"
+import { deriveRefundStatus, clientRefundNet, clientOwedBack } from "../../lib/refunds"
 
 const MODE_CONFIG = {
   initiate: { title: "Initiate refund", confirmLabel: "Start refund" },
@@ -11,6 +11,10 @@ const MODE_CONFIG = {
   client: { title: "Record client refund", confirmLabel: "Record payment" },
   edit_supplier_actual: { title: "Edit Supplier Refund Received", confirmLabel: "Save changes" },
   edit_client_actual: { title: "Edit Client Refund Paid", confirmLabel: "Save changes" },
+}
+
+function fmt(n) {
+  return Number(n).toLocaleString("en-BD")
 }
 
 function derivePaymentStatus(amountPaid, sellPrice) {
@@ -55,6 +59,21 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
   const inputCls =
     "w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
 
+  // Live preview for Initiate/Edit — shows the client-side consequence of the
+  // payable value being typed, before it's saved, so the number can be
+  // eyeballed against intent (e.g. "pass through only the loss" vs "add a
+  // margin on top" vs "absorb it entirely").
+  const previewPayable = payable !== "" ? parseFloat(payable) : null
+  const previewNet = clientRefundNet({
+    sell_price: ticket?.sell_price,
+    amount_paid: ticket?.amount_paid,
+    refund_payable: previewPayable,
+  })
+
+  // Current remaining cash still owed back to the client, before this
+  // "Record Client Refund" transaction is applied.
+  const currentOwedBack = ticket ? clientOwedBack(ticket) : 0
+
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError("")
@@ -91,7 +110,13 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
           refund_receivable: newReceivable,
           refund_payable: newPayable,
           refund_notes: notes.trim() || null,
-          refund_status: deriveRefundStatus(newReceivable, newPayable, ticket.refund_received, ticket.refund_paid),
+          refund_status: deriveRefundStatus({
+            receivable: newReceivable,
+            received: ticket.refund_received,
+            sellPrice: ticket.sell_price,
+            amountPaid: ticket.amount_paid,
+            payable: newPayable,
+          }),
         })
         .eq("id", ticket.id)
         .select(`*, clients(name), suppliers(name)`)
@@ -126,7 +151,13 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
       if (payErr) { setLoading(false); setError(payErr.message); return }
 
       const newReceived = (ticket.refund_received ?? 0) + value
-      const newStatus = deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, newReceived, ticket.refund_paid)
+      const newStatus = deriveRefundStatus({
+        receivable: ticket.refund_receivable,
+        received: newReceived,
+        sellPrice: ticket.sell_price,
+        amountPaid: ticket.amount_paid,
+        payable: ticket.refund_payable,
+      })
 
       const { data, error } = await supabase
         .from("tickets")
@@ -178,7 +209,13 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
       const newPaid = (ticket.refund_paid ?? 0) + value
       const newAmountPaid = Math.max(0, (ticket.amount_paid ?? 0) - value)
       const newPaymentStatus = derivePaymentStatus(newAmountPaid, ticket.sell_price ?? 0)
-      const newRefundStatus = deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, ticket.refund_received, newPaid)
+      const newRefundStatus = deriveRefundStatus({
+        receivable: ticket.refund_receivable,
+        received: ticket.refund_received,
+        sellPrice: ticket.sell_price,
+        amountPaid: newAmountPaid,
+        payable: ticket.refund_payable,
+      })
 
       const { data, error } = await supabase
         .from("tickets")
@@ -207,7 +244,13 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
         .from("tickets")
         .update({
           refund_received: value,
-          refund_status: deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, value, ticket.refund_paid),
+          refund_status: deriveRefundStatus({
+            receivable: ticket.refund_receivable,
+            received: value,
+            sellPrice: ticket.sell_price,
+            amountPaid: ticket.amount_paid,
+            payable: ticket.refund_payable,
+          }),
         })
         .eq("id", ticket.id)
         .select(`*, clients(name), suppliers(name)`)
@@ -227,7 +270,13 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
         .from("tickets")
         .update({
           refund_paid: value,
-          refund_status: deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, ticket.refund_received, value),
+          refund_status: deriveRefundStatus({
+            receivable: ticket.refund_receivable,
+            received: ticket.refund_received,
+            sellPrice: ticket.sell_price,
+            amountPaid: ticket.amount_paid,
+            payable: ticket.refund_payable,
+          }),
         })
         .eq("id", ticket.id)
         .select(`*, clients(name), suppliers(name)`)
@@ -288,6 +337,16 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
                     placeholder="0.00"
                     className={inputCls}
                   />
+                  <p className="mt-1 text-xs text-gray-500">
+                    0 (or blank) = non-refundable, client still owes the full remaining amount. Equal to Sell Price = full forgiveness.
+                  </p>
+                  {ticket && (
+                    <p className={`mt-1 text-xs font-medium ${previewNet > 0 ? "text-red-600" : previewNet < 0 ? "text-orange-600" : "text-emerald-600"}`}>
+                      {previewNet > 0 && `→ Client will owe ${fmt(previewNet)}`}
+                      {previewNet < 0 && `→ You will owe client ${fmt(-previewNet)} back`}
+                      {previewNet === 0 && `→ Settled — nothing owed either way`}
+                    </p>
+                  )}
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
@@ -347,12 +406,11 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
                     placeholder="0.00"
                     className={inputCls}
                   />
-                  {ticket.refund_payable != null && (
-                    <p className="mt-1 text-xs text-gray-400">
-                      Agreed: {Number(ticket.refund_payable).toLocaleString("en-BD")}
-                      {(ticket.refund_paid ?? 0) > 0 && ` · Paid so far: ${Number(ticket.refund_paid).toLocaleString("en-BD")}`}
-                    </p>
-                  )}
+                  <p className="mt-1 text-xs text-gray-400">
+                    Agreed: {fmt(ticket.refund_payable ?? 0)}
+                    {(ticket.refund_paid ?? 0) > 0 && ` · Paid so far: ${fmt(ticket.refund_paid)}`}
+                    {` · Currently owed back: ${fmt(currentOwedBack)}`}
+                  </p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-1">Channel</label>
@@ -397,7 +455,7 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
                   className={inputCls}
                 />
                 <p className="mt-1 text-xs text-gray-400">
-                  Overrides the running total directly — doesn't change any individual refund payment already logged.
+                  Overrides the running total directly — doesn't change any individual refund payment already logged, and doesn't adjust amount_paid.
                 </p>
               </div>
             )}

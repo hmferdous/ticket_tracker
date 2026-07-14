@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { fetchChannels } from "../../lib/channels"
+import { deriveRefundStatus, clientOutstanding, clientEffectiveTarget } from "../../lib/refunds"
 
 const EMPTY = { amount: "", channel_id: "", trx_id: "", notes: "", paid_in_full: false, payment_date: "" }
 
@@ -28,7 +29,8 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
 
   if (!isOpen) return null
 
-  const outstanding = (ticket.sell_price ?? 0) - (ticket.amount_paid ?? 0)
+  const outstanding = clientOutstanding(ticket)
+  const hasActiveRefund = ticket.refund_status != null && ticket.refund_status !== "closed"
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
 
@@ -93,11 +95,25 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
     }
 
     const newAmountPaid = (ticket.amount_paid ?? 0) + amount
-    const newPaymentStatus = derivePaymentStatus(newAmountPaid, ticket.sell_price ?? 0)
+    const newPaymentStatus = derivePaymentStatus(newAmountPaid, clientEffectiveTarget(ticket))
+    const updates = { amount_paid: newAmountPaid, payment_status: newPaymentStatus }
+
+    // A payment collected while a refund is active is how a credit-booking
+    // ticket settles down to its reduced target — recompute refund_status so
+    // it can advance to client_refunded/closed without ever touching refund_paid.
+    if (hasActiveRefund) {
+      updates.refund_status = deriveRefundStatus({
+        receivable: ticket.refund_receivable,
+        received: ticket.refund_received,
+        sellPrice: ticket.sell_price,
+        amountPaid: newAmountPaid,
+        payable: ticket.refund_payable,
+      })
+    }
 
     const { data: updated, error: updateErr } = await supabase
       .from("tickets")
-      .update({ amount_paid: newAmountPaid, payment_status: newPaymentStatus })
+      .update(updates)
       .eq("id", ticket.id)
       .select(`*, clients(name), suppliers(name)`)
       .single()
@@ -132,6 +148,7 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
         <div className="overflow-y-auto flex-1 px-6 py-5">
           <p className="text-sm text-gray-500 mb-4">
             Outstanding amount: <span className="font-medium text-gray-700">{outstanding.toLocaleString("en-BD")}</span>
+            {hasActiveRefund && <span className="text-xs text-orange-600"> (reduced by an active refund)</span>}
           </p>
 
           {error && (

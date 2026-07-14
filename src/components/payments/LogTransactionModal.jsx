@@ -87,7 +87,7 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
   const fetchTicketsForSupplier = useCallback(async (supplierId) => {
     const { data } = await supabase
       .from("tickets")
-      .select("id, passenger_name, route, refund_received, refund_paid, refund_payable, refund_receivable, refund_status")
+      .select("id, passenger_name, route, sell_price, amount_paid, refund_received, refund_paid, refund_payable, refund_receivable, refund_status")
       .eq("agent_id", agent.id)
       .eq("supplier_id", supplierId)
       .order("created_at", { ascending: false })
@@ -273,7 +273,13 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
           // against the ticket's fare, not a refund settlement.
           if (ticket.refund_status != null && ticket.refund_status !== "closed") {
             updates.refund_paid = (ticket.refund_paid ?? 0) + amount
-            updates.refund_status = deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, ticket.refund_received, updates.refund_paid)
+            updates.refund_status = deriveRefundStatus({
+              receivable: ticket.refund_receivable,
+              received: ticket.refund_received,
+              sellPrice: ticket.sell_price,
+              amountPaid: newAmountPaid,
+              payable: ticket.refund_payable,
+            })
           }
 
           await supabase.from("tickets").update(updates).eq("id", form.ticket_id)
@@ -316,7 +322,13 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
 
         if (ticket && ticket.refund_status != null && ticket.refund_status !== "closed") {
           const newReceived = (ticket.refund_received ?? 0) + amount
-          const newRefundStatus = deriveRefundStatus(ticket.refund_receivable, ticket.refund_payable, newReceived, ticket.refund_paid)
+          const newRefundStatus = deriveRefundStatus({
+            receivable: ticket.refund_receivable,
+            received: newReceived,
+            sellPrice: ticket.sell_price,
+            amountPaid: ticket.amount_paid,
+            payable: ticket.refund_payable,
+          })
           const { error: tErr } = await supabase
             .from("tickets")
             .update({ refund_received: newReceived, refund_status: newRefundStatus })

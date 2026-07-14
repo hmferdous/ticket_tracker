@@ -33,7 +33,7 @@ Never disable RLS on any table
 - fare_difference — price difference between old and new ticket on reissue (can be negative; already baked into sell_price and purchase_price)
 - refund_receivable — expected refund amount from supplier
 - refund_received — actual refund received from supplier
-- refund_payable — agreed refund amount to pay client
+- refund_payable — how much you're liable to hand the client back, not a discount/target amount. 0 (or unset) = non-refundable, client still owes the full remaining sell_price. Equal to sell_price = full forgiveness. See "Client Net Position" under Refund Architecture for how this nets against amount_paid
 - refund_paid — actual refund paid to client
 - refund_notes — free-text note entered when initiating a refund (own column, not appended to narration)
 
@@ -58,7 +58,7 @@ Note: reissue fees and fare_difference are NOT separately added to net_margin. T
 - Total Profit = SUM(net_margin) across all tickets in period
 - Office Margin = SUM(office_markup) across all tickets in period
 - Total Refunded to Clients = SUM(tickets.refund_paid) across all tickets — ticket-level, not the payments table. refund_paid is the running cumulative total (see "Refund Architecture"), kept in sync with the real client_refund payment rows by every recording path
-- Open Refunds / Awaiting From Supplier / Owed To Clients — the refund lifecycle has 4 states (initiated -> supplier_refunded or client_refunded, whichever side settles first -> closed), derived by comparing cumulative actuals against agreed targets (see deriveRefundStatus in "Refund Architecture"). Awaiting From Supplier / Owed To Clients sum the actual remaining balance per ticket (`max(receivable - received, 0)` / `max(payable - paid, 0)`), not an all-or-nothing null check, so a partial receipt still counts toward what's left. Refund Net Margin only counts refund_status = closed (fully settled on both sides)
+- Open Refunds / Awaiting From Supplier / Owed To Clients — the refund lifecycle has 4 states (initiated -> supplier_refunded or client_refunded, whichever side settles first -> closed), derived by comparing cumulative actuals against agreed targets (see deriveRefundStatus in "Refund Architecture"). Awaiting From Supplier sums the actual remaining balance per ticket (`max(receivable - received, 0)`), not an all-or-nothing null check, so a partial receipt still counts toward what's left. Owed To Clients sums `clientOwedBack` per ticket (the negative side of the client net position — see "Client Net Position"), not `refund_payable - refund_paid` directly, since that ignores whether the client had actually paid anything toward the ticket in the first place. Refund Net Margin only counts refund_status = closed (fully settled on both sides)
 
 ### Removed Fields
 - reported_price — REMOVED. Do not use or reference anywhere.
@@ -109,7 +109,9 @@ payment_channels:
 - Ticket outstanding = sell_price - ticket amount paid — but only for tickets that are still eligible (see below); void or refund-active tickets contribute 0, not a raw subtraction
 - Unallocated credit on client = SUM(payments.unallocated_amount) for that client
 - Client/Supplier balance outstanding = SUM(ticket outstanding) across that entity's eligible tickets — computed per-ticket, not as totalBilled - totalReceived, so a void/refund-active ticket can't inflate the balance via a payments-side number it isn't actually tied to
-- **Outstanding eligibility**: a ticket only contributes to any outstanding total (Dashboard's Collection Pending / Total Payable to Suppliers, Client/Supplier Detail's Outstanding Balance/Payable, the Outstanding column on Tickets/Client/Supplier tables) when `!is_void && refund_status == null`. Once a ticket is void, or has any refund activity at all (even just initiated), its money story is told by is_void/refund_* instead — amount_paid/purchase_price no longer represent a real collection/payable expectation for it, so it drops out entirely rather than being netted in. This prevents a settled-refund ticket (refund_status = closed) from still showing as fully outstanding just because amount_paid/payment_status were never touched by the refund flow (see "Editing a Logged Payment" above re: the two independent refund-tracking surfaces).
+- **Outstanding eligibility**: client-side and supplier-side outstanding are no longer symmetric here.
+  - Client side (Dashboard's Collection Pending, Client Detail's Outstanding Balance, the Outstanding column on Tickets/Client Detail tables): every non-void ticket contributes `clientOutstanding(ticket)` (see "Client Net Position" under Refund Architecture) — this nets `refund_payable` against `sell_price`/`amount_paid` rather than excluding a refund-active ticket outright, since the client may still owe a reduced amount (e.g. a cancellation fee on a credit booking that hadn't been paid yet) even after a refund is initiated. It degrades to the ordinary `sell_price - amount_paid` for a ticket with no refund at all (`refund_payable` is null there).
+  - Supplier side (Dashboard's Total Payable to Suppliers, Supplier Detail's Outstanding Payable): still excluded entirely once a ticket has any refund activity (`!is_void && refund_status == null`), unchanged. Once you've already paid the supplier and a refund starts, the remaining purchase_price obligation is extinguished, not reduced to a new target — a reduced bill on a not-yet-paid ticket is a void fee, not a refund (see Void Flow).
 
 ### Payment Flow (Client Side)
 1. Agent receives bulk payment from client — logs amount, channel, trx_id
@@ -182,27 +184,42 @@ payments rows created on forward:
 - Type 3: Void — ticket cancelled, may or may not have money exchanged
 
 ### Cumulative Tracking Model
-refund_receivable/refund_payable are the agreed TARGETS, set once via Initiate/Edit Refund Terms. refund_received/refund_paid are cumulative running ACTUALS — every recording action adds to them rather than overwriting, so a refund can be settled across multiple partial receipts/payments on either side, independently, in any order. refund_status is derived (never manually set past initiation) by `deriveRefundStatus` (`src/lib/refunds.js`), shared by every write path (RefundModal, LogTransactionModal, AllocationModal, SupplierAllocationModal, ViewPaymentModal):
+refund_receivable/refund_payable are the agreed TARGETS, set once via Initiate/Edit Refund Terms. refund_received is a cumulative running ACTUAL on the supplier side — every recording action adds to it rather than overwriting, so a supplier-side recovery can happen across multiple partial receipts. The client side works differently — see "Client Net Position" below; refund_paid still exists as a cumulative cash-handed-back audit counter, but it is not what determines whether the client side is settled.
+
+refund_status is derived (never manually set past initiation) by `deriveRefundStatus` (`src/lib/refunds.js`), shared by every write path (RefundModal, LogTransactionModal, AllocationModal, SupplierAllocationModal, ViewPaymentModal, RecordPaymentModal):
   - supplierDone = receivable is null, OR received >= receivable
-  - clientDone = payable is null, OR paid >= payable
+  - clientDone = clientRefundNet(ticket) === 0 (see below) — i.e. sell_price - amount_paid - refund_payable === 0
   - both done → closed; only supplier done → supplier_refunded; only client done → client_refunded; neither → initiated
-  - A side with no agreed target (null) is trivially treated as done, since there's nothing to collect/pay on it
+
+### Client Net Position
+The common failure mode this fixes: a client who booked on credit (hasn't paid anything yet) and cancels doesn't get cash "refunded" — they simply owe less than the original sell_price. The old model only recognized cash flowing back to the client (refund_paid catching up to refund_payable), so this case could never settle. The fix treats refund_payable as "how much I'm liable to hand back" (its actual current meaning), and nets it against what's already been paid — which correctly covers both directions from a single number, in `src/lib/refunds.js`:
+
+```
+clientRefundNet(ticket) = sell_price - amount_paid - (refund_payable ?? 0)
+
+net > 0  →  client still owes net           → clientOutstanding(ticket), collected via a normal Record Payment
+net < 0  →  you owe the client |net| back   → clientOwedBack(ticket), settled via Record Client Refund
+net = 0  →  settled — refund_status can reach client_refunded/closed
+```
+
+refund_payable itself never changes meaning — 0 (or unset) is a non-refundable ticket (client still owes the full remaining sell_price), equal to sell_price is full forgiveness, anything between is a partial discount/fee, and anything combined with a real prior payment (amount_paid > 0) can produce a genuine cash-back liability exactly like before. `clientEffectiveTarget(ticket) = sell_price - refund_payable` is what RecordPaymentModal collects toward once a refund is active, instead of the stale full sell_price.
 
 ### Recording a Refund — Real Payments
 Every refund recording action creates a real, channel-tracked payment row (not just a field update on the ticket), so refunds show up correctly in Payments page totals and channel balances:
 - Supplier side: RefundModal's "Record Supplier Refund" (or LogTransactionModal's Supplier Refund) inserts a payments row (type=supplier_refund, payments.ticket_id set), then adds the amount to refund_received and recomputes refund_status
-- Client side: RefundModal's "Record Client Refund" (or LogTransactionModal's Client Refund) inserts a payments row (type=client_refund) + a ticket_payments row (type=client_refund, negative allocated_amount), then adds the amount to refund_paid, subtracts it from amount_paid (floored at 0), and recomputes payment_status/refund_status
+- Client side, cash back (client had already paid more than the new net target): RefundModal's "Record Client Refund" (or LogTransactionModal's Client Refund) inserts a payments row (type=client_refund) + a ticket_payments row (type=client_refund, negative allocated_amount), then adds the amount to refund_paid, subtracts it from amount_paid (floored at 0), and recomputes payment_status/refund_status
+- Client side, still owes (a credit booking, or a partial payment below the new net target): settled via the ordinary "Record Payment" action, same as any other ticket — RecordPaymentModal targets `clientEffectiveTarget(ticket)` instead of raw sell_price once a refund is active, and recomputes refund_status the same way
 - Both sides can also be settled by netting against an unrelated bulk payment via AllocationModal/SupplierAllocationModal (see "Refund-Aware Allocation" below) instead of a standalone refund receipt
 - "Edit Refund Received"/"Edit Refund Paid" row actions are a blunt override of the running total — for correcting the total itself, not for editing an individual receipt (see "Editing a Logged Payment")
 
 ### Refund Flow
 1. Agent marks ticket as refund initiated
-2. Enters refund_receivable (expected from supplier) and refund_payable (agreed with client)
+2. Enters refund_receivable (expected from supplier) and refund_payable (how much you're liable to hand the client back — see "Client Net Position")
 3. Supplier sends money, one or more times — refund_received accumulates; refund_status recomputes to supplier_refunded once it meets refund_receivable
-4. Agent pays client, one or more times — refund_paid accumulates; refund_status recomputes to client_refunded once it meets refund_payable
+4. Client side settles either direction: if the client had already paid more than the new net target, you hand cash back via Record Client Refund; if they still owe (most commonly a credit booking that hadn't been paid at all), they pay the reduced amount via a normal Record Payment. refund_status recomputes to client_refunded once `clientRefundNet(ticket) === 0`, regardless of which direction settled it
 5. Both sides settled (or one/both sides has no target at all) — refund_status → closed
 6. refund_margin auto-calculated at all times = refund_received - refund_payable
-7. Agent can refund client before receiving from supplier, and either side can be a partial/multi-installment settlement — the two sides are tracked and derived fully independently
+7. Agent can settle the client side before the supplier side, and either side can be a partial/multi-installment settlement — the two sides are tracked and derived fully independently
 8. Row actions for recording supplier/client refunds stay available for as long as refund_status is set and not closed — not gated on the other side, and not gated on this side already having some progress (label switches from "Record ..." to "Add ..." once there's existing progress on that side)
 
 ### Refund-Aware Allocation (Netting)

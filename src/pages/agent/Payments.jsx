@@ -209,7 +209,7 @@ export default function Payments() {
       const { data } = await supabase
         .from("tickets")
         .select(
-          "id, passenger_name, route, travel_date, issue_date, purchase_price, ticket_payments(allocated_amount, type), created_at, " +
+          "id, passenger_name, route, travel_date, issue_date, purchase_price, sell_price, amount_paid, ticket_payments(allocated_amount, type), created_at, " +
             "refund_status, refund_receivable, refund_received, refund_payable, refund_paid"
         )
         .eq("supplier_id", payment.supplier_id)

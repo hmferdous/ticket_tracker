@@ -3,6 +3,7 @@ import { Eye, EyeOff } from "lucide-react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import AppLayout from "../../components/layout/AppLayout"
+import { clientOutstanding, clientOwedBack } from "../../lib/refunds"
 
 function fmt(n) {
   return Number(n ?? 0).toLocaleString("en-BD")
@@ -285,17 +286,23 @@ export default function Dashboard() {
 
   // Cumulative stats — always all-time, never filtered
   const cumulativeStats = useMemo(() => {
-    // Once a ticket is void or has any refund activity, its money story is
-    // told by is_void/refund_* — amount_paid/purchase_price no longer
-    // represent a real collection/payable expectation, so it drops out of
-    // both outstanding totals entirely rather than being netted in.
-    const stillOutstandingEligible = (t) => !t.is_void && t.refund_status == null
-
+    // Client-side outstanding nets sell_price/amount_paid against
+    // refund_payable via clientOutstanding — this degrades to the ordinary
+    // sell_price - amount_paid for a ticket with no refund at all (refund_payable
+    // is null there), so it can safely apply to every non-void ticket without
+    // a separate "unpaid/partial" pre-filter or a refund_status exclusion.
     const outstandingReceivable = tickets
-      .filter((t) => stillOutstandingEligible(t) && (t.payment_status === "unpaid" || t.payment_status === "partial"))
-      .reduce((sum, t) => sum + ((t.sell_price ?? 0) - (t.amount_paid ?? 0)), 0)
+      .filter((t) => !t.is_void)
+      .reduce((sum, t) => sum + clientOutstanding(t), 0)
+
+    // Supplier side doesn't have the same "hadn't paid yet" ambiguity a
+    // refund can introduce on the client side — once a ticket is refund-active,
+    // the remaining purchase_price obligation is extinguished, not reduced to
+    // a new target (a pre-payment credit adjustment is a void fee, not a
+    // refund). So this stays excluded entirely rather than netted.
+    const supplierOutstandingEligible = (t) => !t.is_void && t.refund_status == null
     const totalPayableToSuppliers = tickets
-      .filter(stillOutstandingEligible)
+      .filter(supplierOutstandingEligible)
       .reduce((sum, t) => sum + Math.max((t.purchase_price ?? 0) - supplierAmountPaid(t), 0), 0)
     const officeMarkupContributed = tickets.reduce((sum, t) => sum + (t.office_markup ?? 0), 0)
     return { outstandingReceivable, totalPayableToSuppliers, officeMarkupContributed }
@@ -321,7 +328,7 @@ export default function Dashboard() {
       .reduce((sum, t) => sum + Math.max((t.refund_receivable ?? 0) - (t.refund_received ?? 0), 0), 0),
     owedToClients: tickets
       .filter((t) => t.refund_status != null)
-      .reduce((sum, t) => sum + Math.max((t.refund_payable ?? 0) - (t.refund_paid ?? 0), 0), 0),
+      .reduce((sum, t) => sum + clientOwedBack(t), 0),
     netMargin: tickets
       .filter((t) => t.refund_status === "closed")
       .reduce((sum, t) => sum + ((t.refund_received ?? 0) - (t.refund_payable ?? 0)), 0),

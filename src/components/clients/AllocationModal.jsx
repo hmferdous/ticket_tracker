@@ -135,7 +135,13 @@ export default function AllocationModal({ isOpen, onClose, payment, clientName, 
         const newPaid = (a.ticket.refund_paid ?? 0) + a.amount
         const newAmountPaid = Math.max(0, (a.ticket.amount_paid ?? 0) - a.amount)
         const newPaymentStatus = derivePaymentStatus(newAmountPaid, a.ticket.sell_price ?? 0)
-        const newRefundStatus = deriveRefundStatus(a.ticket.refund_receivable, a.ticket.refund_payable, a.ticket.refund_received, newPaid)
+        const newRefundStatus = deriveRefundStatus({
+          receivable: a.ticket.refund_receivable,
+          received: a.ticket.refund_received,
+          sellPrice: a.ticket.sell_price,
+          amountPaid: newAmountPaid,
+          payable: a.ticket.refund_payable,
+        })
         await supabase
           .from("tickets")
           .update({

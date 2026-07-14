@@ -2,6 +2,7 @@ import { useState } from "react"
 import { NavLink, useLocation, useNavigate } from "react-router-dom"
 import { LayoutDashboard, Ticket, Users, Building2, CreditCard, Settings, FileText, ChevronDown, ChevronRight, ChevronLeft, LogOut } from "lucide-react"
 import { useAuth } from "../../context/AuthContext"
+import { ThemeToggleCompact } from "../ui/ThemeToggle"
 
 const NAV_LINKS = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -44,14 +45,14 @@ export default function Sidebar({ collapsed = false, onToggleCollapsed }) {
 
   return (
     <aside
-      className={`fixed inset-y-0 left-0 ${collapsed ? "w-16" : "w-60"} bg-white border-r border-gray-200 flex flex-col transition-[width] duration-200`}
+      className={`fixed inset-y-0 left-0 ${collapsed ? "w-16" : "w-60"} bg-white dark:bg-gray-900 border-r border-gray-200 dark:border-gray-800 flex flex-col transition-[width] duration-200`}
     >
       <div className={`flex items-center py-5 ${collapsed ? "justify-center px-2" : "justify-between px-6"}`}>
-        {!collapsed && <span className="text-lg font-semibold text-gray-900 truncate">Ticket Tracker</span>}
+        {!collapsed && <span className="text-lg font-semibold text-gray-900 dark:text-gray-100 truncate">Ticket Tracker</span>}
         <button
           type="button"
           onClick={onToggleCollapsed}
-          className="p-1.5 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors shrink-0"
+          className="p-1.5 rounded-md text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors shrink-0"
           aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           title={collapsed ? "Expand sidebar" : "Collapse sidebar"}
         >
@@ -70,8 +71,8 @@ export default function Sidebar({ collapsed = false, onToggleCollapsed }) {
                 collapsed ? "justify-center px-2" : "px-3"
               } ${
                 isActive
-                  ? "bg-blue-50 text-blue-600 border-blue-600"
-                  : "text-gray-600 border-transparent hover:bg-gray-50"
+                  ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400"
+                  : "text-gray-600 dark:text-gray-400 border-transparent hover:bg-gray-50 dark:hover:bg-gray-800"
               }`
             }
           >
@@ -90,8 +91,8 @@ export default function Sidebar({ collapsed = false, onToggleCollapsed }) {
               collapsed ? "justify-center px-2" : "px-3"
             } ${
               reportsActive
-                ? "bg-blue-50 text-blue-600 border-blue-600"
-                : "text-gray-600 border-transparent hover:bg-gray-50"
+                ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 border-blue-600 dark:border-blue-400"
+                : "text-gray-600 dark:text-gray-400 border-transparent hover:bg-gray-50 dark:hover:bg-gray-800"
             }`}
           >
             <FileText className="w-5 h-5 shrink-0" />
@@ -99,8 +100,8 @@ export default function Sidebar({ collapsed = false, onToggleCollapsed }) {
               <>
                 <span className="flex-1 text-left">Reports</span>
                 {reportsOpen
-                  ? <ChevronDown className="w-4 h-4 text-gray-400" />
-                  : <ChevronRight className="w-4 h-4 text-gray-400" />
+                  ? <ChevronDown className="w-4 h-4 text-gray-400 dark:text-gray-500" />
+                  : <ChevronRight className="w-4 h-4 text-gray-400 dark:text-gray-500" />
                 }
               </>
             )}
@@ -115,8 +116,8 @@ export default function Sidebar({ collapsed = false, onToggleCollapsed }) {
                   className={({ isActive }) =>
                     `block px-3 py-2 rounded-lg text-sm transition-colors ${
                       isActive
-                        ? "bg-blue-50 text-blue-600 font-medium"
-                        : "text-gray-500 hover:bg-gray-50 hover:text-gray-700"
+                        ? "bg-blue-50 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 font-medium"
+                        : "text-gray-500 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-800 hover:text-gray-700 dark:hover:text-gray-200"
                     }`
                   }
                 >
@@ -128,13 +129,17 @@ export default function Sidebar({ collapsed = false, onToggleCollapsed }) {
         </div>
       </nav>
 
-      <div className={`py-4 border-t border-gray-100 ${collapsed ? "flex flex-col items-center px-2" : "px-4"}`}>
-        {!collapsed && <p className="text-xs text-gray-400 truncate mb-2">{user?.email}</p>}
+      <div className={`py-2 border-t border-gray-100 dark:border-gray-800 ${collapsed ? "flex flex-col items-center px-2" : "px-3"}`}>
+        <ThemeToggleCompact collapsed={collapsed} />
+      </div>
+
+      <div className={`py-4 border-t border-gray-100 dark:border-gray-800 ${collapsed ? "flex flex-col items-center px-2" : "px-4"}`}>
+        {!collapsed && <p className="text-xs text-gray-400 dark:text-gray-500 truncate mb-2">{user?.email}</p>}
         <button
           onClick={handleLogout}
           title={collapsed ? "Logout" : undefined}
           aria-label="Logout"
-          className={`text-sm text-red-600 hover:text-red-700 font-medium transition-colors ${collapsed ? "p-1.5 rounded-md hover:bg-red-50" : ""}`}
+          className={`text-sm text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 font-medium transition-colors ${collapsed ? "p-1.5 rounded-md hover:bg-red-50 dark:hover:bg-red-900/20" : ""}`}
         >
           {collapsed ? <LogOut className="w-5 h-5" /> : "Logout"}
         </button>

@@ -91,6 +91,12 @@ On save:
   - gds_price saved to tickets table if entered
   - office_markup = purchase_price - gds_price saved silently if gds_price entered, otherwise null
 
+## Ticket Clone
+- "Clone" row action (Tickets page, both Compact and Detailed views, next to Edit) opens `TicketModal` pre-seeded from the source ticket, but as a create — not update.
+- Copied fields: passenger_name, carrier, ticket_number, pnr, route, issue_date, travel_date, return_date, client_id, supplier_id, purchase_price, gds_price, sell_price, narration — i.e. every core ticket-identity/flight/pricing field.
+- Deliberately NOT copied: id (so the modal inserts a new row instead of updating the source), status (defaults back to "booked", same as any new ticket), and everything payment/refund-related (amount_paid, payment_status, refund_status and all refund_* fields, is_void, is_reissue) — the clone starts life exactly like a brand-new ticket, regardless of how settled/refunded/reissued the source ticket is.
+- `TicketModal` takes a `cloneMode` prop purely for copy ("Clone ticket" title, "Save cloned ticket" button) — the actual create-vs-update decision and the inline-payment-section visibility both key off `ticket?.id` (not bare `ticket` truthiness), so a clone-seed object (no id) is treated exactly like the normal "add ticket" flow: initial client/supplier payment can still be entered fresh, it just isn't pre-filled from the source.
+
 ## Plan Gating (future)
 - Supplier Purchase Price field hidden for non-pro users
 - Office markup dashboard section hidden for non-pro users

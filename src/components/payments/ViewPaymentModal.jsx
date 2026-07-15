@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { fetchChannels } from "../../lib/channels"
 import { deriveRefundStatus } from "../../lib/refunds"
+import { blockNonNumericKeys } from "../../lib/numberInput"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -304,7 +305,7 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount</label>
-                  <input type="number" required min="0" step="0.01" value={form.amount} onChange={set("amount")} className={inputCls} />
+                  <input type="number" onKeyDown={blockNonNumericKeys} required min="0" step="0.01" value={form.amount} onChange={set("amount")} className={inputCls} />
                   {(payment.type === "client_payment" || payment.type === "supplier_payment") && allocatedAmount > 0 && (
                     <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Can't go below {fmt(allocatedAmount)} (already allocated)</p>
                   )}

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { suggestUniqueName } from "../../lib/channels"
+import { blockNonNumericKeys } from "../../lib/numberInput"
 
 export default function ChannelModal({ isOpen, onClose, agentId, channel, existingChannels, onSaved }) {
   const [name, setName] = useState("")
@@ -136,7 +137,7 @@ export default function ChannelModal({ isOpen, onClose, agentId, channel, existi
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Starting Balance</label>
                 <input
-                  type="number"
+                  type="number" onKeyDown={blockNonNumericKeys}
                   step="0.01"
                   value={startingBalance}
                   onChange={(e) => setStartingBalance(e.target.value)}

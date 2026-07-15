@@ -6,6 +6,7 @@ import SearchableDropdown from "../ui/SearchableDropdown"
 import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
 import { fetchChannels } from "../../lib/channels"
 import { clientEffectiveTarget } from "../../lib/refunds"
+import { blockNonNumericKeys } from "../../lib/numberInput"
 
 function derivePaymentStatus(amountPaid, target) {
   if (amountPaid <= 0) return "unpaid"
@@ -480,7 +481,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket, cloneMod
                       Purchase Price <span className="text-red-500 dark:text-red-400">*</span>
                     </label>
                     <input
-                      type="number"
+                      type="number" onKeyDown={blockNonNumericKeys}
                       required
                       min="0"
                       step="0.01"
@@ -493,7 +494,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket, cloneMod
                   <div className="pl-3 border-l-2 border-gray-100 dark:border-gray-800">
                     <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Supplier Purchase Price</label>
                     <input
-                      type="number"
+                      type="number" onKeyDown={blockNonNumericKeys}
                       min="0"
                       step="0.01"
                       value={form.gds_price}
@@ -511,7 +512,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket, cloneMod
                     Sell Price <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <input
-                    type="number"
+                    type="number" onKeyDown={blockNonNumericKeys}
                     required
                     min="0"
                     step="0.01"
@@ -574,7 +575,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket, cloneMod
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount Received</label>
                       <input
-                        type="number"
+                        type="number" onKeyDown={blockNonNumericKeys}
                         min="0"
                         step="0.01"
                         value={clientPay.paid_in_full ? (form.sell_price || "") : clientPay.amount}
@@ -649,7 +650,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket, cloneMod
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount Paid</label>
                       <input
-                        type="number"
+                        type="number" onKeyDown={blockNonNumericKeys}
                         min="0"
                         step="0.01"
                         value={supplierPay.paid_in_full ? (form.purchase_price || "") : supplierPay.amount}

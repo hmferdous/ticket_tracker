@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
+import { blockNonNumericKeys } from "../../lib/numberInput"
 
 function buildForm(ticket) {
   return {
@@ -119,15 +120,15 @@ export default function EditReissueModal({ isOpen, onClose, ticket, onSaved }) {
             <div className="grid grid-cols-3 gap-3 pt-2">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Collected</label>
-                <input type="number" min="0" step="0.01" value={form.reissue_fee_collected} onChange={set("reissue_fee_collected")} placeholder="0.00" className={inputCls} />
+                <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_fee_collected} onChange={set("reissue_fee_collected")} placeholder="0.00" className={inputCls} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Paid</label>
-                <input type="number" min="0" step="0.01" value={form.reissue_fee_paid} onChange={set("reissue_fee_paid")} placeholder="0.00" className={inputCls} />
+                <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_fee_paid} onChange={set("reissue_fee_paid")} placeholder="0.00" className={inputCls} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fare Difference</label>
-                <input type="number" step="0.01" value={form.fare_difference} onChange={set("fare_difference")} placeholder="0.00" className={inputCls} />
+                <input type="number" onKeyDown={blockNonNumericKeys} step="0.01" value={form.fare_difference} onChange={set("fare_difference")} placeholder="0.00" className={inputCls} />
               </div>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">

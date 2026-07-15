@@ -6,6 +6,7 @@ import SearchableDropdown from "../ui/SearchableDropdown"
 import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
 import { fetchChannels } from "../../lib/channels"
 import { clientEffectiveTarget } from "../../lib/refunds"
+import { blockNonNumericKeys } from "../../lib/numberInput"
 
 function derivePaymentStatus(amountPaid, target) {
   if (amountPaid <= 0) return "unpaid"
@@ -351,7 +352,7 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                   </div>
                   <div className="pl-3 border-l-2 border-gray-100 dark:border-gray-800">
                     <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Supplier Purchase Price</label>
-                    <input type="number" min="0" step="0.01" value={form.gds_price} onChange={set("gds_price")} placeholder="0.00" className={inputCls} />
+                    <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.gds_price} onChange={set("gds_price")} placeholder="0.00" className={inputCls} />
                     <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Informational only</p>
                   </div>
                 </div>
@@ -371,15 +372,15 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
               <div className="grid grid-cols-3 gap-3">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Collected</label>
-                  <input type="number" min="0" step="0.01" value={form.reissue_fee_collected} onChange={set("reissue_fee_collected")} placeholder="0.00" className={inputCls} />
+                  <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_fee_collected} onChange={set("reissue_fee_collected")} placeholder="0.00" className={inputCls} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Paid</label>
-                  <input type="number" min="0" step="0.01" value={form.reissue_fee_paid} onChange={set("reissue_fee_paid")} placeholder="0.00" className={inputCls} />
+                  <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_fee_paid} onChange={set("reissue_fee_paid")} placeholder="0.00" className={inputCls} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fare Difference</label>
-                  <input type="number" step="0.01" value={form.fare_difference} onChange={set("fare_difference")} placeholder="0.00" className={inputCls} />
+                  <input type="number" onKeyDown={blockNonNumericKeys} step="0.01" value={form.fare_difference} onChange={set("fare_difference")} placeholder="0.00" className={inputCls} />
                 </div>
               </div>
               <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
@@ -414,7 +415,7 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount Received</label>
                       <input
-                        type="number"
+                        type="number" onKeyDown={blockNonNumericKeys}
                         min="0"
                         step="0.01"
                         value={clientPay.paid_in_full ? computedSellPrice : clientPay.amount}

@@ -6,6 +6,7 @@ import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
 import { createClient, createSupplier } from "../tickets/TicketModal"
 import { fetchChannels } from "../../lib/channels"
 import { deriveRefundStatus } from "../../lib/refunds"
+import { blockNonNumericKeys } from "../../lib/numberInput"
 
 const TYPE_CARDS = [
   { value: "client_payment", label: "Client Payment", direction: "IN", icon: Wallet },
@@ -466,7 +467,7 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
                     Amount <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <input
-                    type="number"
+                    type="number" onKeyDown={blockNonNumericKeys}
                     required
                     min="0"
                     step="0.01"

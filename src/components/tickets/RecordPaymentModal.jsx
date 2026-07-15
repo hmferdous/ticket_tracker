@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { fetchChannels } from "../../lib/channels"
 import { deriveRefundStatus, clientOutstanding, clientEffectiveTarget } from "../../lib/refunds"
+import { blockNonNumericKeys } from "../../lib/numberInput"
 
 const EMPTY = { amount: "", channel_id: "", trx_id: "", notes: "", paid_in_full: false, payment_date: "" }
 
@@ -184,7 +185,7 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
                 Amount <span className="text-red-500 dark:text-red-400">*</span>
               </label>
               <input
-                type="number"
+                type="number" onKeyDown={blockNonNumericKeys}
                 required
                 min="0"
                 step="0.01"

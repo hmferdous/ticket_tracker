@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { fetchChannels } from "../../lib/channels"
+import { blockNonNumericKeys } from "../../lib/numberInput"
 
 function emptyForm() {
   return {
@@ -105,7 +106,7 @@ export default function SupplierLogPaymentModal({ isOpen, onClose, supplier, onL
                   Amount <span className="text-red-500 dark:text-red-400">*</span>
                 </label>
                 <input
-                  type="number"
+                  type="number" onKeyDown={blockNonNumericKeys}
                   required
                   min="0"
                   step="0.01"

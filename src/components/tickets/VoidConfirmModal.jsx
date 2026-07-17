@@ -2,6 +2,7 @@ import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { fetchChannels } from "../../lib/channels"
+import { blockNonNumericKeys } from "../../lib/numberInput"
 
 export default function VoidConfirmModal({ isOpen, onClose, ticket, onSaved }) {
   const { agent } = useAuth()
@@ -154,7 +155,7 @@ export default function VoidConfirmModal({ isOpen, onClose, ticket, onSaved }) {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Fee charged by supplier</label>
-                <input type="number" min="0" step="0.01" value={supplierFee} onChange={(e) => setSupplierFee(e.target.value)} placeholder="0.00" className={inputCls} />
+                <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={supplierFee} onChange={(e) => setSupplierFee(e.target.value)} placeholder="0.00" className={inputCls} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Channel</label>
@@ -169,7 +170,7 @@ export default function VoidConfirmModal({ isOpen, onClose, ticket, onSaved }) {
             <div className="grid grid-cols-2 gap-2">
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Fee charged to client</label>
-                <input type="number" min="0" step="0.01" value={clientFee} onChange={(e) => setClientFee(e.target.value)} placeholder="0.00" className={inputCls} />
+                <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={clientFee} onChange={(e) => setClientFee(e.target.value)} placeholder="0.00" className={inputCls} />
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Channel</label>

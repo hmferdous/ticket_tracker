@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react"
 import * as XLSX from "xlsx"
 import { supabase } from "../../lib/supabase"
+import { blockNonNumericKeys } from "../../lib/numberInput"
 import { useAuth } from "../../context/AuthContext"
 import AppLayout from "../../components/layout/AppLayout"
 import { ThemeToggleFull } from "../../components/ui/ThemeToggle"
@@ -261,7 +262,7 @@ export default function Settings() {
                       Days before flight — client payment reminder
                     </label>
                     <input
-                      type="number"
+                      type="number" onKeyDown={blockNonNumericKeys}
                       min="0"
                       value={reminderDaysClient}
                       onChange={(e) => setReminderDaysClient(e.target.value)}
@@ -273,7 +274,7 @@ export default function Settings() {
                       Days before flight — supplier payment reminder
                     </label>
                     <input
-                      type="number"
+                      type="number" onKeyDown={blockNonNumericKeys}
                       min="0"
                       value={reminderDaysSupplier}
                       onChange={(e) => setReminderDaysSupplier(e.target.value)}

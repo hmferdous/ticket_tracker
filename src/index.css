@@ -29,3 +29,18 @@
   background-color: var(--color-gray-900);
   color: var(--color-gray-100);
 }
+
+/* Number inputs across the app are styled as plain text fields (see
+   src/lib/numberInput.js for the matching keystroke validation) — the
+   browser's native up/down spin buttons don't match that design and are
+   removed here globally instead of per-input. */
+input[type="number"] {
+  appearance: textfield;
+  -moz-appearance: textfield;
+}
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+

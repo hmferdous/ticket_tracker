@@ -323,6 +323,7 @@ export default function Tickets() {
   const [error, setError] = useState("")
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTicket, setEditingTicket] = useState(null)
+  const [cloneMode, setCloneMode] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [compact, setCompact] = useState(true)
@@ -479,11 +480,37 @@ export default function Tickets() {
 
   const openAdd = () => {
     setEditingTicket(null)
+    setCloneMode(false)
     setModalOpen(true)
   }
 
   const openEdit = (ticket) => {
     setEditingTicket(ticket)
+    setCloneMode(false)
+    setModalOpen(true)
+  }
+
+  // Clone: seed the "add ticket" form with only ticket-identity/flight/pricing
+  // fields from the source ticket — no id (so it inserts a new row), and no
+  // payment/status/refund fields, matching a genuinely fresh booking.
+  const openClone = (ticket) => {
+    setEditingTicket({
+      passenger_name: ticket.passenger_name,
+      carrier: ticket.carrier,
+      ticket_number: ticket.ticket_number,
+      pnr: ticket.pnr,
+      route: ticket.route,
+      issue_date: ticket.issue_date,
+      travel_date: ticket.travel_date,
+      return_date: ticket.return_date,
+      client_id: ticket.client_id,
+      supplier_id: ticket.supplier_id,
+      purchase_price: ticket.purchase_price,
+      gds_price: ticket.gds_price,
+      sell_price: ticket.sell_price,
+      narration: ticket.narration,
+    })
+    setCloneMode(true)
     setModalOpen(true)
   }
 
@@ -839,6 +866,7 @@ export default function Tickets() {
                                 onClose={() => setOpenActionMenuId(null)}
                                 items={[
                                   { key: "edit", label: "Edit", cls: "text-blue-600 dark:text-blue-400", onClick: () => openEdit(ticket) },
+                                  { key: "clone", label: "Clone", cls: "text-gray-700 dark:text-gray-300", onClick: () => openClone(ticket) },
                                   ...getRowActions(ticket).map((action) => { const config = actionConfig(action, ticket); return config ? { key: action, ...config } : null }).filter(Boolean),
                                   { key: "delete", label: "Delete", cls: "text-red-600 dark:text-red-400", onClick: () => setConfirmDeleteId(ticket.id) },
                                 ]}
@@ -948,6 +976,7 @@ export default function Tickets() {
                                 onClose={() => setOpenActionMenuId(null)}
                                 items={[
                                   { key: "edit", label: "Edit", cls: "text-blue-600 dark:text-blue-400", onClick: () => openEdit(ticket) },
+                                  { key: "clone", label: "Clone", cls: "text-gray-700 dark:text-gray-300", onClick: () => openClone(ticket) },
                                   ...getRowActions(ticket)
                                     .map((action) => {
                                       const config = actionConfig(action, ticket)
@@ -1017,6 +1046,7 @@ export default function Tickets() {
         onClose={() => setModalOpen(false)}
         onSaved={handleSaved}
         ticket={editingTicket}
+        cloneMode={cloneMode}
       />
 
       <VoidConfirmModal

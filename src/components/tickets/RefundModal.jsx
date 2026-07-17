@@ -3,6 +3,7 @@ import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { fetchChannels } from "../../lib/channels"
 import { deriveRefundStatus, clientRefundNet, clientOwedBack } from "../../lib/refunds"
+import { blockNonNumericKeys } from "../../lib/numberInput"
 
 const MODE_CONFIG = {
   initiate: { title: "Initiate refund", confirmLabel: "Start refund" },
@@ -319,7 +320,7 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Expected from Supplier</label>
                   <input
-                    type="number"
+                    type="number" onKeyDown={blockNonNumericKeys}
                     step="0.01"
                     value={receivable}
                     onChange={(e) => setReceivable(e.target.value)}
@@ -330,7 +331,7 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agreed to pay Client</label>
                   <input
-                    type="number"
+                    type="number" onKeyDown={blockNonNumericKeys}
                     step="0.01"
                     value={payable}
                     onChange={(e) => setPayable(e.target.value)}
@@ -366,7 +367,7 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount received from supplier</label>
                   <input
-                    type="number"
+                    type="number" onKeyDown={blockNonNumericKeys}
                     required
                     step="0.01"
                     value={amount}
@@ -398,7 +399,7 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount paid to client</label>
                   <input
-                    type="number"
+                    type="number" onKeyDown={blockNonNumericKeys}
                     required
                     step="0.01"
                     value={amount}
@@ -428,7 +429,7 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Total received from supplier</label>
                 <input
-                  type="number"
+                  type="number" onKeyDown={blockNonNumericKeys}
                   required
                   step="0.01"
                   value={amount}
@@ -446,7 +447,7 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Total paid to client</label>
                 <input
-                  type="number"
+                  type="number" onKeyDown={blockNonNumericKeys}
                   required
                   step="0.01"
                   value={amount}

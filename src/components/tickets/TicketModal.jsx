@@ -6,6 +6,7 @@ import SearchableDropdown from "../ui/SearchableDropdown"
 import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
 import { fetchChannels } from "../../lib/channels"
 import { clientEffectiveTarget } from "../../lib/refunds"
+import { blockNonNumericKeys } from "../../lib/numberInput"
 
 function derivePaymentStatus(amountPaid, target) {
   if (amountPaid <= 0) return "unpaid"
@@ -60,7 +61,7 @@ const EMPTY = {
 
 const EMPTY_PAYMENT = { amount: "", channel_id: "", trx_id: "", notes: "", paid_in_full: false, payment_date: "" }
 
-export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
+export default function TicketModal({ isOpen, onClose, onSaved, ticket, cloneMode = false }) {
   const { agent } = useAuth()
   const [form, setForm] = useState(EMPTY)
   const [clients, setClients] = useState([])
@@ -304,7 +305,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
           <h2 className="text-lg font-semibold text-gray-900 dark:text-gray-100">
-            {ticket ? "Edit ticket" : "Add ticket"}
+            {ticket?.id ? "Edit ticket" : cloneMode ? "Clone ticket" : "Add ticket"}
           </h2>
           <button
             onClick={onClose}
@@ -480,7 +481,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                       Purchase Price <span className="text-red-500 dark:text-red-400">*</span>
                     </label>
                     <input
-                      type="number"
+                      type="number" onKeyDown={blockNonNumericKeys}
                       required
                       min="0"
                       step="0.01"
@@ -493,7 +494,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                   <div className="pl-3 border-l-2 border-gray-100 dark:border-gray-800">
                     <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Supplier Purchase Price</label>
                     <input
-                      type="number"
+                      type="number" onKeyDown={blockNonNumericKeys}
                       min="0"
                       step="0.01"
                       value={form.gds_price}
@@ -511,7 +512,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                     Sell Price <span className="text-red-500 dark:text-red-400">*</span>
                   </label>
                   <input
-                    type="number"
+                    type="number" onKeyDown={blockNonNumericKeys}
                     required
                     min="0"
                     step="0.01"
@@ -537,7 +538,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
             </fieldset>
 
             {/* Client + Supplier Payment — create mode only */}
-            {!ticket && <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+            {!ticket?.id && <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
               <button
                 type="button"
                 onClick={() => setClientPayOpen((o) => !o)}
@@ -574,7 +575,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount Received</label>
                       <input
-                        type="number"
+                        type="number" onKeyDown={blockNonNumericKeys}
                         min="0"
                         step="0.01"
                         value={clientPay.paid_in_full ? (form.sell_price || "") : clientPay.amount}
@@ -627,7 +628,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
               )}
             </div>}
 
-            {!ticket && <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
+            {!ticket?.id && <div className="border border-gray-200 dark:border-gray-800 rounded-lg overflow-hidden">
               <button
                 type="button"
                 onClick={() => setSupplierPayOpen((o) => !o)}
@@ -649,7 +650,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
                     <div>
                       <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Amount Paid</label>
                       <input
-                        type="number"
+                        type="number" onKeyDown={blockNonNumericKeys}
                         min="0"
                         step="0.01"
                         value={supplierPay.paid_in_full ? (form.purchase_price || "") : supplierPay.amount}
@@ -719,7 +720,7 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket }) {
             disabled={loading}
             className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white rounded-lg text-sm font-medium transition-colors"
           >
-            {loading ? "Saving…" : ticket ? "Save changes" : "Add ticket"}
+            {loading ? "Saving…" : ticket?.id ? "Save changes" : cloneMode ? "Save cloned ticket" : "Add ticket"}
           </button>
         </div>
       </div>

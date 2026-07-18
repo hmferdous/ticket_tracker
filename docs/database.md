@@ -248,25 +248,39 @@ AllocationModal (client bulk payments) and SupplierAllocationModal (supplier bul
 A reissue creates a new child ticket linked to the original parent ticket via parent_ticket_id. The original ticket stays intact with its original values and status changes to reissued.
 
 ### Reissue Pricing Model
-The child ticket's sell_price and purchase_price represent the FULL new prices, not incremental amounts:
-- child.sell_price = original_sell_price + fare_difference + reissue_fee_collected
-- child.purchase_price = original_purchase_price + fare_difference + reissue_fee_paid
+The child ticket's sell_price and purchase_price are INCREMENTAL — just what this specific reissue event is worth, not the original ticket's price rolled forward:
+- child.sell_price = fare_difference + reissue_fee_collected
+- child.purchase_price = fare_difference + reissue_fee_paid
 
-The ReissueModal auto-computes these values as the agent types the reissue fee and fare difference fields. sell_price and purchase_price on the child are read-only computed displays — not manually editable.
+Each reissue is its own small, fully independent, auditable ticket row — its own sell_price, its own outstanding (sell_price - amount_paid - refund_payable), its own margin (sell_price - purchase_price, which reduces to reissue_fee_collected - reissue_fee_paid since fare_difference nets to zero margin impact). The parent ticket is untouched by the reissue — it keeps its full original sell_price/purchase_price permanently, in whatever period it was originally booked in, regardless of how many times it's later reissued. This is deliberate: a reissue happening in a later month must never retroactively change an earlier month's already-reported numbers, and the reissue's own fee must be tagged to the month it actually happened in — not smeared across both.
+
+Previously (pre-fix) these were cumulative — child.sell_price = original_sell_price + fare_difference + reissue_fee_collected — which double-counted the original sale every time a ticket was reissued (it landed in both the original ticket's period, via the untouched parent, and again in the reissue's period, baked into the child's inflated cumulative price) and made "Total Sales"/margin figures retroactively change every time a later reissue happened. Existing reissued tickets created before this fix are still stored under the old cumulative meaning and need a one-time data correction if/when migrated:
+```sql
+UPDATE tickets
+SET sell_price = COALESCE(fare_difference, 0) + COALESCE(reissue_fee_collected, 0),
+    purchase_price = COALESCE(fare_difference, 0) + COALESCE(reissue_fee_paid, 0)
+WHERE is_reissue = true
+```
+
+The ReissueModal auto-computes these values as the agent types the reissue fee and fare difference fields. sell_price and purchase_price on the child are read-only computed displays — not manually editable. A separate reference-only "new ticket total" line (original + fare_difference + reissue_fee_collected) is shown alongside for the agent's convenience, so they can still see the cumulative picture — it is never stored anywhere.
+
+gds_price (Supplier Purchase Price) on a reissue child starts blank, not pre-filled from the parent — it's this reissue's own informational supplier cost, not the whole ticket's.
+
+No chain-level rollup UI exists yet (e.g. a single number showing the sum across an original ticket and all its reissues) — an agent auditing the full lifetime value of a repeatedly-reissued ticket currently has to open each ticket in the chain individually via the parent/child links on the Ticket Detail view.
 
 ### Reissue Fields on Child Ticket
 - parent_ticket_id — FK to original ticket
 - is_reissue = true
-- reissue_fee_collected — fee collected from client (stored for reference; baked into sell_price)
-- reissue_fee_paid — fee paid to supplier (stored for reference; baked into purchase_price)
-- fare_difference — price difference (positive or negative; baked into both prices)
+- reissue_fee_collected — fee collected from client; baked into this reissue's own sell_price
+- reissue_fee_paid — fee paid to supplier; baked into this reissue's own purchase_price
+- fare_difference — price difference (positive or negative); baked into both prices, nets to zero margin impact
 
 ### Reissue Flow
 1. Agent clicks Reissue on original ticket row
-2. Modal opens pre-filled with original ticket data
+2. Modal opens pre-filled with original ticket data (passenger, route, etc. — not price)
 3. Agent updates ticket details — carrier, PNR, ticket number, dates
 4. Agent enters fare_difference, reissue_fee_collected, reissue_fee_paid
-5. sell_price and purchase_price auto-compute live from original prices + entered values
+5. sell_price and purchase_price auto-compute live as just those entered values (fare_difference + fee) — not added to the original ticket's price
 6. "Profit From Reissue" (= reissue_fee_collected - reissue_fee_paid) shown as a live display
 7. On save — original ticket status → reissued, new child ticket created with computed prices
 

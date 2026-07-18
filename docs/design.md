@@ -142,20 +142,22 @@ On save:
 
 ## Reissue Modal
 - Opens from row level action on ticket list
-- Pre-filled with original ticket data — passenger, carrier, PNR, route, dates, client, supplier all editable
-- sell_price and purchase_price are READ-ONLY auto-computed displays — not editable inputs:
-  - sell_price = original_sell_price + fare_difference + reissue_fee_collected
-  - purchase_price = original_purchase_price + fare_difference + reissue_fee_paid
+- Pre-filled with original ticket data — passenger, carrier, PNR, route, dates, client, supplier all editable (price is NOT carried over — see below)
+- sell_price and purchase_price are READ-ONLY auto-computed displays — not editable inputs, and INCREMENTAL (this reissue's own price, not the original ticket's price rolled forward):
+  - sell_price = fare_difference + reissue_fee_collected
+  - purchase_price = fare_difference + reissue_fee_paid
   - Both update live as the agent types the reissue fields
+  - A separate "new ticket total" line shows the cumulative original + fare_difference + reissue_fee_collected for reference — informational only, never stored
+- gds_price (Supplier Purchase Price) starts blank — not pre-filled from the original ticket, since it's this reissue's own informational supplier cost
 - Reissue Details section (editable): Reissue Fee Collected, Reissue Fee Paid, Fare Difference
 - "Profit From Reissue" shown as a live read-only display: reissue_fee_collected - reissue_fee_paid
-- Collapsible Record Payment section at bottom (same pattern as ticket form, uses computed sell_price)
-- On save: original ticket marked reissued, new child ticket created with computed prices
+- Collapsible Record Payment section at bottom (same pattern as ticket form, uses computed sell_price — i.e. this reissue's own fee, so "paid in full" means the fee is paid in full, not the whole ticket)
+- On save: original ticket marked reissued (nothing else about it changes — its own sell_price/purchase_price/issue_date stay exactly as originally booked, permanently), new child ticket created as its own independent ticket row with only the incremental price
 
 ## Edit Reissue Details Modal
 - Opens from "Edit Reissue Details" row action on a reissue child ticket
 - Pre-filled with the child's current reissue_fee_collected, reissue_fee_paid, fare_difference
-- sell_price and purchase_price shown read-only, recomputed live the same way as the Reissue Modal — base price (backed out of the ticket's current stored prices) + fare_difference + fee
+- sell_price and purchase_price shown read-only, recomputed live the same way as the Reissue Modal — just fare_difference + fee, no base price involved (previously needed to "back out" the fee from the ticket's stored cumulative price; the incremental model makes that unnecessary)
 - On save: updates reissue_fee_collected, reissue_fee_paid, fare_difference, sell_price, purchase_price, office_markup
 - This is the correct place to fix a reissue fee/fare entry mistake — editing sell_price/purchase_price directly via the generic ticket Edit action does not keep them in sync with the fee fields
 

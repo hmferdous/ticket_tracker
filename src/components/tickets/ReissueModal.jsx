@@ -35,7 +35,10 @@ function buildForm(ticket) {
     supplier_id: ticket?.supplier_id ?? "",
     orig_sell_price: ticket?.sell_price ?? 0,
     orig_purchase_price: ticket?.purchase_price ?? 0,
-    gds_price: ticket?.gds_price ?? "",
+    // Blank, not pre-filled from the parent — gds_price is this reissue's
+    // own informational supplier cost (the GDS transaction for the fare
+    // change itself), not the original ticket's full GDS price.
+    gds_price: "",
     narration: "",
     reissue_fee_collected: "",
     reissue_fee_paid: "",
@@ -111,8 +114,19 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
   const feeCollected  = parseFloat(form.reissue_fee_collected) || 0
   const feePaid       = parseFloat(form.reissue_fee_paid)      || 0
 
-  const computedSellPrice     = (form.orig_sell_price     || 0) + fareDiff + feeCollected
-  const computedPurchasePrice = (form.orig_purchase_price || 0) + fareDiff + feePaid
+  // The reissue child's own sell/purchase price is just what THIS reissue
+  // event is worth — the fare adjustment plus the reissue fee — not the
+  // original ticket's price rolled forward. The original sale was already
+  // recognized as revenue on the parent ticket when it was first booked;
+  // re-including it here would double-count it every time a ticket is
+  // reissued. Each reissue is its own small, independently auditable
+  // ticket row.
+  const computedSellPrice     = fareDiff + feeCollected
+  const computedPurchasePrice = fareDiff + feePaid
+
+  // Reference only, never stored — lets the agent see what the client's
+  // ticket is now cumulatively worth across the whole reissue chain so far.
+  const newTicketTotal = (form.orig_sell_price || 0) + fareDiff + feeCollected
 
   const reissueProfit = feeCollected - feePaid
 
@@ -344,11 +358,11 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <div className="space-y-2">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Purchase Price</label>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Purchase Price (this reissue)</label>
                     <div className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg text-sm text-gray-900 dark:text-gray-100 tabular-nums">
                       {computedPurchasePrice.toLocaleString("en-BD")}
                     </div>
-                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Auto-computed from original + fare diff + reissue fee paid</p>
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Auto-computed: fare diff + reissue fee paid — this reissue's own cost, not the original ticket's price</p>
                   </div>
                   <div className="pl-3 border-l-2 border-gray-100 dark:border-gray-800">
                     <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Supplier Purchase Price</label>
@@ -357,13 +371,17 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sell Price</label>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sell Price (this reissue)</label>
                   <div className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg text-sm text-gray-900 dark:text-gray-100 tabular-nums">
                     {computedSellPrice.toLocaleString("en-BD")}
                   </div>
-                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Auto-computed from original + fare diff + reissue fee collected</p>
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Auto-computed: fare diff + reissue fee collected — what this reissue itself charges the client, tracked as its own ticket</p>
                 </div>
               </div>
+              <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
+                Reference only, not stored — new ticket total across the whole reissue chain so far:{" "}
+                <span className="font-medium text-gray-600 dark:text-gray-400 tabular-nums">{newTicketTotal.toLocaleString("en-BD")}</span>
+              </p>
             </fieldset>
 
             {/* Reissue Details */}

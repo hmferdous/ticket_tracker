@@ -10,16 +10,6 @@ function buildForm(ticket) {
   }
 }
 
-// The portion of sell/purchase price that predates this reissue's fee/fare terms —
-// derived by backing the current fee/fare fields out of the stored prices.
-function baseSellPrice(ticket) {
-  return (ticket?.sell_price ?? 0) - (ticket?.fare_difference ?? 0) - (ticket?.reissue_fee_collected ?? 0)
-}
-
-function basePurchasePrice(ticket) {
-  return (ticket?.purchase_price ?? 0) - (ticket?.fare_difference ?? 0) - (ticket?.reissue_fee_paid ?? 0)
-}
-
 export default function EditReissueModal({ isOpen, onClose, ticket, onSaved }) {
   const [form, setForm] = useState(() => buildForm(ticket))
   const [loading, setLoading] = useState(false)
@@ -44,8 +34,11 @@ export default function EditReissueModal({ isOpen, onClose, ticket, onSaved }) {
   const feeCollected = parseFloat(form.reissue_fee_collected) || 0
   const feePaid = parseFloat(form.reissue_fee_paid) || 0
 
-  const computedSellPrice = baseSellPrice(ticket) + fareDiff + feeCollected
-  const computedPurchasePrice = basePurchasePrice(ticket) + fareDiff + feePaid
+  // This reissue's own sell/purchase price — fare adjustment + reissue fee,
+  // not the original ticket's price rolled forward (see ReissueModal for
+  // why: the original sale is already recognized on the parent ticket).
+  const computedSellPrice = fareDiff + feeCollected
+  const computedPurchasePrice = fareDiff + feePaid
   const reissueProfit = feeCollected - feePaid
 
   const inputCls =
@@ -103,19 +96,19 @@ export default function EditReissueModal({ isOpen, onClose, ticket, onSaved }) {
           <form id="edit-reissue-form" onSubmit={handleSubmit} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Purchase Price</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Purchase Price (this reissue)</label>
                 <div className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg text-sm text-gray-900 dark:text-gray-100 tabular-nums">
                   {computedPurchasePrice.toLocaleString("en-BD")}
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sell Price</label>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sell Price (this reissue)</label>
                 <div className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg text-sm text-gray-900 dark:text-gray-100 tabular-nums">
                   {computedSellPrice.toLocaleString("en-BD")}
                 </div>
               </div>
             </div>
-            <p className="text-xs text-gray-400 dark:text-gray-500">Prices recompute live from the fields below</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">This reissue's own price — fare diff + reissue fee, recomputed live from the fields below</p>
 
             <div className="grid grid-cols-3 gap-3 pt-2">
               <div>

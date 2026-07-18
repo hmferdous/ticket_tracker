@@ -149,14 +149,15 @@ On save:
   - Reissue Details, Notes
 - Carrier, Client, and Supplier are NOT shown for re-selection — they're carried over silently from the original ticket as-is (a reissue is virtually always the same airline/client/supplier as the ticket it's reissuing). Use the normal ticket Edit action on the new child ticket afterward for the rare case where one of these needs to actually change.
 - No Record Payment section — a reissue only creates the ticket row. Recording a payment against it afterward uses the same Record Payment row action as any other ticket.
-- sell_price and purchase_price are READ-ONLY auto-computed displays — not editable inputs, and INCREMENTAL (this reissue's own price, not the original ticket's price rolled forward):
-  - sell_price = fare_difference + reissue_fee_collected
-  - purchase_price = fare_difference + reissue_fee_paid
-  - Both update live as the agent types the reissue fields
-  - A separate "new ticket total" line shows the cumulative original + fare_difference + reissue_fee_collected for reference — informational only, never stored
+- Field order in the form: Reissue Details (the optional breakdown) comes BEFORE Financials, so the relationship reads top-to-bottom — fill in the breakdown, watch it flow down into the prices.
+- Two ways to set sell_price/purchase_price, both supported at once — INCREMENTAL either way (this reissue's own price, not the original ticket's price rolled forward, same reasoning as before):
+  1. **Direct entry** — Sell Price / Purchase Price are real, always-editable inputs. An agent who already knows the final numbers can just type them and skip the breakdown fields entirely (they're optional).
+  2. **Breakdown entry** — Reissue Fee Collected / Reissue Fee Paid / Fare Difference, same as before (sell_price = fare_difference + reissue_fee_collected, purchase_price = fare_difference + reissue_fee_paid). Each breakdown field is labeled with a "↳ feeds Sell Price" / "↳ feeds Purchase Price" / "↳ feeds both" hint so it's clear which final number each one drives.
+  - **Interaction between the two**: each price field starts by mirroring the live breakdown total. The instant the agent types into a price field directly — whether it was blank, already showing 0, or already auto-filled from the breakdown — it detaches and stays exactly what they typed, permanently, even if the breakdown fields are edited afterward. This holds regardless of order (direct-entry-first, or breakdown-first-then-manually-adjusted both detach the same way). Sell Price and Purchase Price detach independently of each other.
+  - Once detached, if the entered value differs from what the breakdown currently implies, an inline amber hint appears under that price field: "Breakdown implies X — differs by Y", with a "Use X instead" link that re-attaches the field to live-sync from the breakdown again (and keeps following it from then on, until touched directly again). Not shown when the two happen to match, or when the field was never touched.
+  - A separate "new ticket total" line shows original_sell_price + (whichever sell_price actually ends up saved, direct or breakdown-derived) — informational only, never stored.
 - gds_price (Supplier Purchase Price) starts blank — not pre-filled from the original ticket, since it's this reissue's own informational supplier cost
-- Reissue Details section (editable): Reissue Fee Collected, Reissue Fee Paid, Fare Difference
-- "Profit From Reissue" shown as a live read-only display: reissue_fee_collected - reissue_fee_paid
+- "Profit From Reissue" = the real sell_price - purchase_price that will actually be saved (not just the breakdown's fee spread) — so it stays accurate even when one or both prices were entered directly instead of computed
 - On save: original ticket marked reissued (nothing else about it changes — its own sell_price/purchase_price/issue_date stay exactly as originally booked, permanently), new child ticket created as its own independent ticket row with only the incremental price
 
 ## Edit Reissue Details Modal

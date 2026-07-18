@@ -28,12 +28,17 @@ function buildForm(ticket) {
     // change itself), not the original ticket's full GDS price.
     gds_price: "",
     narration: "",
-    reissue_fee_collected: "",
-    reissue_fee_paid: "",
+    // Breakdown fields. Airlines Penalty and Fare Difference are pass-
+    // throughs — charged to the client and owed to the supplier equally,
+    // zero margin impact on their own. Reissue Margin and Commission are
+    // the two levers that actually generate profit.
+    airlines_penalty: "",
     fare_difference: "",
+    reissue_margin: "",
+    commission: "",
     // Direct-entry price fields — start blank and, until the agent types
     // into them directly, mirror whatever the breakdown fields below imply
-    // (see sellPriceDirty/purchasePriceDirty).
+    // (see sellPriceDirty/purchasePriceDirty/commissionDirty).
     sell_price: "",
     purchase_price: "",
   }
@@ -49,6 +54,7 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
   // (for the mismatch hint below) but stops overwriting the price field.
   const [sellPriceDirty, setSellPriceDirty] = useState(false)
   const [purchasePriceDirty, setPurchasePriceDirty] = useState(false)
+  const [commissionDirty, setCommissionDirty] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -58,24 +64,32 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
     setForm(buildForm(ticket))
     setSellPriceDirty(false)
     setPurchasePriceDirty(false)
+    setCommissionDirty(false)
   }, [isOpen, ticket])
 
   if (!isOpen) return null
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
 
-  const fareDiff      = parseFloat(form.fare_difference)      || 0
-  const feeCollected  = parseFloat(form.reissue_fee_collected) || 0
-  const feePaid       = parseFloat(form.reissue_fee_paid)      || 0
+  const airlinesPenalty = parseFloat(form.airlines_penalty) || 0
+  const fareDiff         = parseFloat(form.fare_difference)  || 0
+  const reissueMargin     = parseFloat(form.reissue_margin)  || 0
 
-  // What the breakdown fields alone imply — the fare adjustment plus the
-  // reissue fee. Not the original ticket's price rolled forward: the
-  // original sale was already recognized as revenue on the parent ticket
-  // when it was first booked, so re-including it here would double-count
-  // it every time a ticket is reissued. Each reissue is its own small,
-  // independently auditable ticket row.
-  const breakdownSellPrice     = fareDiff + feeCollected
-  const breakdownPurchasePrice = fareDiff + feePaid
+  // Commission earned on the fare-difference booking — the same
+  // detach-on-manual-edit pattern as Sell/Purchase Price below.
+  const autoCommission = Math.round(fareDiff * 0.07 * 100) / 100
+  const commission = commissionDirty ? (parseFloat(form.commission) || 0) : autoCommission
+
+  // What the breakdown fields alone imply. Airlines Penalty and Fare
+  // Difference are pass-throughs, added identically to both sides — not
+  // the original ticket's price rolled forward: the original sale was
+  // already recognized as revenue on the parent ticket when it was first
+  // booked, so re-including it here would double-count it every time a
+  // ticket is reissued. Reissue Margin and Commission are what actually
+  // shift the margin: margin adds to Sell Price only, commission reduces
+  // Purchase Price only.
+  const breakdownSellPrice     = airlinesPenalty + reissueMargin + fareDiff
+  const breakdownPurchasePrice = airlinesPenalty + fareDiff - commission
 
   // The value that actually gets saved: whatever the agent typed directly
   // once they've touched the field, otherwise the live breakdown total.
@@ -90,8 +104,13 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
     setPurchasePriceDirty(true)
     setForm((f) => ({ ...f, purchase_price: e.target.value }))
   }
+  const setCommission = (e) => {
+    setCommissionDirty(true)
+    setForm((f) => ({ ...f, commission: e.target.value }))
+  }
   const resyncSellPrice = () => setSellPriceDirty(false)
   const resyncPurchasePrice = () => setPurchasePriceDirty(false)
+  const resyncCommission = () => setCommissionDirty(false)
 
   // Reference only, never stored — lets the agent see what the client's
   // ticket is now cumulatively worth across the whole reissue chain so far,
@@ -133,9 +152,14 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
       narration: form.narration.trim() || null,
       parent_ticket_id: ticket.id,
       is_reissue: true,
-      reissue_fee_collected: form.reissue_fee_collected !== "" ? parseFloat(form.reissue_fee_collected) : null,
-      reissue_fee_paid: form.reissue_fee_paid !== "" ? parseFloat(form.reissue_fee_paid) : null,
+      airlines_penalty: form.airlines_penalty !== "" ? parseFloat(form.airlines_penalty) : null,
       fare_difference: form.fare_difference !== "" ? parseFloat(form.fare_difference) : null,
+      reissue_margin: form.reissue_margin !== "" ? parseFloat(form.reissue_margin) : null,
+      // Persist the resolved commission (auto-calculated or manually
+      // overridden) whenever either field was touched, so the saved value
+      // always matches what actually fed into purchase_price — not just
+      // whatever the agent may or may not have typed directly.
+      commission: form.fare_difference !== "" || form.commission !== "" ? commission : null,
     }
 
     // Mark original ticket as reissued
@@ -246,24 +270,56 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
 
             {/* Reissue Details — optional breakdown. Filling these in drives
                 Sell Price / Purchase Price below live, until you edit one of
-                those directly. */}
+                those directly. Grouped by which side each field feeds:
+                Airlines Penalty and Fare Difference are pass-throughs that
+                hit both sides equally; Reissue Margin and Commission are
+                the two fields that actually move the margin, one on each
+                side. */}
             <fieldset>
               <legend className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Reissue Details (optional breakdown)</legend>
-              <div className="grid grid-cols-3 gap-3">
+
+              <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">Feeds both</p>
+              <div className="grid grid-cols-2 gap-3 mb-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Collected</label>
-                  <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_fee_collected} onChange={set("reissue_fee_collected")} placeholder="0.00" className={inputCls} />
-                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">↳ feeds Sell Price</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Paid</label>
-                  <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_fee_paid} onChange={set("reissue_fee_paid")} placeholder="0.00" className={inputCls} />
-                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">↳ feeds Purchase Price</p>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Airlines Penalty</label>
+                  <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.airlines_penalty} onChange={set("airlines_penalty")} placeholder="0.00" className={inputCls} />
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Change fee charged by the airline — passed through to the client and owed to the supplier equally</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fare Difference</label>
                   <input type="number" onKeyDown={blockNonNumericKeys} step="0.01" value={form.fare_difference} onChange={set("fare_difference")} placeholder="0.00" className={inputCls} />
-                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">↳ feeds both</p>
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Price difference between old and new fare — can be negative</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
+                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">Feeds Sell Price</p>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Margin</label>
+                  <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_margin} onChange={set("reissue_margin")} placeholder="0.00" className={inputCls} />
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">What you charge on top, beyond the pass-through costs</p>
+                </div>
+                <div className="pt-3 border-t border-gray-100 dark:border-gray-800">
+                  <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-2">Feeds Purchase Price</p>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Commission</label>
+                  <input
+                    type="number" onKeyDown={blockNonNumericKeys}
+                    step="0.01"
+                    value={commissionDirty ? form.commission : String(autoCommission)}
+                    onChange={setCommission}
+                    placeholder="0.00"
+                    className={inputCls}
+                  />
+                  {commissionDirty && commission !== autoCommission ? (
+                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                      Auto-calc (7% of Fare Difference) suggests {autoCommission.toLocaleString("en-BD")} — differs by {Math.abs(commission - autoCommission).toLocaleString("en-BD")}.{" "}
+                      <button type="button" onClick={resyncCommission} className="underline hover:no-underline">
+                        Use {autoCommission.toLocaleString("en-BD")} instead
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Auto: 7% of Fare Difference — earned back, deducted from Purchase Price</p>
+                  )}
                 </div>
               </div>
             </fieldset>

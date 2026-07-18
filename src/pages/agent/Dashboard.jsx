@@ -223,7 +223,7 @@ export default function Dashboard() {
         .select(
           `id, passenger_name, route, travel_date, issue_date, sell_price, purchase_price, amount_paid, payment_status,
            is_void, refund_status, refund_receivable, refund_received, refund_payable, refund_paid,
-           reissue_fee_collected, reissue_fee_paid, fare_difference,
+           airlines_penalty, fare_difference, reissue_margin, commission,
            void_fee_collected, void_fee_paid,
            office_markup, client_id, clients(name), ticket_payments(allocated_amount, type), created_at`
         )

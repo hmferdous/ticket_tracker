@@ -4,20 +4,27 @@ import { blockNonNumericKeys } from "../../lib/numberInput"
 
 function buildForm(ticket) {
   return {
-    reissue_fee_collected: ticket?.reissue_fee_collected != null ? String(ticket.reissue_fee_collected) : "",
-    reissue_fee_paid: ticket?.reissue_fee_paid != null ? String(ticket.reissue_fee_paid) : "",
+    airlines_penalty: ticket?.airlines_penalty != null ? String(ticket.airlines_penalty) : "",
     fare_difference: ticket?.fare_difference != null ? String(ticket.fare_difference) : "",
+    reissue_margin: ticket?.reissue_margin != null ? String(ticket.reissue_margin) : "",
+    commission: ticket?.commission != null ? String(ticket.commission) : "",
   }
 }
 
 export default function EditReissueModal({ isOpen, onClose, ticket, onSaved }) {
   const [form, setForm] = useState(() => buildForm(ticket))
+  // Commission starts "dirty" whenever the ticket already has a stored
+  // value — otherwise re-opening this modal on an existing reissue would
+  // silently replace a previously-overridden commission with the 7%
+  // auto-calc the moment fare_difference gets touched.
+  const [commissionDirty, setCommissionDirty] = useState(() => ticket?.commission != null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
   useEffect(() => {
     if (isOpen) {
       setForm(buildForm(ticket))
+      setCommissionDirty(ticket?.commission != null)
       setError("")
     }
   }, [isOpen, ticket])
@@ -30,16 +37,26 @@ export default function EditReissueModal({ isOpen, onClose, ticket, onSaved }) {
 
   const set = (field) => (e) => setForm((f) => ({ ...f, [field]: e.target.value }))
 
-  const fareDiff = parseFloat(form.fare_difference) || 0
-  const feeCollected = parseFloat(form.reissue_fee_collected) || 0
-  const feePaid = parseFloat(form.reissue_fee_paid) || 0
+  const airlinesPenalty = parseFloat(form.airlines_penalty) || 0
+  const fareDiff         = parseFloat(form.fare_difference)  || 0
+  const reissueMargin     = parseFloat(form.reissue_margin)  || 0
 
-  // This reissue's own sell/purchase price — fare adjustment + reissue fee,
-  // not the original ticket's price rolled forward (see ReissueModal for
-  // why: the original sale is already recognized on the parent ticket).
-  const computedSellPrice = fareDiff + feeCollected
-  const computedPurchasePrice = fareDiff + feePaid
-  const reissueProfit = feeCollected - feePaid
+  const autoCommission = Math.round(fareDiff * 0.07 * 100) / 100
+  const commission = commissionDirty ? (parseFloat(form.commission) || 0) : autoCommission
+
+  const setCommission = (e) => {
+    setCommissionDirty(true)
+    setForm((f) => ({ ...f, commission: e.target.value }))
+  }
+  const resyncCommission = () => setCommissionDirty(false)
+
+  // This reissue's own sell/purchase price — pass-throughs (Airlines
+  // Penalty, Fare Difference) plus the two margin levers (Reissue Margin
+  // on the sell side, Commission deducted on the purchase side). Not the
+  // original ticket's price rolled forward (see ReissueModal for why).
+  const computedSellPrice = airlinesPenalty + reissueMargin + fareDiff
+  const computedPurchasePrice = airlinesPenalty + fareDiff - commission
+  const reissueProfit = computedSellPrice - computedPurchasePrice
 
   const inputCls =
     "w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-sm text-gray-900 dark:text-gray-100 placeholder-gray-400 dark:placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -50,9 +67,10 @@ export default function EditReissueModal({ isOpen, onClose, ticket, onSaved }) {
     setLoading(true)
 
     const updates = {
-      reissue_fee_collected: form.reissue_fee_collected !== "" ? parseFloat(form.reissue_fee_collected) : null,
-      reissue_fee_paid: form.reissue_fee_paid !== "" ? parseFloat(form.reissue_fee_paid) : null,
+      airlines_penalty: form.airlines_penalty !== "" ? parseFloat(form.airlines_penalty) : null,
       fare_difference: form.fare_difference !== "" ? parseFloat(form.fare_difference) : null,
+      reissue_margin: form.reissue_margin !== "" ? parseFloat(form.reissue_margin) : null,
+      commission: form.fare_difference !== "" || form.commission !== "" ? commission : null,
       sell_price: computedSellPrice,
       purchase_price: computedPurchasePrice,
       office_markup: ticket.gds_price != null ? computedPurchasePrice - ticket.gds_price : null,
@@ -108,20 +126,45 @@ export default function EditReissueModal({ isOpen, onClose, ticket, onSaved }) {
                 </div>
               </div>
             </div>
-            <p className="text-xs text-gray-400 dark:text-gray-500">This reissue's own price — fare diff + reissue fee, recomputed live from the fields below</p>
+            <p className="text-xs text-gray-400 dark:text-gray-500">This reissue's own price — recomputed live from the fields below</p>
 
-            <div className="grid grid-cols-3 gap-3 pt-2">
+            <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide pt-2">Feeds both</p>
+            <div className="grid grid-cols-2 gap-3">
               <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Collected</label>
-                <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_fee_collected} onChange={set("reissue_fee_collected")} placeholder="0.00" className={inputCls} />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Paid</label>
-                <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_fee_paid} onChange={set("reissue_fee_paid")} placeholder="0.00" className={inputCls} />
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Airlines Penalty</label>
+                <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.airlines_penalty} onChange={set("airlines_penalty")} placeholder="0.00" className={inputCls} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fare Difference</label>
                 <input type="number" onKeyDown={blockNonNumericKeys} step="0.01" value={form.fare_difference} onChange={set("fare_difference")} placeholder="0.00" className={inputCls} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">Feeds Sell Price</p>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Margin</label>
+                <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_margin} onChange={set("reissue_margin")} placeholder="0.00" className={inputCls} />
+              </div>
+              <div>
+                <p className="text-[10px] font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-1">Feeds Purchase Price</p>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Commission</label>
+                <input
+                  type="number" onKeyDown={blockNonNumericKeys}
+                  step="0.01"
+                  value={commissionDirty ? form.commission : String(autoCommission)}
+                  onChange={setCommission}
+                  placeholder="0.00"
+                  className={inputCls}
+                />
+                {commissionDirty && commission !== autoCommission && (
+                  <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                    Auto-calc suggests {autoCommission.toLocaleString("en-BD")}.{" "}
+                    <button type="button" onClick={resyncCommission} className="underline hover:no-underline">
+                      Use it
+                    </button>
+                  </p>
+                )}
               </div>
             </div>
             <p className="text-sm text-gray-600 dark:text-gray-400">

@@ -16,10 +16,10 @@ Never disable RLS on any table
 - `reminders` — email reminder rules per ticket
 
 ## Key Fields on Tickets
-- purchase_price — total cost to agent. Mandatory. Used for all calculations (margin, payments, refunds). On reissue child tickets this is original_purchase + fare_difference + reissue_fee_paid.
+- purchase_price — total cost to agent. Mandatory. Used for all calculations (margin, payments, refunds). On reissue child tickets this is INCREMENTAL — just this reissue's own cost, not the original ticket's price rolled forward — see "Reissue Pricing Model" below.
 - gds_price — optional. Raw airline/GDS cost before company markup. Label in form: Supplier Purchase Price. Informational only — no effect on any calculation. Pro plan feature (gated later).
 - office_markup — auto-calculated on save as purchase_price - gds_price. Never entered in form. Stored silently. Used only for dashboard reporting of company contribution. Null if gds_price not entered.
-- sell_price — actual price charged to client (real number, private). On reissue child tickets this is original_sell + fare_difference + reissue_fee_collected.
+- sell_price — actual price charged to client (real number, private). On reissue child tickets this is INCREMENTAL — just this reissue's own charge — see "Reissue Pricing Model" below.
 - issue_date — optional. Date the ticket was issued.
 - amount_paid — derived from SUM(ticket_payments.allocated_amount) for this ticket
 - payment_status — unpaid, partial, paid (derived from amount_paid vs sell_price)
@@ -28,9 +28,11 @@ Never disable RLS on any table
 - parent_ticket_id — nullable FK to tickets.id. Set when this ticket is a reissue of another.
 - is_reissue — boolean. true if this ticket was created as a reissue of another ticket.
 - is_void — boolean. true if ticket was voided.
-- reissue_fee_collected — amount collected from client for reissue (stored for reference; already baked into sell_price)
-- reissue_fee_paid — amount paid to supplier for reissue (stored for reference; already baked into purchase_price)
-- fare_difference — price difference between old and new ticket on reissue (can be negative; already baked into sell_price and purchase_price)
+- airlines_penalty — the airline's change fee on reissue; feeds both sell_price and purchase_price equally (see "Reissue Pricing Model")
+- reissue_margin — the agent's own markup on reissue; feeds sell_price only
+- commission — commission earned on the fare-difference booking on reissue (auto 7% of fare_difference, editable); feeds purchase_price only, as a deduction
+- fare_difference — price difference between old and new ticket on reissue (can be negative); feeds both sell_price and purchase_price equally, nets to zero margin impact on its own
+- reissue_fee_collected, reissue_fee_paid — deprecated prior reissue breakdown fields, no longer written by new reissues (old data retained on existing rows for audit purposes)
 - refund_receivable — expected refund amount from supplier
 - refund_received — actual refund received from supplier
 - refund_payable — how much you're liable to hand the client back, not a discount/target amount. 0 (or unset) = non-refundable, client still owes the full remaining sell_price. Equal to sell_price = full forgiveness. See "Client Net Position" under Refund Architecture for how this nets against amount_paid
@@ -45,11 +47,11 @@ Never disable RLS on any table
 - void_fee_margin = void_fee_collected - void_fee_paid
 - net_margin = ticket_margin + refund_margin + void_fee_margin
 
-Note: reissue fees and fare_difference are NOT separately added to net_margin. They are already embedded in sell_price and purchase_price on the child reissue ticket. Adding them again would double-count. void_fee_collected/void_fee_paid ARE separately added — they're a standalone transaction tied to the void event, not embedded in sell_price/purchase_price anywhere.
+Note: the reissue breakdown fields (airlines_penalty, reissue_margin, commission, fare_difference) are NOT separately added to net_margin. They are already embedded in sell_price and purchase_price on the child reissue ticket. Adding them again would double-count. void_fee_collected/void_fee_paid ARE separately added — they're a standalone transaction tied to the void event, not embedded in sell_price/purchase_price anywhere.
 
-### Reissue Profit (display only, not added to net_margin)
-- profit_from_reissue = reissue_fee_collected - reissue_fee_paid
-- Shown in the reissue modal as a quick reference for the agent — the margin earned purely from the reissue transaction
+### Reissue Profit ("Profit From Reissue" in the modal, display only, not separately added to net_margin)
+- profit_from_reissue = sell_price - purchase_price (the reissue child's own ticket_margin) = reissue_margin + commission, since airlines_penalty and fare_difference cancel out between the two prices
+- Shown in the Reissue Modal / Edit Reissue Details Modal as a live quick reference for the agent — the margin earned purely from the reissue transaction. Already covered by net_margin once the ticket is saved (net_margin = ticket_margin + ... = (sell_price - purchase_price) + ..., not double-counted)
 
 ### Chain Margin (parent + all reissued children)
 - chain_net_margin = SUM(net_margin) across parent ticket and all tickets where parent_ticket_id = parent.id
@@ -248,21 +250,30 @@ AllocationModal (client bulk payments) and SupplierAllocationModal (supplier bul
 A reissue creates a new child ticket linked to the original parent ticket via parent_ticket_id. The original ticket stays intact with its original values and status changes to reissued.
 
 ### Reissue Pricing Model
-The child ticket's sell_price and purchase_price are INCREMENTAL — just what this specific reissue event is worth, not the original ticket's price rolled forward:
-- child.sell_price = fare_difference + reissue_fee_collected
-- child.purchase_price = fare_difference + reissue_fee_paid
+The child ticket's sell_price and purchase_price are INCREMENTAL — just what this specific reissue event is worth, not the original ticket's price rolled forward. They're built from a 4-field breakdown, grouped by which side each field feeds:
+- **Feeds both** (pass-throughs — added identically to both sides, zero margin impact on their own): airlines_penalty (the airline's change fee — owed by the client and to the supplier equally), fare_difference (price difference between old and new fare, can be negative)
+- **Feeds sell_price only**: reissue_margin — the agent's own markup on top of the pass-through costs
+- **Feeds purchase_price only, as a deduction**: commission — auto-calculated in the UI as 7% of fare_difference (rounded to 2dp) but stored as whatever the resolved value actually was (auto or manually overridden), representing the commission earned back on the fare-difference booking
 
-Each reissue is its own small, fully independent, auditable ticket row — its own sell_price, its own outstanding (sell_price - amount_paid - refund_payable), its own margin (sell_price - purchase_price, which reduces to reissue_fee_collected - reissue_fee_paid since fare_difference nets to zero margin impact). The parent ticket is untouched by the reissue — it keeps its full original sell_price/purchase_price permanently, in whatever period it was originally booked in, regardless of how many times it's later reissued. This is deliberate: a reissue happening in a later month must never retroactively change an earlier month's already-reported numbers, and the reissue's own fee must be tagged to the month it actually happened in — not smeared across both.
-
-Previously (pre-fix) these were cumulative — child.sell_price = original_sell_price + fare_difference + reissue_fee_collected — which double-counted the original sale every time a ticket was reissued (it landed in both the original ticket's period, via the untouched parent, and again in the reissue's period, baked into the child's inflated cumulative price) and made "Total Sales"/margin figures retroactively change every time a later reissue happened. Existing reissued tickets created before this fix are still stored under the old cumulative meaning and need a one-time data correction if/when migrated:
-```sql
-UPDATE tickets
-SET sell_price = COALESCE(fare_difference, 0) + COALESCE(reissue_fee_collected, 0),
-    purchase_price = COALESCE(fare_difference, 0) + COALESCE(reissue_fee_paid, 0)
-WHERE is_reissue = true
+```
+child.sell_price     = airlines_penalty + reissue_margin + fare_difference
+child.purchase_price  = airlines_penalty + fare_difference − commission
 ```
 
-sell_price and purchase_price are directly editable inputs, not read-only displays — an agent who already knows the final numbers can type them straight in and skip the breakdown fields (fare_difference/reissue_fee_collected/reissue_fee_paid) entirely, since those are optional. If the breakdown fields ARE used, they drive the price fields live (sell_price = fare_difference + reissue_fee_collected, purchase_price = fare_difference + reissue_fee_paid) — but only until the agent types into a price field directly, at which point that field detaches permanently (a manual edit always wins over the breakdown, regardless of entry order) and an inline hint surfaces if the two then disagree, with a one-click way to re-sync. See docs/design.md's Reissue Modal section for the full detach/mismatch-hint behavior. A separate reference-only "new ticket total" line (original_sell_price + whichever sell_price actually gets saved) is shown alongside for the agent's convenience, so they can still see the cumulative picture — it is never stored anywhere.
+Only reissue_margin and commission actually move the margin — airlines_penalty and fare_difference cancel out between the two prices on their own, since they're added identically to both.
+
+Each reissue is its own small, fully independent, auditable ticket row — its own sell_price, its own outstanding (sell_price - amount_paid - refund_payable), its own margin (sell_price - purchase_price). The parent ticket is untouched by the reissue — it keeps its full original sell_price/purchase_price permanently, in whatever period it was originally booked in, regardless of how many times it's later reissued. This is deliberate: a reissue happening in a later month must never retroactively change an earlier month's already-reported numbers, and the reissue's own fee must be tagged to the month it actually happened in — not smeared across both.
+
+**New columns needed** — airlines_penalty, reissue_margin, and commission don't exist in the schema yet and need to be added before this works:
+```sql
+ALTER TABLE tickets
+  ADD COLUMN airlines_penalty numeric,
+  ADD COLUMN reissue_margin numeric,
+  ADD COLUMN commission numeric;
+```
+reissue_fee_collected and reissue_fee_paid are deprecated by this — new reissues no longer write to them (their old data stays for historical/audit purposes on existing rows, just not written going forward). If there's existing reissued-ticket data under the prior two-field breakdown model that needs preserving under the new one, that's a judgment call on how to map reissue_fee_collected/reissue_fee_paid onto the new fields (they don't correspond 1:1 — the old model didn't distinguish pass-through penalty from margin, or fare-difference-driven commission from a flat fee) rather than a mechanical migration — no SQL is prescribed for that.
+
+sell_price and purchase_price are directly editable inputs, not read-only displays — an agent who already knows the final numbers can type them straight in and skip the breakdown fields entirely, since those are optional. If the breakdown fields ARE used, they drive the price fields live — but only until the agent types into a price field directly, at which point that field detaches permanently (a manual edit always wins over the breakdown, regardless of entry order) and an inline hint surfaces if the two then disagree, with a one-click way to re-sync. Commission has this same detach/auto-calc/mismatch-hint behavior as its own field, independent of Sell Price/Purchase Price. See docs/design.md's Reissue Modal section for the full behavior. A separate reference-only "new ticket total" line (original_sell_price + whichever sell_price actually gets saved) is shown alongside for the agent's convenience, so they can still see the cumulative picture — it is never stored anywhere.
 
 gds_price (Supplier Purchase Price) on a reissue child starts blank, not pre-filled from the parent — it's this reissue's own informational supplier cost, not the whole ticket's.
 
@@ -271,18 +282,20 @@ No chain-level rollup UI exists yet (e.g. a single number showing the sum across
 ### Reissue Fields on Child Ticket
 - parent_ticket_id — FK to original ticket
 - is_reissue = true
-- reissue_fee_collected — fee collected from client; baked into this reissue's own sell_price
-- reissue_fee_paid — fee paid to supplier; baked into this reissue's own purchase_price
-- fare_difference — price difference (positive or negative); baked into both prices, nets to zero margin impact
+- airlines_penalty — the airline's change fee; feeds both sell_price and purchase_price equally
+- fare_difference — price difference (positive or negative); feeds both sell_price and purchase_price equally, nets to zero margin impact on its own
+- reissue_margin — the agent's own markup; feeds sell_price only
+- commission — commission earned on the fare-difference booking (auto 7% of fare_difference, editable); feeds purchase_price only, as a deduction
+- reissue_fee_collected, reissue_fee_paid — deprecated, no longer written by new reissues (see above)
 
 ### Reissue Flow
 1. Agent clicks Reissue on original ticket row
 2. Modal opens pre-filled with original ticket data (passenger, route, dates — not price). Carrier, client, and supplier are carried over silently, not shown for re-selection — the modal only exposes fields that plausibly change on a reissue (passenger name, ticket number, PNR, route, dates)
 3. Agent updates PNR/ticket number/dates as needed
-4. Agent enters fare_difference, reissue_fee_collected, reissue_fee_paid
-5. sell_price and purchase_price auto-compute live as just those entered values (fare_difference + fee) — not added to the original ticket's price
-6. "Profit From Reissue" (= reissue_fee_collected - reissue_fee_paid) shown as a live display
-7. On save — original ticket status → reissued, new child ticket created with computed prices. No payment is recorded as part of this flow — use the normal Record Payment row action on the new ticket afterward if needed
+4. Agent enters airlines_penalty, fare_difference, reissue_margin, and/or commission (all optional) — or skips straight to typing sell_price/purchase_price directly
+5. sell_price and purchase_price auto-compute live from the breakdown, per the formula above, until/unless entered directly
+6. "Profit From Reissue" (= the real sell_price − purchase_price that will be saved) shown as a live display
+7. On save — original ticket status → reissued, new child ticket created with the resolved prices. No payment is recorded as part of this flow — use the normal Record Payment row action on the new ticket afterward if needed
 
 ### Chain Margin
 - Displayed on ticket detail view — not list view

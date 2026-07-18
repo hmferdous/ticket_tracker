@@ -152,7 +152,13 @@ On save:
 - Field order in the form: Reissue Details (the optional breakdown) comes BEFORE Financials, so the relationship reads top-to-bottom — fill in the breakdown, watch it flow down into the prices.
 - Two ways to set sell_price/purchase_price, both supported at once — INCREMENTAL either way (this reissue's own price, not the original ticket's price rolled forward, same reasoning as before):
   1. **Direct entry** — Sell Price / Purchase Price are real, always-editable inputs. An agent who already knows the final numbers can just type them and skip the breakdown fields entirely (they're optional).
-  2. **Breakdown entry** — Reissue Fee Collected / Reissue Fee Paid / Fare Difference, same as before (sell_price = fare_difference + reissue_fee_collected, purchase_price = fare_difference + reissue_fee_paid). Each breakdown field is labeled with a "↳ feeds Sell Price" / "↳ feeds Purchase Price" / "↳ feeds both" hint so it's clear which final number each one drives.
+  2. **Breakdown entry** — four fields, grouped in the form by which side they feed (not listed in one flat row):
+     - **Feeds both** (pass-throughs — added identically to both sides, zero margin impact on their own): Airlines Penalty (the change fee the airline charges, owed to the client and to the supplier equally), Fare Difference (price difference between old and new fare, can be negative).
+     - **Feeds Sell Price only**: Reissue Margin — the agent's own markup on top of the pass-through costs.
+     - **Feeds Purchase Price only, as a deduction**: Commission — auto-calculated as 7% of Fare Difference (rounded to 2dp), representing the commission earned back on the fare-difference booking, which reduces the effective cost. Same detach/mismatch-hint pattern as Sell Price/Purchase Price below (see `commissionDirty` in ReissueModal): auto-fills live until the agent edits it directly, at which point it detaches, with an inline hint if it then disagrees with the 7% auto-calc.
+     - `sell_price = airlines_penalty + reissue_margin + fare_difference`
+     - `purchase_price = airlines_penalty + fare_difference − commission`
+     - Only Reissue Margin and Commission actually move the margin — Airlines Penalty and Fare Difference cancel out between the two prices on their own.
   - **Interaction between the two**: each price field starts by mirroring the live breakdown total. The instant the agent types into a price field directly — whether it was blank, already showing 0, or already auto-filled from the breakdown — it detaches and stays exactly what they typed, permanently, even if the breakdown fields are edited afterward. This holds regardless of order (direct-entry-first, or breakdown-first-then-manually-adjusted both detach the same way). Sell Price and Purchase Price detach independently of each other.
   - Once detached, if the entered value differs from what the breakdown currently implies, an inline amber hint appears under that price field: "Breakdown implies X — differs by Y", with a "Use X instead" link that re-attaches the field to live-sync from the breakdown again (and keeps following it from then on, until touched directly again). Not shown when the two happen to match, or when the field was never touched.
   - A separate "new ticket total" line shows original_sell_price + (whichever sell_price actually ends up saved, direct or breakdown-derived) — informational only, never stored.
@@ -162,10 +168,11 @@ On save:
 
 ## Edit Reissue Details Modal
 - Opens from "Edit Reissue Details" row action on a reissue child ticket
-- Pre-filled with the child's current reissue_fee_collected, reissue_fee_paid, fare_difference
-- sell_price and purchase_price shown read-only, recomputed live the same way as the Reissue Modal — just fare_difference + fee, no base price involved (previously needed to "back out" the fee from the ticket's stored cumulative price; the incremental model makes that unnecessary)
-- On save: updates reissue_fee_collected, reissue_fee_paid, fare_difference, sell_price, purchase_price, office_markup
-- This is the correct place to fix a reissue fee/fare entry mistake — editing sell_price/purchase_price directly via the generic ticket Edit action does not keep them in sync with the fee fields
+- Pre-filled with the child's current airlines_penalty, fare_difference, reissue_margin, commission — same four-field breakdown as the Reissue Modal, same "feeds both" / "feeds Sell Price" / "feeds Purchase Price" grouping
+- sell_price and purchase_price shown read-only, recomputed live from the breakdown the same way as the Reissue Modal's breakdown path (this modal doesn't have the Reissue Modal's separate direct-entry mode — it only edits the breakdown fields)
+- Commission has the same auto-calc-at-7%-of-fare_difference-until-edited-directly pattern as the Reissue Modal, including the mismatch hint. Re-opening this modal on a ticket that already has a stored commission value starts it "dirty" (not auto-recalculating), so simply opening the modal never silently replaces a previously-chosen commission override
+- On save: updates airlines_penalty, fare_difference, reissue_margin, commission, sell_price, purchase_price, office_markup
+- This is the correct place to fix a reissue breakdown entry mistake — editing sell_price/purchase_price directly via the generic ticket Edit action does not keep them in sync with the breakdown fields
 
 ## Refund Flow UI
 - Initiated from row level action on ticket list

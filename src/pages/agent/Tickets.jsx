@@ -371,7 +371,7 @@ export default function Tickets() {
         amount_paid, payment_status, status, refund_status,
         is_reissue, is_void, parent_ticket_id,
         refund_receivable, refund_received, refund_payable, refund_paid, refund_notes,
-        reissue_fee_collected, reissue_fee_paid, fare_difference,
+        airlines_penalty, fare_difference, reissue_margin, commission,
         void_fee_collected, void_fee_paid,
         client_id, supplier_id,
         clients(name),

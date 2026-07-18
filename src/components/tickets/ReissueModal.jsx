@@ -31,12 +31,24 @@ function buildForm(ticket) {
     reissue_fee_collected: "",
     reissue_fee_paid: "",
     fare_difference: "",
+    // Direct-entry price fields — start blank and, until the agent types
+    // into them directly, mirror whatever the breakdown fields below imply
+    // (see sellPriceDirty/purchasePriceDirty).
+    sell_price: "",
+    purchase_price: "",
   }
 }
 
 export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
   const { agent } = useAuth()
   const [form, setForm] = useState(() => buildForm(ticket))
+  // Tracks whether the agent has typed into Sell Price / Purchase Price
+  // directly. Until they do, the field mirrors the breakdown fields live;
+  // the instant they touch it by hand, it detaches and becomes theirs —
+  // the breakdown keeps computing its own implied total in the background
+  // (for the mismatch hint below) but stops overwriting the price field.
+  const [sellPriceDirty, setSellPriceDirty] = useState(false)
+  const [purchasePriceDirty, setPurchasePriceDirty] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
 
@@ -44,6 +56,8 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
     if (!isOpen) return
     setError("")
     setForm(buildForm(ticket))
+    setSellPriceDirty(false)
+    setPurchasePriceDirty(false)
   }, [isOpen, ticket])
 
   if (!isOpen) return null
@@ -54,21 +68,39 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
   const feeCollected  = parseFloat(form.reissue_fee_collected) || 0
   const feePaid       = parseFloat(form.reissue_fee_paid)      || 0
 
-  // The reissue child's own sell/purchase price is just what THIS reissue
-  // event is worth — the fare adjustment plus the reissue fee — not the
-  // original ticket's price rolled forward. The original sale was already
-  // recognized as revenue on the parent ticket when it was first booked;
-  // re-including it here would double-count it every time a ticket is
-  // reissued. Each reissue is its own small, independently auditable
-  // ticket row.
-  const computedSellPrice     = fareDiff + feeCollected
-  const computedPurchasePrice = fareDiff + feePaid
+  // What the breakdown fields alone imply — the fare adjustment plus the
+  // reissue fee. Not the original ticket's price rolled forward: the
+  // original sale was already recognized as revenue on the parent ticket
+  // when it was first booked, so re-including it here would double-count
+  // it every time a ticket is reissued. Each reissue is its own small,
+  // independently auditable ticket row.
+  const breakdownSellPrice     = fareDiff + feeCollected
+  const breakdownPurchasePrice = fareDiff + feePaid
+
+  // The value that actually gets saved: whatever the agent typed directly
+  // once they've touched the field, otherwise the live breakdown total.
+  const sellPrice     = sellPriceDirty     ? (parseFloat(form.sell_price)     || 0) : breakdownSellPrice
+  const purchasePrice = purchasePriceDirty ? (parseFloat(form.purchase_price) || 0) : breakdownPurchasePrice
+
+  const setSellPrice = (e) => {
+    setSellPriceDirty(true)
+    setForm((f) => ({ ...f, sell_price: e.target.value }))
+  }
+  const setPurchasePrice = (e) => {
+    setPurchasePriceDirty(true)
+    setForm((f) => ({ ...f, purchase_price: e.target.value }))
+  }
+  const resyncSellPrice = () => setSellPriceDirty(false)
+  const resyncPurchasePrice = () => setPurchasePriceDirty(false)
 
   // Reference only, never stored — lets the agent see what the client's
-  // ticket is now cumulatively worth across the whole reissue chain so far.
-  const newTicketTotal = (form.orig_sell_price || 0) + fareDiff + feeCollected
+  // ticket is now cumulatively worth across the whole reissue chain so far,
+  // using whichever sell price actually ends up being saved.
+  const newTicketTotal = (form.orig_sell_price || 0) + sellPrice
 
-  const reissueProfit = feeCollected - feePaid
+  // Always the real entered/computed numbers, regardless of which entry
+  // mode was used for either side.
+  const reissueProfit = sellPrice - purchasePrice
 
   const handleBackdrop = (e) => {
     if (e.target === e.currentTarget) onClose()
@@ -93,10 +125,10 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
       return_date: form.return_date || null,
       client_id: form.client_id || null,
       supplier_id: form.supplier_id || null,
-      purchase_price: computedPurchasePrice,
+      purchase_price: purchasePrice,
       gds_price: gdsPrice,
-      office_markup: gdsPrice !== null ? computedPurchasePrice - gdsPrice : null,
-      sell_price: computedSellPrice,
+      office_markup: gdsPrice !== null ? purchasePrice - gdsPrice : null,
+      sell_price: sellPrice,
       status: "booked",
       narration: form.narration.trim() || null,
       parent_ticket_id: ticket.id,
@@ -212,17 +244,60 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
               </div>
             </fieldset>
 
-            {/* Financials */}
+            {/* Reissue Details — optional breakdown. Filling these in drives
+                Sell Price / Purchase Price below live, until you edit one of
+                those directly. */}
+            <fieldset>
+              <legend className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Reissue Details (optional breakdown)</legend>
+              <div className="grid grid-cols-3 gap-3">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Collected</label>
+                  <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_fee_collected} onChange={set("reissue_fee_collected")} placeholder="0.00" className={inputCls} />
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">↳ feeds Sell Price</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Paid</label>
+                  <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_fee_paid} onChange={set("reissue_fee_paid")} placeholder="0.00" className={inputCls} />
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">↳ feeds Purchase Price</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fare Difference</label>
+                  <input type="number" onKeyDown={blockNonNumericKeys} step="0.01" value={form.fare_difference} onChange={set("fare_difference")} placeholder="0.00" className={inputCls} />
+                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">↳ feeds both</p>
+                </div>
+              </div>
+            </fieldset>
+
+            {/* Financials — Sell Price / Purchase Price are always directly
+                editable. If the breakdown above is filled in, they start out
+                mirroring it live; typing into either price field directly
+                detaches it from the breakdown from that point on (order
+                doesn't matter — whichever you touch by hand wins). */}
             <fieldset>
               <legend className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Financials</legend>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                 <div className="space-y-2">
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Purchase Price (this reissue)</label>
-                    <div className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg text-sm text-gray-900 dark:text-gray-100 tabular-nums">
-                      {computedPurchasePrice.toLocaleString("en-BD")}
-                    </div>
-                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Auto-computed: fare diff + reissue fee paid — this reissue's own cost, not the original ticket's price</p>
+                    <input
+                      type="number" onKeyDown={blockNonNumericKeys}
+                      min="0"
+                      step="0.01"
+                      value={purchasePriceDirty ? form.purchase_price : String(breakdownPurchasePrice)}
+                      onChange={setPurchasePrice}
+                      placeholder="0.00"
+                      className={inputCls}
+                    />
+                    {purchasePriceDirty && purchasePrice !== breakdownPurchasePrice ? (
+                      <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                        Breakdown implies {breakdownPurchasePrice.toLocaleString("en-BD")} — differs by {Math.abs(purchasePrice - breakdownPurchasePrice).toLocaleString("en-BD")}.{" "}
+                        <button type="button" onClick={resyncPurchasePrice} className="underline hover:no-underline">
+                          Use {breakdownPurchasePrice.toLocaleString("en-BD")} instead
+                        </button>
+                      </p>
+                    ) : (
+                      <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">This reissue's own cost — not the original ticket's price. Enter directly, or fill in the breakdown below.</p>
+                    )}
                   </div>
                   <div className="pl-3 border-l-2 border-gray-100 dark:border-gray-800">
                     <label className="block text-sm font-medium text-gray-600 dark:text-gray-400 mb-1">Supplier Purchase Price</label>
@@ -232,33 +307,25 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Sell Price (this reissue)</label>
-                  <div className="w-full px-3 py-2 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-800 rounded-lg text-sm text-gray-900 dark:text-gray-100 tabular-nums">
-                    {computedSellPrice.toLocaleString("en-BD")}
-                  </div>
-                  <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">Auto-computed: fare diff + reissue fee collected — what this reissue itself charges the client, tracked as its own ticket</p>
-                </div>
-              </div>
-              <p className="mt-3 text-xs text-gray-400 dark:text-gray-500">
-                Reference only, not stored — new ticket total across the whole reissue chain so far:{" "}
-                <span className="font-medium text-gray-600 dark:text-gray-400 tabular-nums">{newTicketTotal.toLocaleString("en-BD")}</span>
-              </p>
-            </fieldset>
-
-            {/* Reissue Details */}
-            <fieldset>
-              <legend className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Reissue Details</legend>
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Collected</label>
-                  <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_fee_collected} onChange={set("reissue_fee_collected")} placeholder="0.00" className={inputCls} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Reissue Fee Paid</label>
-                  <input type="number" onKeyDown={blockNonNumericKeys} min="0" step="0.01" value={form.reissue_fee_paid} onChange={set("reissue_fee_paid")} placeholder="0.00" className={inputCls} />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Fare Difference</label>
-                  <input type="number" onKeyDown={blockNonNumericKeys} step="0.01" value={form.fare_difference} onChange={set("fare_difference")} placeholder="0.00" className={inputCls} />
+                  <input
+                    type="number" onKeyDown={blockNonNumericKeys}
+                    min="0"
+                    step="0.01"
+                    value={sellPriceDirty ? form.sell_price : String(breakdownSellPrice)}
+                    onChange={setSellPrice}
+                    placeholder="0.00"
+                    className={inputCls}
+                  />
+                  {sellPriceDirty && sellPrice !== breakdownSellPrice ? (
+                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                      Breakdown implies {breakdownSellPrice.toLocaleString("en-BD")} — differs by {Math.abs(sellPrice - breakdownSellPrice).toLocaleString("en-BD")}.{" "}
+                      <button type="button" onClick={resyncSellPrice} className="underline hover:no-underline">
+                        Use {breakdownSellPrice.toLocaleString("en-BD")} instead
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">What this reissue itself charges the client. Enter directly, or fill in the breakdown below.</p>
+                  )}
                 </div>
               </div>
               <p className="mt-3 text-sm text-gray-600 dark:text-gray-400">
@@ -266,6 +333,10 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
                 <span className={`font-medium ${reissueProfit >= 0 ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"}`}>
                   {reissueProfit.toLocaleString("en-BD")}
                 </span>
+              </p>
+              <p className="mt-1 text-xs text-gray-400 dark:text-gray-500">
+                Reference only, not stored — new ticket total across the whole reissue chain so far:{" "}
+                <span className="font-medium text-gray-600 dark:text-gray-400 tabular-nums">{newTicketTotal.toLocaleString("en-BD")}</span>
               </p>
             </fieldset>
 

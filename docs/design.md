@@ -142,7 +142,13 @@ On save:
 
 ## Reissue Modal
 - Opens from row level action on ticket list
-- Pre-filled with original ticket data — passenger, carrier, PNR, route, dates, client, supplier all editable (price is NOT carried over — see below)
+- Deliberately minimal — only fields that plausibly change on a reissue are shown:
+  - Passenger: Passenger Name (editable), Ticket Number, PNR
+  - Travel: Route, Issue Date, Travel Date, Return Date
+  - Financials (see below)
+  - Reissue Details, Notes
+- Carrier, Client, and Supplier are NOT shown for re-selection — they're carried over silently from the original ticket as-is (a reissue is virtually always the same airline/client/supplier as the ticket it's reissuing). Use the normal ticket Edit action on the new child ticket afterward for the rare case where one of these needs to actually change.
+- No Record Payment section — a reissue only creates the ticket row. Recording a payment against it afterward uses the same Record Payment row action as any other ticket.
 - sell_price and purchase_price are READ-ONLY auto-computed displays — not editable inputs, and INCREMENTAL (this reissue's own price, not the original ticket's price rolled forward):
   - sell_price = fare_difference + reissue_fee_collected
   - purchase_price = fare_difference + reissue_fee_paid
@@ -151,7 +157,6 @@ On save:
 - gds_price (Supplier Purchase Price) starts blank — not pre-filled from the original ticket, since it's this reissue's own informational supplier cost
 - Reissue Details section (editable): Reissue Fee Collected, Reissue Fee Paid, Fare Difference
 - "Profit From Reissue" shown as a live read-only display: reissue_fee_collected - reissue_fee_paid
-- Collapsible Record Payment section at bottom (same pattern as ticket form, uses computed sell_price — i.e. this reissue's own fee, so "paid in full" means the fee is paid in full, not the whole ticket)
 - On save: original ticket marked reissued (nothing else about it changes — its own sell_price/purchase_price/issue_date stay exactly as originally booked, permanently), new child ticket created as its own independent ticket row with only the incremental price
 
 ## Edit Reissue Details Modal

@@ -277,12 +277,12 @@ No chain-level rollup UI exists yet (e.g. a single number showing the sum across
 
 ### Reissue Flow
 1. Agent clicks Reissue on original ticket row
-2. Modal opens pre-filled with original ticket data (passenger, route, etc. — not price)
-3. Agent updates ticket details — carrier, PNR, ticket number, dates
+2. Modal opens pre-filled with original ticket data (passenger, route, dates — not price). Carrier, client, and supplier are carried over silently, not shown for re-selection — the modal only exposes fields that plausibly change on a reissue (passenger name, ticket number, PNR, route, dates)
+3. Agent updates PNR/ticket number/dates as needed
 4. Agent enters fare_difference, reissue_fee_collected, reissue_fee_paid
 5. sell_price and purchase_price auto-compute live as just those entered values (fare_difference + fee) — not added to the original ticket's price
 6. "Profit From Reissue" (= reissue_fee_collected - reissue_fee_paid) shown as a live display
-7. On save — original ticket status → reissued, new child ticket created with computed prices
+7. On save — original ticket status → reissued, new child ticket created with computed prices. No payment is recorded as part of this flow — use the normal Record Payment row action on the new ticket afterward if needed
 
 ### Chain Margin
 - Displayed on ticket detail view — not list view

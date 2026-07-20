@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
+import { reverseTicketPaymentRow, TICKET_REVERSAL_FIELDS } from "../../lib/paymentReversal"
 
 function fmt(n) {
   return Number(n ?? 0).toLocaleString("en-BD")
@@ -18,13 +19,81 @@ async function fetchDescendants(ticketId) {
   while (frontier.length) {
     const { data } = await supabase
       .from("tickets")
-      .select("id, route, travel_date, passenger_name, sell_price")
+      .select("id, route, travel_date, passenger_name, sell_price, pnr, ticket_number")
       .in("parent_ticket_id", frontier)
     if (!data || data.length === 0) break
     descendants.push(...data)
     frontier = data.map((d) => d.id)
   }
   return descendants
+}
+
+// Frees any ordinary client/supplier payment allocations tied to the tickets
+// being archived, so the money goes back into the pool for reallocation
+// instead of staying stuck on a ticket the agent can no longer see or pick.
+// Void-fee and refund-netted allocations are deliberately left untouched —
+// void fees are one-off payments created fully-consumed (unallocated_amount
+// 0 from the start), never part of a shared pool to begin with; refund
+// netting has its own refund_status knock-on effects that deserve separate
+// handling, not bundling into an archive action.
+async function freePaymentAllocations(ticketIds, ticketLabels) {
+  const { data: tps } = await supabase
+    .from("ticket_payments")
+    .select("id, payment_id, ticket_id, allocated_amount, type")
+    .in("ticket_id", ticketIds)
+    .in("type", ["client", "supplier"])
+
+  if (!tps || tps.length === 0) return
+
+  const { data: tickets } = await supabase.from("tickets").select(TICKET_REVERSAL_FIELDS).in("id", ticketIds)
+  const ticketsById = new Map((tickets ?? []).map((t) => [t.id, t]))
+
+  // Reversals are applied per-ticket in sequence (not off one stale
+  // snapshot) since a ticket can have more than one ticket_payments row
+  // across different payments — applying both off the same starting
+  // amount_paid would silently drop one of them.
+  const tpsByTicket = new Map()
+  for (const tp of tps) {
+    const list = tpsByTicket.get(tp.ticket_id) ?? []
+    list.push(tp)
+    tpsByTicket.set(tp.ticket_id, list)
+  }
+  for (const [ticketId, ticketTps] of tpsByTicket) {
+    let runningTicket = ticketsById.get(ticketId)
+    if (!runningTicket) continue
+    let finalUpdates = {}
+    for (const tp of ticketTps) {
+      const { updates } = reverseTicketPaymentRow(runningTicket, tp)
+      runningTicket = { ...runningTicket, ...updates }
+      finalUpdates = { ...finalUpdates, ...updates }
+    }
+    if (Object.keys(finalUpdates).length > 0) {
+      await supabase.from("tickets").update(finalUpdates).eq("id", ticketId)
+    }
+  }
+
+  await supabase.from("ticket_payments").delete().in("id", tps.map((tp) => tp.id))
+
+  const freedByPayment = new Map()
+  for (const tp of tps) {
+    const label = ticketLabels.get(tp.ticket_id) ?? "an archived ticket"
+    const entry = freedByPayment.get(tp.payment_id) ?? { total: 0, labels: new Set() }
+    entry.total += tp.allocated_amount
+    entry.labels.add(label)
+    freedByPayment.set(tp.payment_id, entry)
+  }
+
+  const today = fmtDate(new Date().toISOString())
+  for (const [paymentId, entry] of freedByPayment) {
+    const { data: payment } = await supabase.from("payments").select("unallocated_amount, notes").eq("id", paymentId).single()
+    if (!payment) continue
+    const noteLine = `Freed ${fmt(entry.total)} on ${today} — previously allocated to ${Array.from(entry.labels).join(", ")}, now archived.`
+    const newNotes = payment.notes ? `${payment.notes}\n${noteLine}` : noteLine
+    await supabase
+      .from("payments")
+      .update({ unallocated_amount: (payment.unallocated_amount ?? 0) + entry.total, notes: newNotes })
+      .eq("id", paymentId)
+  }
 }
 
 export default function ArchiveConfirmModal({ isOpen, onClose, ticket, onArchived }) {
@@ -51,6 +120,18 @@ export default function ArchiveConfirmModal({ isOpen, onClose, ticket, onArchive
     setArchiving(true)
     setError("")
     const allIds = [ticket.id, ...descendants.map((d) => d.id)]
+    const ticketLabels = new Map(
+      [ticket, ...descendants].map((t) => [t.id, t.pnr || t.ticket_number || t.passenger_name || `ticket ${t.id}`])
+    )
+
+    try {
+      await freePaymentAllocations(allIds, ticketLabels)
+    } catch (e) {
+      setArchiving(false)
+      setError(e.message ?? "Failed to free existing payment allocations")
+      return
+    }
+
     const { error } = await supabase
       .from("tickets")
       .update({ archived_at: new Date().toISOString() })
@@ -79,9 +160,9 @@ export default function ArchiveConfirmModal({ isOpen, onClose, ticket, onArchive
             Delete this ticket?
           </h2>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
-            This archives the ticket — it's removed from your lists and reports, but the record
-            (and any real payments logged against it) is kept for audit. There's no restore option yet,
-            so treat this as final for now.
+            This archives the ticket — it's removed from your lists and reports, but the record is kept
+            for audit. Any client/supplier payment allocated to it is freed back up for reallocation to
+            another ticket, not deleted. There's no restore option yet, so treat this as final for now.
           </p>
 
           {error && (

@@ -137,8 +137,8 @@ On save:
 ## Archive Confirm Modal
 - Opens from the "Delete" row action — replaces the old inline "Delete? Yes/No" row confirm, since archiving a chain needs room to list what's being archived
 - Before showing the confirm, walks the ticket's full reissue descendant tree (children, grandchildren, …) and lists each one (route, travel date, sell price) alongside the ticket being deleted, so the agent can see exactly what's about to be archived as a unit — a solo ticket with no reissue children just shows itself
-- Copy makes clear this archives, not permanently deletes: the ticket (and its real payment history) is retained for audit, just hidden from the app — no restore UI exists yet, so frame it as a one-way action for now
-- On confirm, sets archived_at on the ticket and every descendant in one action; the whole chain disappears from the list together
+- Copy makes clear this archives, not permanently deletes: the ticket record is retained for audit, just hidden from the app — no restore UI exists yet, so frame it as a one-way action for now. Also states that any payment allocated to the ticket is freed for reallocation, not deleted, since that's a real behavior change an agent should know about before confirming
+- On confirm: any ordinary client/supplier payment allocation on the ticket (or its descendants) is reversed and freed back into that payment's unallocated pool first, then archived_at is set on the ticket and every descendant in one action; the whole chain disappears from the list together
 
 ## Void Confirm Modal
 - Opens from the "Void" row action — still a confirm-to-proceed modal ("This cannot be undone"), not a full form

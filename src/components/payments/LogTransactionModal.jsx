@@ -7,6 +7,11 @@ import { createClient, createSupplier } from "../tickets/TicketModal"
 import { fetchChannels } from "../../lib/channels"
 import { deriveRefundStatus } from "../../lib/refunds"
 import { blockNonNumericKeys } from "../../lib/numberInput"
+import { logActivity } from "../../lib/activityLog"
+
+function fmt(n) {
+  return Number(n ?? 0).toLocaleString("en-BD")
+}
 
 const TYPE_CARDS = [
   { value: "client_payment", label: "Client Payment", direction: "IN", icon: Wallet },
@@ -195,6 +200,14 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
 
       if (payErr) { setError(payErr.message); setLoading(false); return }
 
+      logActivity({
+        agentId: agent.id,
+        paymentId: clientPayment.id,
+        eventType: "payment_created",
+        description: `Client payment logged — ${fmt(amount)} (unallocated, no ticket picked yet)`,
+        metadata: { amount, client_id: form.client_id },
+      })
+
       setLoading(false)
       onLogged(clientPayment)
       onClose()
@@ -224,6 +237,14 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
         .single()
 
       if (payErr) { setError(payErr.message); setLoading(false); return }
+
+      logActivity({
+        agentId: agent.id,
+        paymentId: payment.id,
+        eventType: "payment_created",
+        description: `Supplier payment logged — ${fmt(amount)} (unallocated, no ticket picked yet)`,
+        metadata: { amount, supplier_id: form.supplier_id },
+      })
 
       setLoading(false)
       onLogged(payment)
@@ -289,6 +310,15 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
         }
       }
 
+      logActivity({
+        agentId: agent.id,
+        ticketId: form.ticket_id || null,
+        paymentId: refund.id,
+        eventType: "refund_settled_client",
+        description: `Client refund paid — ${fmt(amount)}${form.ticket_id ? "" : " (no ticket linked)"}`,
+        metadata: { amount, ticket_id: form.ticket_id || null },
+      })
+
       setLoading(false)
       onLogged(refund)
       onClose()
@@ -339,6 +369,15 @@ export default function LogTransactionModal({ isOpen, onClose, onLogged }) {
           if (tErr) { setError(tErr.message); setLoading(false); return }
         }
       }
+
+      logActivity({
+        agentId: agent.id,
+        ticketId: form.ticket_id || null,
+        paymentId: refund.id,
+        eventType: "refund_settled_supplier",
+        description: `Supplier refund received — ${fmt(amount)}${form.ticket_id ? "" : " (no ticket linked)"}`,
+        metadata: { amount, ticket_id: form.ticket_id || null },
+      })
 
       setLoading(false)
       onLogged(refund)

@@ -4,8 +4,13 @@ import { useAuth } from "../../context/AuthContext"
 import { fetchChannels } from "../../lib/channels"
 import { deriveRefundStatus, clientOutstanding, clientEffectiveTarget } from "../../lib/refunds"
 import { blockNonNumericKeys } from "../../lib/numberInput"
+import { logActivity } from "../../lib/activityLog"
 
 const EMPTY = { amount: "", channel_id: "", trx_id: "", notes: "", paid_in_full: false, payment_date: "" }
+
+function fmt(n) {
+  return Number(n ?? 0).toLocaleString("en-BD")
+}
 
 function derivePaymentStatus(amountPaid, sellPrice) {
   if (amountPaid <= 0) return "unpaid"
@@ -133,6 +138,16 @@ export default function RecordPaymentModal({ isOpen, onClose, ticket, onSaved })
       setError(updateErr.message)
       return
     }
+
+    logActivity({
+      agentId: agent.id,
+      ticketId: ticket.id,
+      paymentId: payRow.id,
+      eventType: "payment_created",
+      description: `Client payment recorded — ${fmt(amount)}${excess > 0 ? ` (${fmt(allocatedAmount)} applied, ${fmt(excess)} left unallocated)` : ""}`,
+      metadata: { amount, allocated_amount: allocatedAmount, unallocated_amount: excess },
+    })
+
     onSaved(updated, payRow)
     onClose()
   }

@@ -282,6 +282,15 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket, cloneMod
           .eq("id", savedTicket.id)
         savedTicket.amount_paid = newAmountPaid
         savedTicket.payment_status = newPaymentStatus
+
+        logActivity({
+          agentId: agent.id,
+          ticketId: savedTicket.id,
+          paymentId: payRow.id,
+          eventType: "payment_created",
+          description: `Client payment recorded at ticket save — ${fmt(clientAmount)}`,
+          metadata: { amount: clientAmount },
+        })
       }
     }
 
@@ -312,6 +321,15 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket, cloneMod
           ticket_id: savedTicket.id,
           allocated_amount: supplierAmount,
           type: "supplier",
+        })
+
+        logActivity({
+          agentId: agent.id,
+          ticketId: savedTicket.id,
+          paymentId: payRow.id,
+          eventType: "payment_created",
+          description: `Supplier payment recorded at ticket save — ${fmt(supplierAmount)}`,
+          metadata: { amount: supplierAmount },
         })
       }
     }

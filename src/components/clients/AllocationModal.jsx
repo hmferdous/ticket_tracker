@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react"
 import { supabase } from "../../lib/supabase"
+import { useAuth } from "../../context/AuthContext"
 import { deriveRefundStatus, clientOwedBack } from "../../lib/refunds"
+import { logActivity } from "../../lib/activityLog"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -52,6 +54,7 @@ function buildAllocations(eligibleTickets, available, mode, selectedIds) {
 }
 
 export default function AllocationModal({ isOpen, onClose, payment, clientName, tickets, onAllocated }) {
+  const { agent } = useAuth()
   const [mode, setMode] = useState(null) // null | 'distribute' | 'select'
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [loading, setLoading] = useState(false)
@@ -160,6 +163,14 @@ export default function AllocationModal({ isOpen, onClose, payment, clientName, 
           .eq("id", a.ticket.id)
       }
     }
+
+    logActivity({
+      agentId: agent.id,
+      paymentId: payment.id,
+      eventType: "payment_allocated",
+      description: `Allocated ${fmt(allocatingTotal)} of ${fmt(available)} across ${allocations.length} ticket${allocations.length > 1 ? "s" : ""}`,
+      metadata: { allocations: allocations.map((a) => ({ ticket_id: a.ticket.id, amount: a.amount, kind: a.ticket.kind })) },
+    })
 
     setLoading(false)
     onAllocated()

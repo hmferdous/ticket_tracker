@@ -11,6 +11,7 @@ import ViewPaymentModal from "../../components/payments/ViewPaymentModal"
 import DocumentsTab from "../../components/ui/DocumentsTab"
 import AppLayout from "../../components/layout/AppLayout"
 import { reverseTicketPaymentRow, TICKET_REVERSAL_FIELDS } from "../../lib/paymentReversal"
+import { logActivity } from "../../lib/activityLog"
 import { clientOutstanding, ticketEffectiveSale } from "../../lib/refunds"
 
 function fmt(n) {
@@ -317,6 +318,8 @@ export default function ClientDetail() {
   const handleDeletePayment = async (paymentId) => {
     if (deletingPaymentId) return
 
+    const deletedPayment = payments.find((p) => p.id === paymentId)
+
     const { data: tps } = await supabase
       .from("ticket_payments")
       .select("id, ticket_id, allocated_amount, type")
@@ -357,6 +360,14 @@ export default function ClientDetail() {
     const { error } = await supabase.from("payments").delete().eq("id", paymentId)
     setDeletingPaymentId(null)
     if (error) { setError(error.message); return }
+
+    logActivity({
+      agentId: agent.id,
+      ticketId: ticketIds.size > 0 ? Array.from(ticketIds)[0] : null,
+      eventType: "payment_deleted",
+      description: `Payment deleted — ${fmt(deletedPayment?.amount)} (${deletedPayment?.type ?? "client_payment"})`,
+      metadata: { payment_id: paymentId, amount: deletedPayment?.amount, type: deletedPayment?.type, reversed_tickets: Array.from(ticketIds) },
+    })
 
     fetchAll()
   }

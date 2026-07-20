@@ -3,6 +3,11 @@ import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { fetchChannels } from "../../lib/channels"
 import { blockNonNumericKeys } from "../../lib/numberInput"
+import { logActivity } from "../../lib/activityLog"
+
+function fmt(n) {
+  return Number(n ?? 0).toLocaleString("en-BD")
+}
 
 function emptyForm() {
   return {
@@ -76,6 +81,14 @@ export default function SupplierLogPaymentModal({ isOpen, onClose, supplier, onL
       setLoading(false)
       return
     }
+
+    logActivity({
+      agentId: agent.id,
+      paymentId: payment.id,
+      eventType: "payment_created",
+      description: `Supplier payment logged for ${supplier?.name ?? "supplier"} — ${fmt(amount)} (unallocated, no ticket picked yet)`,
+      metadata: { amount, supplier_id: supplier.id },
+    })
 
     setLoading(false)
     onLogged(payment)

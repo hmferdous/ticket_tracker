@@ -255,8 +255,8 @@ AllocationModal (client bulk payments) and SupplierAllocationModal (supplier bul
 - `ticket_activity_log` — append-only audit trail. One row per event, never updated or deleted.
   - `id`, `agent_id`
   - `ticket_id` — nullable. Set for ticket-scoped events (price edits, void, reissue, archive).
-  - `payment_id` — nullable, FK to payments. Set for payment-lifecycle events. A payment can touch zero, one, or many tickets over its life (bulk payments get allocated across several), so payment events are logged once per payment, not once per ticket — `metadata` lists which ticket(s) were affected. At least one of ticket_id/payment_id is set; both can be set together (e.g. "payment allocated to ticket X").
-  - `event_type` — plain text, not a CHECK-constrained enum, so a new event type never needs a migration. Wired up so far: `void` (VoidConfirmModal), `ticket_created`/`ticket_price_edited` (TicketModal), `reissue_created` (ReissueModal), `reissue_edited` (EditReissueModal), `archived`/`archive_freed_allocation` (ArchiveConfirmModal). Not yet wired: `payment_created`, `payment_edited`, `payment_deleted`, `payment_allocated`, `refund_initiated`, `refund_terms_edited`, `refund_settled_supplier`, `refund_settled_client`, `refund_cancelled`
+  - `payment_id` — nullable, FK to payments, `ON DELETE SET NULL`. Set for payment-lifecycle events. A payment can touch zero, one, or many tickets over its life (bulk payments get allocated across several), so payment events are logged once per payment, not once per ticket — `metadata` lists which ticket(s) were affected. Generally at least one of ticket_id/payment_id is set (both can be set together, e.g. "payment allocated to ticket X") — EXCEPT `payment_deleted`, which never sets payment_id: the payments row is already gone by the time the log write happens, and a fresh INSERT referencing a nonexistent id would fail regardless of the FK's ON DELETE behavior (that clause only protects EXISTING log rows when a referenced payment is deleted later, not a new insert against an already-deleted one). The deleted payment's id/amount/type live in `metadata` instead, and `ticket_id` is set to one of the tickets it was reversed off of, if any.
+  - `event_type` — plain text, not a CHECK-constrained enum, so a new event type never needs a migration. Wired up so far: `void` (VoidConfirmModal), `ticket_created`/`ticket_price_edited` (TicketModal), `reissue_created` (ReissueModal), `reissue_edited` (EditReissueModal), `archived`/`archive_freed_allocation` (ArchiveConfirmModal), `payment_created` (RecordPaymentModal/LogTransactionModal/SupplierLogPaymentModal/TicketModal inline payments), `refund_settled_client`/`refund_settled_supplier` (LogTransactionModal), `payment_edited` (ViewPaymentModal), `payment_allocated` (AllocationModal/SupplierAllocationModal), `payment_deleted` (Payments.jsx/ClientDetail.jsx/SupplierDetail.jsx). Not yet wired: `refund_initiated`, `refund_terms_edited`, `refund_cancelled` (RefundModal)
   - `description` — human-readable one-liner
   - `metadata` — jsonb, structured before/after values for programmatic use
   - `created_at`
@@ -271,7 +271,7 @@ CREATE TABLE IF NOT EXISTS ticket_activity_log (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_id uuid NOT NULL REFERENCES agents(id),
   ticket_id uuid REFERENCES tickets(id),
-  payment_id uuid REFERENCES payments(id),
+  payment_id uuid REFERENCES payments(id) ON DELETE SET NULL,
   event_type text NOT NULL,
   description text NOT NULL,
   metadata jsonb,
@@ -285,6 +285,13 @@ CREATE POLICY "Agents manage their own activity log"
   FOR ALL
   USING (agent_id = (SELECT id FROM agents WHERE user_id = auth.uid()))
   WITH CHECK (agent_id = (SELECT id FROM agents WHERE user_id = auth.uid()));
+```
+
+If you already ran the block above before `ON DELETE SET NULL` was added to `payment_id`, run this once to fix it in place — without it, deleting a payment that already has any activity log entries referencing it would fail outright with a foreign key violation:
+```sql
+ALTER TABLE ticket_activity_log DROP CONSTRAINT IF EXISTS ticket_activity_log_payment_id_fkey;
+ALTER TABLE ticket_activity_log ADD CONSTRAINT ticket_activity_log_payment_id_fkey
+  FOREIGN KEY (payment_id) REFERENCES payments(id) ON DELETE SET NULL;
 ```
 
 ### Archive Flow

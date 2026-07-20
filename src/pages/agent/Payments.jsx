@@ -8,6 +8,7 @@ import ViewPaymentModal from "../../components/payments/ViewPaymentModal"
 import LogTransactionModal from "../../components/payments/LogTransactionModal"
 import { fetchChannels } from "../../lib/channels"
 import { reverseTicketPaymentRow, reverseStandaloneSupplierRefund, TICKET_REVERSAL_FIELDS } from "../../lib/paymentReversal"
+import { logActivity } from "../../lib/activityLog"
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100, 200]
 
@@ -287,6 +288,15 @@ export default function Payments() {
     const { error } = await supabase.from("payments").delete().eq("id", payment.id)
     setDeletingId(null)
     if (error) { setError(error.message); return }
+
+    logActivity({
+      agentId: agent.id,
+      ticketId: ticketIds.size > 0 ? Array.from(ticketIds)[0] : null,
+      eventType: "payment_deleted",
+      description: `Payment deleted — ${fmt(payment.amount)} (${payment.type})`,
+      metadata: { payment_id: payment.id, amount: payment.amount, type: payment.type, reversed_tickets: Array.from(ticketIds) },
+    })
+
     fetchPayments()
   }
 

@@ -411,6 +411,7 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
           {editing ? (
             <>
               <button
+                key="cancel"
                 type="button"
                 onClick={() => { setEditing(false); setForm(buildForm(payment)); setError("") }}
                 className="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
@@ -418,6 +419,7 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
                 Cancel
               </button>
               <button
+                key="save"
                 type="submit"
                 form="edit-payment-form"
                 disabled={saving}
@@ -429,12 +431,16 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
           ) : (
             <>
               <button
+                key="close"
+                type="button"
                 onClick={onClose}
                 className="px-4 py-2 border border-gray-300 dark:border-gray-700 text-gray-700 dark:text-gray-300 rounded-lg text-sm font-medium hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
               >
                 Close
               </button>
               <button
+                key="edit"
+                type="button"
                 onClick={() => setEditing(true)}
                 className="px-4 py-2 bg-gray-900 hover:bg-gray-700 text-white rounded-lg text-sm font-medium transition-colors"
               >

@@ -13,7 +13,7 @@ import AllocationModal from "../../components/clients/AllocationModal"
 import TicketDetailModal from "../../components/tickets/TicketDetailModal"
 import AppLayout from "../../components/layout/AppLayout"
 import { AIRLINES } from "../../lib/airlines"
-import { clientOutstanding } from "../../lib/refunds"
+import { clientOutstanding, ticketNetMargin } from "../../lib/refunds"
 import { logActivity } from "../../lib/activityLog"
 
 // Row-level actions available for a ticket, based on its current state
@@ -308,17 +308,6 @@ function fmtMargin(n) {
   return Number(n).toLocaleString("en-BD")
 }
 
-
-function computeNetMargin(ticket) {
-  const ticketMargin = (ticket.sell_price ?? 0) - (ticket.purchase_price ?? 0)
-  // Booked/agreed basis, matching ticket_margin's own accrual nature — uses
-  // refund_receivable (what the supplier agreed to) rather than refund_received
-  // (what's actually landed so far), so this reflects the deal's true
-  // economics instead of fluctuating with how far collection has progressed.
-  const refundMargin = (ticket.refund_receivable ?? 0) - (ticket.refund_payable ?? 0)
-  const voidFeeMargin = (ticket.void_fee_collected ?? 0) - (ticket.void_fee_paid ?? 0)
-  return ticketMargin + refundMargin + voidFeeMargin
-}
 
 export default function Tickets() {
   const { agent } = useAuth()
@@ -904,7 +893,7 @@ export default function Tickets() {
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {pagedTickets.map((ticket) => {
                     const ticketMargin = (ticket.sell_price ?? 0) - (ticket.purchase_price ?? 0)
-                    const netMargin = computeNetMargin(ticket)
+                    const netMargin = ticketNetMargin(ticket)
                     const narration = ticket.narration
                       ? ticket.narration.length > 30
                         ? ticket.narration.slice(0, 30) + "…"

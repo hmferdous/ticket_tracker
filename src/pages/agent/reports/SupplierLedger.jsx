@@ -4,6 +4,7 @@ import { supabase } from "../../../lib/supabase"
 import { useAuth } from "../../../context/AuthContext"
 import { generateLedgerPdf } from "../../../lib/generateLedgerPdf"
 import AppLayout from "../../../components/layout/AppLayout"
+import { effectivePurchasePrice } from "../../../lib/refunds"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -89,7 +90,7 @@ export default function SupplierLedger() {
     const [ticketRes, paymentRes] = await Promise.all([
       supabase
         .from("tickets")
-        .select("id, passenger_name, route, issue_date, purchase_price, is_void")
+        .select("id, passenger_name, route, issue_date, purchase_price, is_void, refund_status, void_fee_paid, price_override_source")
         .eq("agent_id", agent.id)
         .eq("supplier_id", supplierId),
       supabase
@@ -109,11 +110,14 @@ export default function SupplierLedger() {
     setGenerated(true)
   }
 
-  // Opening balance: net payable to supplier before dateFrom
+  // Opening balance: net payable to supplier before dateFrom. A void
+  // ticket's invoiced amount is its cancellation fee (effectivePurchasePrice),
+  // not the never-really-purchased original purchase_price — but it's still
+  // a real invoice line, not excluded outright the way it used to be.
   const openingBalance = useMemo(() => {
     if (!generated || !dateFrom) return null
-    const nonVoidTickets = tickets.filter((t) => !t.is_void && t.issue_date && t.issue_date < dateFrom)
-    const invoiced = nonVoidTickets.reduce((s, t) => s + (t.purchase_price ?? 0), 0)
+    const priorTickets = tickets.filter((t) => t.issue_date && t.issue_date < dateFrom)
+    const invoiced = priorTickets.reduce((s, t) => s + effectivePurchasePrice(t), 0)
     const paid = payments
       .filter((p) => p.type === "supplier_payment" && p.payment_date && p.payment_date < dateFrom)
       .reduce((s, p) => s + (p.amount ?? 0), 0)
@@ -128,9 +132,10 @@ export default function SupplierLedger() {
     if (!generated) return []
     const entries = []
 
-    // Ticket entries (debit — we owe the supplier)
+    // Ticket entries (debit — we owe the supplier). A void ticket still gets
+    // an invoice line, for its cancellation fee (effectivePurchasePrice)
+    // rather than the original never-really-purchased purchase_price
     for (const t of tickets) {
-      if (t.is_void) continue
       if (!t.issue_date) continue
       if (dateFrom && t.issue_date < dateFrom) continue
       if (dateTo && t.issue_date > dateTo) continue
@@ -138,9 +143,9 @@ export default function SupplierLedger() {
         _sort: t.issue_date,
         date: t.issue_date,
         type: "invoice",
-        description: `${t.passenger_name ?? ""}${t.route ? ` — ${t.route}` : ""}`,
+        description: `${t.passenger_name ?? ""}${t.route ? ` — ${t.route}` : ""}${t.is_void ? " (Void)" : ""}`,
         refIssueDate: null,
-        debit: t.purchase_price ?? 0,
+        debit: effectivePurchasePrice(t),
         credit: null,
       })
     }

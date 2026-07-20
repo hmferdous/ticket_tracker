@@ -117,6 +117,7 @@ export default function Settings() {
           .from("tickets")
           .select("*, clients(name), suppliers(name)")
           .eq("agent_id", agent.id)
+          .is("archived_at", null)
           .order("created_at", { ascending: false }),
         supabase.from("clients").select("*").eq("agent_id", agent.id).order("client_id_number"),
         supabase.from("suppliers").select("*").eq("agent_id", agent.id).order("supplier_id_number"),

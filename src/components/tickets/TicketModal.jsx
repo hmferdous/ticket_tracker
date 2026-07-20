@@ -7,11 +7,16 @@ import SearchableEntityDropdown from "../ui/SearchableEntityDropdown"
 import { fetchChannels } from "../../lib/channels"
 import { clientEffectiveTarget } from "../../lib/refunds"
 import { blockNonNumericKeys } from "../../lib/numberInput"
+import { logActivity } from "../../lib/activityLog"
 
 function derivePaymentStatus(amountPaid, target) {
   if (amountPaid <= 0) return "unpaid"
   if (amountPaid >= target) return "paid"
   return "partial"
+}
+
+function fmt(n) {
+  return Number(n ?? 0).toLocaleString("en-BD")
 }
 
 export async function createClient(supabase, agentId, name, extra = {}) {
@@ -186,11 +191,15 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket, cloneMod
       narration: form.narration.trim() || null,
     }
 
+    const isEdit = !!ticket?.id
     let result
-    if (ticket?.id) {
+    if (isEdit) {
+      // A manual edit is always the deliberate, self-explanatory case — clear
+      // any auto-override marker (e.g. from voiding) since the agent just set
+      // this price on purpose.
       result = await supabase
         .from("tickets")
-        .update(payload)
+        .update({ ...payload, price_override_source: null })
         .eq("id", ticket.id)
         .select(`*, clients(name), suppliers(name)`)
         .single()
@@ -210,6 +219,31 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket, cloneMod
 
     const savedTicket = result.data
     const today = new Date().toISOString().split("T")[0]
+
+    if (isEdit) {
+      if (ticket.sell_price !== payload.sell_price || ticket.purchase_price !== payload.purchase_price) {
+        logActivity({
+          agentId: agent.id,
+          ticketId: savedTicket.id,
+          eventType: "ticket_price_edited",
+          description:
+            `Price edited — sell_price ${fmt(ticket.sell_price)} → ${fmt(payload.sell_price)}, ` +
+            `purchase_price ${fmt(ticket.purchase_price)} → ${fmt(payload.purchase_price)}`,
+          metadata: {
+            before: { sell_price: ticket.sell_price, purchase_price: ticket.purchase_price },
+            after: { sell_price: payload.sell_price, purchase_price: payload.purchase_price },
+          },
+        })
+      }
+    } else {
+      logActivity({
+        agentId: agent.id,
+        ticketId: savedTicket.id,
+        eventType: "ticket_created",
+        description: `Ticket created — sell_price ${fmt(payload.sell_price)}, purchase_price ${fmt(payload.purchase_price)}`,
+        metadata: { sell_price: payload.sell_price, purchase_price: payload.purchase_price },
+      })
+    }
 
     // Client payment — independent transaction
     const clientAmount = clientPay.paid_in_full ? parseFloat(form.sell_price) : parseFloat(clientPay.amount)
@@ -248,6 +282,15 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket, cloneMod
           .eq("id", savedTicket.id)
         savedTicket.amount_paid = newAmountPaid
         savedTicket.payment_status = newPaymentStatus
+
+        logActivity({
+          agentId: agent.id,
+          ticketId: savedTicket.id,
+          paymentId: payRow.id,
+          eventType: "payment_created",
+          description: `Client payment recorded at ticket save — ${fmt(clientAmount)}`,
+          metadata: { amount: clientAmount },
+        })
       }
     }
 
@@ -278,6 +321,15 @@ export default function TicketModal({ isOpen, onClose, onSaved, ticket, cloneMod
           ticket_id: savedTicket.id,
           allocated_amount: supplierAmount,
           type: "supplier",
+        })
+
+        logActivity({
+          agentId: agent.id,
+          ticketId: savedTicket.id,
+          paymentId: payRow.id,
+          eventType: "payment_created",
+          description: `Supplier payment recorded at ticket save — ${fmt(supplierAmount)}`,
+          metadata: { amount: supplierAmount },
         })
       }
     }

@@ -1,6 +1,12 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
+import { useAuth } from "../../context/AuthContext"
 import { blockNonNumericKeys } from "../../lib/numberInput"
+import { logActivity } from "../../lib/activityLog"
+
+function fmt(n) {
+  return Number(n ?? 0).toLocaleString("en-BD")
+}
 
 function buildForm(ticket) {
   return {
@@ -12,6 +18,7 @@ function buildForm(ticket) {
 }
 
 export default function EditReissueModal({ isOpen, onClose, ticket, onSaved }) {
+  const { agent } = useAuth()
   const [form, setForm] = useState(() => buildForm(ticket))
   // Commission starts "dirty" whenever the ticket already has a stored
   // value — otherwise re-opening this modal on an existing reissue would
@@ -88,6 +95,22 @@ export default function EditReissueModal({ isOpen, onClose, ticket, onSaved }) {
       setError(error.message)
       return
     }
+
+    if (ticket.sell_price !== computedSellPrice || ticket.purchase_price !== computedPurchasePrice) {
+      logActivity({
+        agentId: agent.id,
+        ticketId: ticket.id,
+        eventType: "reissue_edited",
+        description:
+          `Reissue details edited — sell_price ${fmt(ticket.sell_price)} → ${fmt(computedSellPrice)}, ` +
+          `purchase_price ${fmt(ticket.purchase_price)} → ${fmt(computedPurchasePrice)}`,
+        metadata: {
+          before: { sell_price: ticket.sell_price, purchase_price: ticket.purchase_price },
+          after: { sell_price: computedSellPrice, purchase_price: computedPurchasePrice },
+        },
+      })
+    }
+
     onSaved(data)
     onClose()
   }

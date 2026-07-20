@@ -11,6 +11,7 @@ import ViewPaymentModal from "../../components/payments/ViewPaymentModal"
 import DocumentsTab from "../../components/ui/DocumentsTab"
 import AppLayout from "../../components/layout/AppLayout"
 import { reverseTicketPaymentRow, TICKET_REVERSAL_FIELDS } from "../../lib/paymentReversal"
+import { logActivity } from "../../lib/activityLog"
 import { clientOutstanding, ticketEffectiveSale } from "../../lib/refunds"
 
 function fmt(n) {
@@ -234,6 +235,7 @@ export default function ClientDetail() {
         `)
         .eq("client_id", id)
         .eq("agent_id", agent.id)
+        .is("archived_at", null)
         .order("created_at", { ascending: false }),
       supabase
         .from("payments")
@@ -259,14 +261,13 @@ export default function ClientDetail() {
 
   const totalBilled = useMemo(() => tickets.reduce((sum, t) => sum + ticketEffectiveSale(t), 0), [tickets])
   const totalReceived = useMemo(() => payments.reduce((sum, p) => sum + (p.amount ?? 0), 0), [payments])
-  // Void tickets don't represent a real collection expectation — sum
-  // per-ticket outstanding instead of netting totalBilled against
-  // totalReceived, so those tickets can't inflate the balance. A refund-active
-  // ticket nets sell_price/amount_paid against refund_payable via
-  // clientOutstanding rather than being excluded outright, since the client
-  // may still owe a reduced amount (e.g. a cancellation fee) after the refund.
+  // Sum per-ticket outstanding instead of netting totalBilled against
+  // totalReceived, so a single ticket's numbers can't skew the balance. A
+  // void ticket's outstanding is against its fee (not the original sale) and
+  // a refund-active ticket nets sell_price/amount_paid against refund_payable
+  // — both handled inside clientOutstanding, no exclusion needed here.
   const outstandingBalance = useMemo(
-    () => tickets.filter((t) => !t.is_void).reduce((sum, t) => sum + clientOutstanding(t), 0),
+    () => tickets.reduce((sum, t) => sum + clientOutstanding(t), 0),
     [tickets]
   )
   const unallocatedCredit = useMemo(() => payments.reduce((sum, p) => sum + (p.unallocated_amount ?? 0), 0), [payments])
@@ -292,6 +293,7 @@ export default function ClientDetail() {
       `)
       .eq("client_id", id)
       .eq("agent_id", agent.id)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
     setTickets(data ?? [])
     setAllocationTarget(payment)
@@ -315,6 +317,8 @@ export default function ClientDetail() {
 
   const handleDeletePayment = async (paymentId) => {
     if (deletingPaymentId) return
+
+    const deletedPayment = payments.find((p) => p.id === paymentId)
 
     const { data: tps } = await supabase
       .from("ticket_payments")
@@ -356,6 +360,14 @@ export default function ClientDetail() {
     const { error } = await supabase.from("payments").delete().eq("id", paymentId)
     setDeletingPaymentId(null)
     if (error) { setError(error.message); return }
+
+    logActivity({
+      agentId: agent.id,
+      ticketId: ticketIds.size > 0 ? Array.from(ticketIds)[0] : null,
+      eventType: "payment_deleted",
+      description: `Payment deleted — ${fmt(deletedPayment?.amount)} (${deletedPayment?.type ?? "client_payment"})`,
+      metadata: { payment_id: paymentId, amount: deletedPayment?.amount, type: deletedPayment?.type, reversed_tickets: Array.from(ticketIds) },
+    })
 
     fetchAll()
   }
@@ -500,7 +512,7 @@ export default function ClientDetail() {
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {tickets.map((ticket) => {
-                        const outstanding = !ticket.is_void ? clientOutstanding(ticket) : 0
+                        const outstanding = clientOutstanding(ticket)
                         const statusBadge = paymentStatusBadge(ticket.payment_status)
                         const chips = computeTicketChips(ticket)
                         return (

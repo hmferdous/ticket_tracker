@@ -4,6 +4,7 @@ import { supabase } from "../../../lib/supabase"
 import { useAuth } from "../../../context/AuthContext"
 import { generateLedgerPdf } from "../../../lib/generateLedgerPdf"
 import AppLayout from "../../../components/layout/AppLayout"
+import { effectiveSellPrice } from "../../../lib/refunds"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -90,7 +91,7 @@ export default function ClientLedger() {
     const [ticketRes, paymentRes] = await Promise.all([
       supabase
         .from("tickets")
-        .select("id, passenger_name, route, issue_date, sell_price, amount_paid, payment_status, is_void")
+        .select("id, passenger_name, route, issue_date, sell_price, amount_paid, payment_status, is_void, refund_status, void_fee_collected, price_override_source")
         .eq("agent_id", agent.id)
         .eq("client_id", clientId),
       supabase
@@ -110,11 +111,14 @@ export default function ClientLedger() {
     setGenerated(true)
   }
 
-  // Opening balance: everything strictly before dateFrom
+  // Opening balance: everything strictly before dateFrom. A void ticket's
+  // invoiced amount is its cancellation fee (effectiveSellPrice), not the
+  // never-really-billed original sell_price — but it's still a real invoice
+  // line, not excluded outright the way it used to be.
   const openingBalance = useMemo(() => {
     if (!generated || !dateFrom) return null
-    const nonVoidTickets = tickets.filter((t) => !t.is_void && t.issue_date && t.issue_date < dateFrom)
-    const invoiced = nonVoidTickets.reduce((s, t) => s + (t.sell_price ?? 0), 0)
+    const priorTickets = tickets.filter((t) => t.issue_date && t.issue_date < dateFrom)
+    const invoiced = priorTickets.reduce((s, t) => s + effectiveSellPrice(t), 0)
     const received = payments
       .filter((p) => p.type === "client_payment" && p.payment_date && p.payment_date < dateFrom)
       .reduce((s, p) => s + (p.amount ?? 0), 0)
@@ -129,9 +133,10 @@ export default function ClientLedger() {
     if (!generated) return []
     const entries = []
 
-    // Ticket entries (debit)
+    // Ticket entries (debit) — a void ticket still gets an invoice line, for
+    // its cancellation fee (effectiveSellPrice) rather than the original
+    // never-really-billed sell_price
     for (const t of tickets) {
-      if (t.is_void) continue
       if (!t.issue_date) continue
       if (dateFrom && t.issue_date < dateFrom) continue
       if (dateTo && t.issue_date > dateTo) continue
@@ -139,9 +144,9 @@ export default function ClientLedger() {
         _sort: t.issue_date,
         date: t.issue_date,
         type: "invoice",
-        description: `${t.passenger_name ?? ""}${t.route ? ` — ${t.route}` : ""}`,
+        description: `${t.passenger_name ?? ""}${t.route ? ` — ${t.route}` : ""}${t.is_void ? " (Void)" : ""}`,
         refIssueDate: null,
-        debit: t.sell_price ?? 0,
+        debit: effectiveSellPrice(t),
         credit: null,
       })
     }

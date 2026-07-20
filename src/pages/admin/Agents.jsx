@@ -89,7 +89,7 @@ export default function Agents() {
   }
 
   const fetchTicketCounts = async () => {
-    const { data, error } = await supabase.from("tickets").select("agent_id")
+    const { data, error } = await supabase.from("tickets").select("agent_id").is("archived_at", null)
     if (error) return
     const counts = {}
     for (const row of data ?? []) {

@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext"
 import { fetchChannels } from "../../lib/channels"
 import { deriveRefundStatus } from "../../lib/refunds"
 import { blockNonNumericKeys } from "../../lib/numberInput"
+import { logActivity } from "../../lib/activityLog"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -166,6 +167,17 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
         .eq("id", payment.id)
       setSaving(false)
       if (error) { setError(error.message); return }
+
+      if (amount !== payment.amount) {
+        logActivity({
+          agentId: agent.id,
+          paymentId: payment.id,
+          eventType: "payment_edited",
+          description: `Payment edited — amount ${fmt(payment.amount)} → ${fmt(amount)}`,
+          metadata: { before: { amount: payment.amount }, after: { amount } },
+        })
+      }
+
       onSaved?.()
       onClose()
       return
@@ -240,6 +252,18 @@ export default function ViewPaymentModal({ isOpen, onClose, payment, onSaved }) 
     const { error } = await supabase.from("payments").update(baseUpdates).eq("id", payment.id)
     setSaving(false)
     if (error) { setError(error.message); return }
+
+    if (amount !== payment.amount) {
+      logActivity({
+        agentId: agent.id,
+        ticketId: cascadesToTicket ? linkedRefundAlloc.tickets?.id : (payment.type === "supplier_refund" ? payment.ticket_id : null),
+        paymentId: payment.id,
+        eventType: "payment_edited",
+        description: `Payment edited — amount ${fmt(payment.amount)} → ${fmt(amount)}`,
+        metadata: { before: { amount: payment.amount }, after: { amount } },
+      })
+    }
+
     onSaved?.()
     onClose()
   }

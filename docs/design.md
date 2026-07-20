@@ -120,7 +120,7 @@ On save:
 
 ## Row Level Actions on Ticket List
 - Actions are grouped behind a hamburger-menu button per row (not inline buttons) — opens a dropdown, closes on outside click
-- Edit, Delete, and View are always present in the menu
+- Edit, Delete, and View are always present in the menu — "Delete" archives, it does not hard-delete (see "Archive Confirm Modal" below)
 - Contextual actions are shown/hidden per-action based on ticket state, not a fixed per-status table:
   - Void: status not void, not reissued, refund_status not closed
   - Refund: status not void, not reissued, refund_status is null
@@ -134,11 +134,17 @@ On save:
 - Actions that aren't applicable are omitted from the menu entirely, never shown disabled
 - Suppliers list also uses the same hamburger-menu pattern for row actions
 
+## Archive Confirm Modal
+- Opens from the "Delete" row action — replaces the old inline "Delete? Yes/No" row confirm, since archiving a chain needs room to list what's being archived
+- Before showing the confirm, walks the ticket's full reissue descendant tree (children, grandchildren, …) and lists each one (route, travel date, sell price) alongside the ticket being deleted, so the agent can see exactly what's about to be archived as a unit — a solo ticket with no reissue children just shows itself
+- Copy makes clear this archives, not permanently deletes: the ticket record is retained for audit, just hidden from the app — no restore UI exists yet, so frame it as a one-way action for now. Also states that any payment allocated to the ticket is freed for reallocation, not deleted, since that's a real behavior change an agent should know about before confirming
+- On confirm: any ordinary client/supplier payment allocation on the ticket (or its descendants) is reversed and freed back into that payment's unallocated pool first, then archived_at is set on the ticket and every descendant in one action; the whole chain disappears from the list together
+
 ## Void Confirm Modal
 - Opens from the "Void" row action — still a confirm-to-proceed modal ("This cannot be undone"), not a full form
-- Adds an optional "Cancellation fees" section: two independent amount + channel pairs — "Fee charged by supplier" and "Fee charged to client" — both blank by default, no requirement to fill either
-- Blocked with an inline error if an amount is entered on a side the ticket has no client_id/supplier_id for
-- On confirm: any non-zero fee creates a real, channel-tracked payment (client_payment / supplier_payment) allocated to the ticket, in addition to voiding it — so cancellation fees show up in Payments, Channel Ledger, and the entity's payment history like any other transaction
+- Two plain number fields, no channel pickers: "Fee owed to supplier" and "Fee owed by client" — both blank by default (blank = 0), no requirement to fill either
+- Copy makes clear this REPLACES the ticket's sell price and purchase price with the fees entered — the original sale is dropped from every calculation, not just margin — and that no payment is recorded here; collecting/paying the fee happens later through the ordinary Record Payment flow, same as any other ticket
+- On confirm: sell_price/purchase_price are overwritten with the client/supplier fee (this is an "agreed target" like refund_receivable/refund_payable at refund initiation, not a settled transaction — no payments/ticket_payments rows are created). A `void` event is written to the activity log recording the before/after prices
 
 ## Reissue Modal
 - Opens from row level action on ticket list

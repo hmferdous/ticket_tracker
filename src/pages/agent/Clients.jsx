@@ -114,7 +114,8 @@ export default function Clients() {
         .from("tickets")
         .select("client_id, sell_price")
         .eq("agent_id", agent.id)
-        .not("client_id", "is", null),
+        .not("client_id", "is", null)
+        .is("archived_at", null),
       supabase
         .from("payments")
         .select("client_id, amount, unallocated_amount")

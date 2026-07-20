@@ -4,6 +4,7 @@ import { useAuth } from "../../context/AuthContext"
 import { fetchChannels } from "../../lib/channels"
 import { deriveRefundStatus, clientRefundNet, clientOwedBack } from "../../lib/refunds"
 import { blockNonNumericKeys } from "../../lib/numberInput"
+import { logActivity } from "../../lib/activityLog"
 
 const MODE_CONFIG = {
   initiate: { title: "Initiate refund", confirmLabel: "Start refund" },
@@ -96,6 +97,15 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
         .single()
       setLoading(false)
       if (error) { setError(error.message); return }
+
+      logActivity({
+        agentId: agent.id,
+        ticketId: ticket.id,
+        eventType: "refund_initiated",
+        description: `Refund initiated — expected from supplier ${fmt(refundReceivable ?? 0)}, agreed to client ${fmt(refundPayable ?? 0)}`,
+        metadata: { refund_receivable: refundReceivable, refund_payable: refundPayable },
+      })
+
       onSaved(data)
       onClose()
       return
@@ -124,6 +134,22 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
         .single()
       setLoading(false)
       if (error) { setError(error.message); return }
+
+      if (newReceivable !== ticket.refund_receivable || newPayable !== ticket.refund_payable) {
+        logActivity({
+          agentId: agent.id,
+          ticketId: ticket.id,
+          eventType: "refund_terms_edited",
+          description:
+            `Refund terms edited — expected from supplier ${fmt(ticket.refund_receivable ?? 0)} → ${fmt(newReceivable ?? 0)}, ` +
+            `agreed to client ${fmt(ticket.refund_payable ?? 0)} → ${fmt(newPayable ?? 0)}`,
+          metadata: {
+            before: { refund_receivable: ticket.refund_receivable, refund_payable: ticket.refund_payable },
+            after: { refund_receivable: newReceivable, refund_payable: newPayable },
+          },
+        })
+      }
+
       onSaved(data)
       onClose()
       return
@@ -138,7 +164,7 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
       const selectedChannel = channels.find((c) => c.id === channelId)
       const today = new Date().toISOString().split("T")[0]
 
-      const { error: payErr } = await supabase.from("payments").insert({
+      const { data: payRow, error: payErr } = await supabase.from("payments").insert({
         agent_id: agent.id,
         supplier_id: ticket.supplier_id,
         ticket_id: ticket.id,
@@ -148,7 +174,7 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
         channel: selectedChannel?.name ?? null,
         channel_id: channelId || null,
         payment_date: today,
-      })
+      }).select("id").single()
       if (payErr) { setLoading(false); setError(payErr.message); return }
 
       const newReceived = (ticket.refund_received ?? 0) + value
@@ -169,6 +195,16 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
 
       setLoading(false)
       if (error) { setError(error.message); return }
+
+      logActivity({
+        agentId: agent.id,
+        ticketId: ticket.id,
+        paymentId: payRow.id,
+        eventType: "refund_settled_supplier",
+        description: `Supplier refund received — ${fmt(value)}`,
+        metadata: { amount: value },
+      })
+
       onSaved(data)
       onClose()
       return
@@ -232,6 +268,16 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
 
       setLoading(false)
       if (error) { setError(error.message); return }
+
+      logActivity({
+        agentId: agent.id,
+        ticketId: ticket.id,
+        paymentId: payRow.id,
+        eventType: "refund_settled_client",
+        description: `Client refund paid — ${fmt(value)}`,
+        metadata: { amount: value },
+      })
+
       onSaved(data)
       onClose()
       return
@@ -258,6 +304,17 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
         .single()
       setLoading(false)
       if (error) { setError(error.message); return }
+
+      if (value !== ticket.refund_received) {
+        logActivity({
+          agentId: agent.id,
+          ticketId: ticket.id,
+          eventType: "refund_received_adjusted",
+          description: `Refund received total overridden — ${fmt(ticket.refund_received ?? 0)} → ${fmt(value)}`,
+          metadata: { before: ticket.refund_received, after: value },
+        })
+      }
+
       onSaved(data)
       onClose()
       return
@@ -284,6 +341,17 @@ export default function RefundModal({ isOpen, onClose, ticket, mode, onSaved }) 
         .single()
       setLoading(false)
       if (error) { setError(error.message); return }
+
+      if (value !== ticket.refund_paid) {
+        logActivity({
+          agentId: agent.id,
+          ticketId: ticket.id,
+          eventType: "refund_paid_adjusted",
+          description: `Refund paid total overridden — ${fmt(ticket.refund_paid ?? 0)} → ${fmt(value)}`,
+          metadata: { before: ticket.refund_paid, after: value },
+        })
+      }
+
       onSaved(data)
       onClose()
       return

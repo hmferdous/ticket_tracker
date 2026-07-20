@@ -2,6 +2,11 @@ import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import { blockNonNumericKeys } from "../../lib/numberInput"
+import { logActivity } from "../../lib/activityLog"
+
+function fmt(n) {
+  return Number(n ?? 0).toLocaleString("en-BD")
+}
 
 function buildForm(ticket) {
   return {
@@ -186,6 +191,14 @@ export default function ReissueModal({ isOpen, onClose, ticket, onSaved }) {
       setLoading(false)
       return
     }
+
+    logActivity({
+      agentId: agent.id,
+      ticketId: child.id,
+      eventType: "reissue_created",
+      description: `Reissued from ticket ${ticket.pnr || ticket.id} — sell_price ${fmt(sellPrice)}, purchase_price ${fmt(purchasePrice)}`,
+      metadata: { parent_ticket_id: ticket.id, sell_price: sellPrice, purchase_price: purchasePrice },
+    })
 
     setLoading(false)
     onSaved({ parentId: ticket.id, child })

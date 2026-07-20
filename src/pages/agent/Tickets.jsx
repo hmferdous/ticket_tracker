@@ -4,6 +4,7 @@ import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import TicketModal from "../../components/tickets/TicketModal"
 import VoidConfirmModal from "../../components/tickets/VoidConfirmModal"
+import ArchiveConfirmModal from "../../components/tickets/ArchiveConfirmModal"
 import RefundModal from "../../components/tickets/RefundModal"
 import ReissueModal from "../../components/tickets/ReissueModal"
 import EditReissueModal from "../../components/tickets/EditReissueModal"
@@ -13,6 +14,7 @@ import TicketDetailModal from "../../components/tickets/TicketDetailModal"
 import AppLayout from "../../components/layout/AppLayout"
 import { AIRLINES } from "../../lib/airlines"
 import { clientOutstanding } from "../../lib/refunds"
+import { logActivity } from "../../lib/activityLog"
 
 // Row-level actions available for a ticket, based on its current state
 function getRowActions(ticket) {
@@ -23,7 +25,10 @@ function getRowActions(ticket) {
   if (notVoid && notReissued && ticket.refund_status !== "closed") actions.push("void")
   if (notVoid && notReissued && ticket.refund_status === null) actions.push("refund")
   if (notVoid && notReissued && ticket.refund_status !== "initiated") actions.push("reissue")
-  if (ticket.payment_status !== "paid" && notVoid) actions.push("record_payment")
+  // A void ticket can still owe a client fee (sell_price holds the fee once
+  // voided) — record_payment stays available for it as long as there's
+  // actually something to collect, unlike other void-gated actions above.
+  if (ticket.payment_status !== "paid" && (notVoid || (ticket.sell_price ?? 0) > 0)) actions.push("record_payment")
   if (ticket.is_reissue && notVoid) actions.push("edit_reissue_details")
 
   // Both sides settle independently and can take multiple installments —
@@ -324,8 +329,7 @@ export default function Tickets() {
   const [modalOpen, setModalOpen] = useState(false)
   const [editingTicket, setEditingTicket] = useState(null)
   const [cloneMode, setCloneMode] = useState(false)
-  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
-  const [deleting, setDeleting] = useState(false)
+  const [deletingTicket, setDeletingTicket] = useState(null)
   const [compact, setCompact] = useState(true)
 
   // Row-level action modals
@@ -379,6 +383,7 @@ export default function Tickets() {
         created_at
       `)
       .eq("agent_id", agent.id)
+      .is("archived_at", null)
       .order("issue_date", { ascending: false, nullsFirst: false })
 
     setLoading(false)
@@ -522,16 +527,8 @@ export default function Tickets() {
     })
   }
 
-  const handleDelete = async (id) => {
-    setDeleting(true)
-    const { error } = await supabase.from("tickets").delete().eq("id", id)
-    setDeleting(false)
-    if (error) {
-      setError(error.message)
-    } else {
-      setTickets((prev) => prev.filter((t) => t.id !== id))
-      setConfirmDeleteId(null)
-    }
+  const handleArchived = (archivedIds) => {
+    setTickets((prev) => prev.filter((t) => !archivedIds.includes(t.id)))
   }
 
   const openAllocateForClient = async (payment, clientId, clientName) => {
@@ -543,6 +540,7 @@ export default function Tickets() {
       )
       .eq("client_id", clientId)
       .eq("agent_id", agent.id)
+      .is("archived_at", null)
     setAllocationTarget({ payment, tickets: data ?? [], clientName })
   }
 
@@ -592,6 +590,15 @@ export default function Tickets() {
       .single()
 
     if (error) { setError(error.message); return }
+
+    logActivity({
+      agentId: agent.id,
+      ticketId: ticket.id,
+      eventType: "refund_cancelled",
+      description: `Refund cancelled — cleared terms (was expecting ${fmt(ticket.refund_receivable ?? 0)} from supplier, ${fmt(ticket.refund_payable ?? 0)} agreed to client)`,
+      metadata: { refund_receivable: ticket.refund_receivable, refund_payable: ticket.refund_payable },
+    })
+
     handleSaved(data)
   }
 
@@ -827,7 +834,7 @@ export default function Tickets() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {pagedTickets.map((ticket) => {
-                    const outstanding = !ticket.is_void ? clientOutstanding(ticket) : 0
+                    const outstanding = clientOutstanding(ticket)
                     const fmtDate = (d) => d
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                       : <span className="text-gray-300 dark:text-gray-600">—</span>
@@ -848,31 +855,19 @@ export default function Tickets() {
                           <TicketChips ticket={ticket} />
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {confirmDeleteId === ticket.id ? (
-                            <div className="flex items-center justify-end gap-2">
-                              <span className="text-gray-500 dark:text-gray-400 text-xs">Delete?</span>
-                              <button onClick={() => handleDelete(ticket.id)} disabled={deleting} className="text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 px-2.5 py-1 rounded-md transition-colors">
-                                {deleting ? "…" : "Yes"}
-                              </button>
-                              <button onClick={() => setConfirmDeleteId(null)} className="text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors">
-                                No
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex justify-end">
-                              <RowActionsMenu
-                                isOpen={openActionMenuId === ticket.id}
-                                onToggle={() => setOpenActionMenuId((id) => (id === ticket.id ? null : ticket.id))}
-                                onClose={() => setOpenActionMenuId(null)}
-                                items={[
-                                  { key: "edit", label: "Edit", cls: "text-blue-600 dark:text-blue-400", onClick: () => openEdit(ticket) },
-                                  { key: "clone", label: "Clone", cls: "text-gray-700 dark:text-gray-300", onClick: () => openClone(ticket) },
-                                  ...getRowActions(ticket).map((action) => { const config = actionConfig(action, ticket); return config ? { key: action, ...config } : null }).filter(Boolean),
-                                  { key: "delete", label: "Delete", cls: "text-red-600 dark:text-red-400", onClick: () => setConfirmDeleteId(ticket.id) },
-                                ]}
-                              />
-                            </div>
-                          )}
+                          <div className="flex justify-end">
+                            <RowActionsMenu
+                              isOpen={openActionMenuId === ticket.id}
+                              onToggle={() => setOpenActionMenuId((id) => (id === ticket.id ? null : ticket.id))}
+                              onClose={() => setOpenActionMenuId(null)}
+                              items={[
+                                { key: "edit", label: "Edit", cls: "text-blue-600 dark:text-blue-400", onClick: () => openEdit(ticket) },
+                                { key: "clone", label: "Clone", cls: "text-gray-700 dark:text-gray-300", onClick: () => openClone(ticket) },
+                                ...getRowActions(ticket).map((action) => { const config = actionConfig(action, ticket); return config ? { key: action, ...config } : null }).filter(Boolean),
+                                { key: "delete", label: "Delete", cls: "text-red-600 dark:text-red-400", onClick: () => setDeletingTicket(ticket) },
+                              ]}
+                            />
+                          </div>
                         </td>
                       </tr>
                     )
@@ -918,7 +913,7 @@ export default function Tickets() {
                     const fmtD = (d) => d
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                       : <span className="text-gray-300 dark:text-gray-600">—</span>
-                    const detailOutstanding = !ticket.is_void ? clientOutstanding(ticket) : 0
+                    const detailOutstanding = clientOutstanding(ticket)
                     return (
                       <tr key={ticket.id} className="hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">
                         <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{fmtD(ticket.issue_date)}</td>
@@ -949,45 +944,26 @@ export default function Tickets() {
                           <TicketChips ticket={ticket} />
                         </td>
                         <td className="px-4 py-3 text-right">
-                          {confirmDeleteId === ticket.id ? (
-                            <div className="flex items-center justify-end gap-2">
-                              <span className="text-gray-500 dark:text-gray-400 text-xs">Delete?</span>
-                              <button
-                                onClick={() => handleDelete(ticket.id)}
-                                disabled={deleting}
-                                className="text-xs font-medium text-white bg-red-600 hover:bg-red-700 disabled:opacity-60 px-2.5 py-1 rounded-md transition-colors"
-                              >
-                                {deleting ? "…" : "Yes"}
-                              </button>
-                              <button
-                                onClick={() => setConfirmDeleteId(null)}
-                                className="text-xs font-medium text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200 px-2.5 py-1 rounded-md border border-gray-200 dark:border-gray-800 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-                              >
-                                No
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex justify-end">
-                              <RowActionsMenu
-                                isOpen={openActionMenuId === ticket.id}
-                                onToggle={() =>
-                                  setOpenActionMenuId((id) => (id === ticket.id ? null : ticket.id))
-                                }
-                                onClose={() => setOpenActionMenuId(null)}
-                                items={[
-                                  { key: "edit", label: "Edit", cls: "text-blue-600 dark:text-blue-400", onClick: () => openEdit(ticket) },
-                                  { key: "clone", label: "Clone", cls: "text-gray-700 dark:text-gray-300", onClick: () => openClone(ticket) },
-                                  ...getRowActions(ticket)
-                                    .map((action) => {
-                                      const config = actionConfig(action, ticket)
-                                      return config ? { key: action, ...config } : null
-                                    })
-                                    .filter(Boolean),
-                                  { key: "delete", label: "Delete", cls: "text-red-600 dark:text-red-400", onClick: () => setConfirmDeleteId(ticket.id) },
-                                ]}
-                              />
-                            </div>
-                          )}
+                          <div className="flex justify-end">
+                            <RowActionsMenu
+                              isOpen={openActionMenuId === ticket.id}
+                              onToggle={() =>
+                                setOpenActionMenuId((id) => (id === ticket.id ? null : ticket.id))
+                              }
+                              onClose={() => setOpenActionMenuId(null)}
+                              items={[
+                                { key: "edit", label: "Edit", cls: "text-blue-600 dark:text-blue-400", onClick: () => openEdit(ticket) },
+                                { key: "clone", label: "Clone", cls: "text-gray-700 dark:text-gray-300", onClick: () => openClone(ticket) },
+                                ...getRowActions(ticket)
+                                  .map((action) => {
+                                    const config = actionConfig(action, ticket)
+                                    return config ? { key: action, ...config } : null
+                                  })
+                                  .filter(Boolean),
+                                { key: "delete", label: "Delete", cls: "text-red-600 dark:text-red-400", onClick: () => setDeletingTicket(ticket) },
+                              ]}
+                            />
+                          </div>
                         </td>
                       </tr>
                     )
@@ -1054,6 +1030,13 @@ export default function Tickets() {
         onClose={() => setVoidingTicket(null)}
         ticket={voidingTicket}
         onSaved={handleSaved}
+      />
+
+      <ArchiveConfirmModal
+        isOpen={!!deletingTicket}
+        onClose={() => setDeletingTicket(null)}
+        ticket={deletingTicket}
+        onArchived={handleArchived}
       />
 
       <RefundModal

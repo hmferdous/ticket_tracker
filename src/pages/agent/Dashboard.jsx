@@ -3,7 +3,7 @@ import { Eye, EyeOff } from "lucide-react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import AppLayout from "../../components/layout/AppLayout"
-import { clientOutstanding, clientOwedBack, ticketNetMargin, ticketEffectiveSale } from "../../lib/refunds"
+import { clientOutstanding, clientOwedBack, ticketNetMargin, ticketEffectiveSale, supplierOutstanding } from "../../lib/refunds"
 
 function fmt(n) {
   return Number(n ?? 0).toLocaleString("en-BD")
@@ -216,7 +216,8 @@ export default function Dashboard() {
            void_fee_collected, void_fee_paid,
            office_markup, client_id, clients(name), ticket_payments(allocated_amount, type), created_at`
         )
-        .eq("agent_id", agent.id),
+        .eq("agent_id", agent.id)
+        .is("archived_at", null),
       supabase
         .from("payments")
         .select(
@@ -282,21 +283,21 @@ export default function Dashboard() {
     // Client-side outstanding nets sell_price/amount_paid against
     // refund_payable via clientOutstanding — this degrades to the ordinary
     // sell_price - amount_paid for a ticket with no refund at all (refund_payable
-    // is null there), so it can safely apply to every non-void ticket without
-    // a separate "unpaid/partial" pre-filter or a refund_status exclusion.
-    const outstandingReceivable = tickets
-      .filter((t) => !t.is_void)
-      .reduce((sum, t) => sum + clientOutstanding(t), 0)
+    // is null there), and to the fee vs its own amount_paid for a void ticket
+    // (handled inside clientOutstanding), so it applies to every ticket
+    // without a separate void/refund_status pre-filter.
+    const outstandingReceivable = tickets.reduce((sum, t) => sum + clientOutstanding(t), 0)
 
     // Supplier side doesn't have the same "hadn't paid yet" ambiguity a
     // refund can introduce on the client side — once a ticket is refund-active,
     // the remaining purchase_price obligation is extinguished, not reduced to
     // a new target (a pre-payment credit adjustment is a void fee, not a
-    // refund). So this stays excluded entirely rather than netted.
-    const supplierOutstandingEligible = (t) => !t.is_void && t.refund_status == null
+    // refund). So refund-active tickets stay excluded entirely rather than
+    // netted; a void ticket's payable is against its fee, handled inside
+    // supplierOutstanding.
     const totalPayableToSuppliers = tickets
-      .filter(supplierOutstandingEligible)
-      .reduce((sum, t) => sum + Math.max((t.purchase_price ?? 0) - supplierAmountPaid(t), 0), 0)
+      .filter((t) => t.refund_status == null)
+      .reduce((sum, t) => sum + supplierOutstanding({ ...t, supplierAmountPaid: supplierAmountPaid(t) }), 0)
     const officeMarkupContributed = tickets.reduce((sum, t) => sum + (t.office_markup ?? 0), 0)
     return { outstandingReceivable, totalPayableToSuppliers, officeMarkupContributed }
   }, [tickets])

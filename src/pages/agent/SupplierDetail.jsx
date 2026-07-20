@@ -11,7 +11,7 @@ import ViewPaymentModal from "../../components/payments/ViewPaymentModal"
 import DocumentsTab from "../../components/ui/DocumentsTab"
 import AppLayout from "../../components/layout/AppLayout"
 import { reverseTicketPaymentRow, TICKET_REVERSAL_FIELDS } from "../../lib/paymentReversal"
-import { ticketEffectivePurchase } from "../../lib/refunds"
+import { ticketEffectivePurchase, supplierOutstanding, effectivePurchasePrice } from "../../lib/refunds"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -242,14 +242,16 @@ export default function SupplierDetail() {
 
   const totalPurchased = useMemo(() => tickets.reduce((sum, t) => sum + ticketEffectivePurchase(t), 0), [tickets])
   const totalPaid = useMemo(() => payments.reduce((sum, p) => sum + (p.amount ?? 0), 0), [payments])
-  // Void/refund-active tickets don't represent a real payable expectation
-  // anymore — sum per-ticket outstanding instead of netting totalPurchased
-  // against totalPaid, so those tickets can't inflate the balance.
+  // Refund-active tickets don't represent a real payable expectation
+  // anymore — once a refund starts, this is superseded by refund
+  // reconciliation instead (tracked separately). A void ticket's payable is
+  // against its fee (not the original purchase), handled inside
+  // supplierOutstanding, so it isn't excluded here.
   const outstandingPayable = useMemo(
     () =>
       tickets
-        .filter((t) => !t.is_void && t.refund_status == null)
-        .reduce((sum, t) => sum + Math.max((t.purchase_price ?? 0) - (t.supplierAmountPaid ?? 0), 0), 0),
+        .filter((t) => t.refund_status == null)
+        .reduce((sum, t) => sum + supplierOutstanding(t), 0),
     [tickets]
   )
   const unallocated = useMemo(() => payments.reduce((sum, p) => sum + (p.unallocated_amount ?? 0), 0), [payments])
@@ -493,10 +495,8 @@ export default function SupplierDetail() {
                     </thead>
                     <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                       {tickets.map((ticket) => {
-                        const outstanding = !ticket.is_void && ticket.refund_status == null
-                          ? (ticket.purchase_price ?? 0) - (ticket.supplierAmountPaid ?? 0)
-                          : 0
-                        const status = derivePaymentStatus(ticket.supplierAmountPaid ?? 0, ticket.purchase_price ?? 0)
+                        const outstanding = ticket.refund_status == null ? supplierOutstanding(ticket) : 0
+                        const status = derivePaymentStatus(ticket.supplierAmountPaid ?? 0, effectivePurchasePrice(ticket))
                         const statusBadge = paymentStatusBadge(status)
                         return (
                           <tr

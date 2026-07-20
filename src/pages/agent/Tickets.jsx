@@ -24,7 +24,10 @@ function getRowActions(ticket) {
   if (notVoid && notReissued && ticket.refund_status !== "closed") actions.push("void")
   if (notVoid && notReissued && ticket.refund_status === null) actions.push("refund")
   if (notVoid && notReissued && ticket.refund_status !== "initiated") actions.push("reissue")
-  if (ticket.payment_status !== "paid" && notVoid) actions.push("record_payment")
+  // A void ticket can still owe a client fee (sell_price holds the fee once
+  // voided) — record_payment stays available for it as long as there's
+  // actually something to collect, unlike other void-gated actions above.
+  if (ticket.payment_status !== "paid" && (notVoid || (ticket.sell_price ?? 0) > 0)) actions.push("record_payment")
   if (ticket.is_reissue && notVoid) actions.push("edit_reissue_details")
 
   // Both sides settle independently and can take multiple installments —
@@ -821,7 +824,7 @@ export default function Tickets() {
                 </thead>
                 <tbody className="divide-y divide-gray-100 dark:divide-gray-800">
                   {pagedTickets.map((ticket) => {
-                    const outstanding = !ticket.is_void ? clientOutstanding(ticket) : 0
+                    const outstanding = clientOutstanding(ticket)
                     const fmtDate = (d) => d
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                       : <span className="text-gray-300 dark:text-gray-600">—</span>
@@ -900,7 +903,7 @@ export default function Tickets() {
                     const fmtD = (d) => d
                       ? new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
                       : <span className="text-gray-300 dark:text-gray-600">—</span>
-                    const detailOutstanding = !ticket.is_void ? clientOutstanding(ticket) : 0
+                    const detailOutstanding = clientOutstanding(ticket)
                     return (
                       <tr key={ticket.id} className="hover:bg-slate-50 dark:hover:bg-gray-800 transition-colors">
                         <td className="px-4 py-3 text-xs text-gray-500 dark:text-gray-400">{fmtD(ticket.issue_date)}</td>

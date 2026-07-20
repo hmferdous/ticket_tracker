@@ -43,12 +43,11 @@ Never disable RLS on any table
 ## Margin Calculations
 
 ### Per Ticket
-- ticket_margin = sell_price - purchase_price
+- ticket_margin = effectiveSellPrice - effectivePurchasePrice (src/lib/refunds.js) — plain sell_price/purchase_price for almost every ticket. For an "untouched void" (is_void = true AND refund_status still null — voided before any refund negotiation, i.e. no real money was ever actually transacted) voided under the current model, sell_price/purchase_price were themselves REPLACED with the cancellation fees at void time (see Void Flow), so this already reads the fee — no separate void term needed. Only for a void ticket predating that change (price_override_source not "void", so its sell_price/purchase_price are still the stale original) does this substitute void_fee_collected/void_fee_paid instead, so historical data doesn't inflate margin with a number that was never real
 - refund_margin = refund_receivable - refund_payable — booked/agreed basis, matching ticket_margin's own accrual nature (sell_price/purchase_price are booked values too, not amounts actually collected/paid). Uses refund_receivable (what the supplier agreed to), not refund_received (what's actually landed so far) — otherwise net_margin would fluctuate purely with how far supplier-side collection has progressed rather than reflecting the deal's real economics, even though the agreed terms haven't changed
-- void_fee_margin = void_fee_collected - void_fee_paid
-- net_margin = ticket_margin + refund_margin + void_fee_margin — EXCEPT for an "untouched void" (is_void = true AND refund_status is still null — voided before any refund negotiation, i.e. no real money was ever actually transacted per Void Flow), where net_margin collapses to just void_fee_margin. ticket_margin/refund_margin are meaningless for a ticket that was never really bought or sold; only a standalone cancellation fee (if any) is real. A void ticket that WAS paid and then went through the refund flow (refund_status set) is not "untouched" — it's treated like any other refunded ticket, full formula above. See ticketNetMargin in src/lib/refunds.js (the canonical implementation — Dashboard/ClientDetail/SupplierDetail/Ledger reports all import it rather than reimplementing)
+- net_margin = ticket_margin + refund_margin. See ticketNetMargin in src/lib/refunds.js (the canonical implementation — Dashboard/ClientDetail/SupplierDetail/Ledger reports all import it rather than reimplementing)
 
-Note: the reissue breakdown fields (airlines_penalty, reissue_margin, commission, fare_difference) are NOT separately added to net_margin. They are already embedded in sell_price and purchase_price on the child reissue ticket. Adding them again would double-count. void_fee_collected/void_fee_paid ARE separately added — they're a standalone transaction tied to the void event, not embedded in sell_price/purchase_price anywhere.
+Note: the reissue breakdown fields (airlines_penalty, reissue_margin, commission, fare_difference) are NOT separately added to net_margin. They are already embedded in sell_price and purchase_price on the child reissue ticket. Adding them again would double-count.
 
 ### Reissue Profit ("Profit From Reissue" in the modal, display only, not separately added to net_margin)
 - profit_from_reissue = sell_price - purchase_price (the reissue child's own ticket_margin) = reissue_margin + commission, since airlines_penalty and fare_difference cancel out between the two prices
@@ -58,8 +57,8 @@ Note: the reissue breakdown fields (airlines_penalty, reissue_margin, commission
 - chain_net_margin = SUM(net_margin) across parent ticket and all tickets where parent_ticket_id = parent.id
 
 ### Dashboard Reporting
-- Total Sales (Dashboard) / Total Billed (Client Detail) = SUM(ticketEffectiveSale) across the relevant tickets — sell_price net of any agreed refund_payable, plus void_fee_collected, EXCEPT an untouched void (see "Per Ticket" above) which contributes only void_fee_collected, never its never-really-billed sell_price. See ticketEffectiveSale in src/lib/refunds.js
-- Total Purchased (Supplier Detail) = SUM(ticketEffectivePurchase) — the mirror: purchase_price net of refund_receivable, plus void_fee_paid, with the same untouched-void carve-out (contributes only void_fee_paid). See ticketEffectivePurchase in src/lib/refunds.js
+- Total Sales (Dashboard) / Total Billed (Client Detail) = SUM(ticketEffectiveSale) across the relevant tickets — sell_price net of any agreed refund_payable (see "Per Ticket" above for how a void ticket's sell_price is itself the cancellation fee). See ticketEffectiveSale in src/lib/refunds.js
+- Total Purchased (Supplier Detail) = SUM(ticketEffectivePurchase) — the mirror: purchase_price net of refund_receivable. See ticketEffectivePurchase in src/lib/refunds.js
 - Total Profit = SUM(net_margin) across all tickets in period
 - Office Margin = SUM(office_markup) across all tickets in period
 - Total Refunded to Clients = SUM(tickets.refund_paid) across all tickets — ticket-level, not the payments table. refund_paid is the running cumulative total (see "Refund Architecture"), kept in sync with the real client_refund payment rows by every recording path
@@ -238,14 +237,55 @@ AllocationModal (client bulk payments) and SupplierAllocationModal (supplier bul
 ### Void Flow
 - Agent marks ticket as void — status → void, is_void = true
 - Ticket stays in system for audit trail — never deleted
-- If client had paid — refund flow still applies (Type 2, partial refund with penalty, covers a supplier penalty / reduced client refund on an already-paid ticket)
-- If no money exchanged — ticket sits as void record with zero margin impact, unless...
-- Cancellation fees (VoidConfirmModal): optional, entered on the void action itself — a supplier fee charged to the agent, and/or a fee the agent charges the client for handling the cancellation. Independent of the refund flow — this is for a ticket that was never actually paid/purchased for real money, just a standalone administrative charge tied to voiding it. Both optional, blank by default.
-  - void_fee_paid stored on the ticket; if > 0, also creates a real supplier_payment row (channel-tracked) linked via a ticket_payments row with type=void_fee_supplier
-  - void_fee_collected stored on the ticket; if > 0, also creates a real client_payment row (channel-tracked) linked via a ticket_payments row with type=void_fee_client
-  - Both ticket_payments types are deliberately distinct from type=client/supplier — they're excluded from the amount_paid/supplierAmountPaid derivation (that SUM only counts type=client/supplier), since these fees aren't paying down the original sell_price/purchase_price
-  - Requires the ticket to actually have a client_id/supplier_id linked before that side's fee can be entered
-  - void_fee_margin = void_fee_collected - void_fee_paid, folded into net_margin (see Margin Calculations)
+- If client had paid — refund flow still applies (Type 2, partial refund with penalty, covers a supplier penalty / reduced client refund on an already-paid ticket). This is the pre-existing "was actually paid for" path and is untouched by the change below.
+- Otherwise (nothing real was ever transacted — the ordinary case): voiding REPLACES sell_price and purchase_price with the cancellation fees entered in VoidConfirmModal, dropping the original sale from every calculation entirely, not just from margin. Both fees are optional, blank-by-default; a blank fee sets that side's price to 0.
+  - void_fee_collected (fee owed by the client) is written to BOTH void_fee_collected and sell_price
+  - void_fee_paid (fee owed to the supplier) is written to BOTH void_fee_paid and purchase_price
+  - price_override_source is set to "void" on the ticket (see "Price Override Tracking" below)
+  - payment_status is recomputed against the new sell_price (the fee), not the original
+  - No payment record is created at void time — this is an agreed target, exactly like refund_receivable/refund_payable at refund initiation, not a settled transaction. Collecting the client fee or paying the supplier fee later goes through the ordinary Record Payment flow, against the ticket's (now fee-sized) sell_price/purchase_price, using the existing amount_paid/supplierAmountPaid derivation unchanged — no new payment mechanism needed
+  - A `void` event is written to ticket_activity_log recording the before/after prices and the fee amounts (see "Activity Log" below)
+  - Outstanding/payable/margin formulas (clientOutstanding, supplierOutstanding, ticketNetMargin, ticketEffectiveSale, ticketEffectivePurchase in src/lib/refunds.js) read sell_price/purchase_price directly and need no void-specific branching as a result — EXCEPT a backward-compatibility fallback for void tickets created before this change, which still carry their original untouched sell_price/purchase_price with the fee living only in void_fee_collected/void_fee_paid; those are detected by price_override_source not being "void" and substitute the fee in instead
+
+### Price Override Tracking
+- `tickets.price_override_source` — nullable text. Set whenever something OTHER than a manual TicketModal edit changes sell_price/purchase_price (today: `"void"`; extensible to any future automated overwrite). Cleared back to null the next time the agent manually edits the ticket's price through the normal edit flow, since that's a deliberate, self-explanatory agent action that no longer needs an explanatory flag.
+- Distinct from the activity log: this is a fast, queryable "was this auto-set" signal for the UI (e.g. a badge next to Sell/Purchase Price); the log is the actual explanation of what happened and when.
+
+### Activity Log
+- `ticket_activity_log` — append-only audit trail. One row per event, never updated or deleted.
+  - `id`, `agent_id`
+  - `ticket_id` — nullable. Set for ticket-scoped events (price edits, void, reissue, archive).
+  - `payment_id` — nullable, FK to payments. Set for payment-lifecycle events. A payment can touch zero, one, or many tickets over its life (bulk payments get allocated across several), so payment events are logged once per payment, not once per ticket — `metadata` lists which ticket(s) were affected. At least one of ticket_id/payment_id is set; both can be set together (e.g. "payment allocated to ticket X").
+  - `event_type` — plain text, not a CHECK-constrained enum, so a new event type never needs a migration. Current values: `void`. Planned as other flows get wired up: `ticket_created`, `ticket_price_edited`, `reissue_created`, `reissue_edited`, `archived`, `archive_freed_allocation`, `payment_created`, `payment_edited`, `payment_deleted`, `payment_allocated`, `refund_initiated`, `refund_terms_edited`, `refund_settled_supplier`, `refund_settled_client`, `refund_cancelled`
+  - `description` — human-readable one-liner
+  - `metadata` — jsonb, structured before/after values for programmatic use
+  - `created_at`
+- Writes go through `logActivity()` in src/lib/activityLog.js — one shared insert path so every call site writes the same shape. Logging failures are swallowed (logged to console, not surfaced to the agent) — it's a best-effort audit trail, never something that should block the mutation it's describing.
+- No viewer UI yet — this is the DB-level foundation (schema + writes), a dedicated history view is future work.
+
+**New schema needed:**
+```sql
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS price_override_source text;
+
+CREATE TABLE IF NOT EXISTS ticket_activity_log (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id uuid NOT NULL REFERENCES agents(id),
+  ticket_id uuid REFERENCES tickets(id),
+  payment_id uuid REFERENCES payments(id),
+  event_type text NOT NULL,
+  description text NOT NULL,
+  metadata jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+ALTER TABLE ticket_activity_log ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Agents manage their own activity log"
+  ON ticket_activity_log
+  FOR ALL
+  USING (agent_id = (SELECT id FROM agents WHERE user_id = auth.uid()))
+  WITH CHECK (agent_id = (SELECT id FROM agents WHERE user_id = auth.uid()));
+```
 
 ### Archive Flow
 - Tickets are never hard-deleted from the Tickets page. What used to be "Delete" now archives — sets archived_at = now() — so the row (and every real payment ever recorded against it) is retained for audit, never destroyed. There is no unarchive/restore UI yet; this is a one-way action from the agent's perspective.

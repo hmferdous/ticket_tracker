@@ -14,6 +14,7 @@ import TicketDetailModal from "../../components/tickets/TicketDetailModal"
 import AppLayout from "../../components/layout/AppLayout"
 import { AIRLINES } from "../../lib/airlines"
 import { clientOutstanding } from "../../lib/refunds"
+import { logActivity } from "../../lib/activityLog"
 
 // Row-level actions available for a ticket, based on its current state
 function getRowActions(ticket) {
@@ -589,6 +590,15 @@ export default function Tickets() {
       .single()
 
     if (error) { setError(error.message); return }
+
+    logActivity({
+      agentId: agent.id,
+      ticketId: ticket.id,
+      eventType: "refund_cancelled",
+      description: `Refund cancelled — cleared terms (was expecting ${fmt(ticket.refund_receivable ?? 0)} from supplier, ${fmt(ticket.refund_payable ?? 0)} agreed to client)`,
+      metadata: { refund_receivable: ticket.refund_receivable, refund_payable: ticket.refund_payable },
+    })
+
     handleSaved(data)
   }
 

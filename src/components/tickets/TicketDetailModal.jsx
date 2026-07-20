@@ -187,9 +187,10 @@ export default function TicketDetailModal({ isOpen, onClose, ticket, tickets, on
             <div>
               <h3 className="text-xs font-semibold text-gray-400 dark:text-gray-500 uppercase tracking-wide mb-3">Reissue Details</h3>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                <Field label="Reissue Fee Collected" value={fmt(ticket.reissue_fee_collected)} />
-                <Field label="Reissue Fee Paid" value={fmt(ticket.reissue_fee_paid)} />
+                <Field label="Airlines Penalty" value={fmt(ticket.airlines_penalty)} />
                 <Field label="Fare Difference" value={fmt(ticket.fare_difference)} />
+                <Field label="Reissue Margin" value={fmt(ticket.reissue_margin)} />
+                <Field label="Commission" value={fmt(ticket.commission)} />
               </div>
             </div>
           )}

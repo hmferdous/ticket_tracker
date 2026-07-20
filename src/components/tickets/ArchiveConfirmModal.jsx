@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react"
 import { supabase } from "../../lib/supabase"
+import { useAuth } from "../../context/AuthContext"
 import { reverseTicketPaymentRow, TICKET_REVERSAL_FIELDS } from "../../lib/paymentReversal"
+import { logActivity } from "../../lib/activityLog"
 
 function fmt(n) {
   return Number(n ?? 0).toLocaleString("en-BD")
@@ -36,7 +38,7 @@ async function fetchDescendants(ticketId) {
 // 0 from the start), never part of a shared pool to begin with; refund
 // netting has its own refund_status knock-on effects that deserve separate
 // handling, not bundling into an archive action.
-async function freePaymentAllocations(ticketIds, ticketLabels) {
+async function freePaymentAllocations(agentId, ticketIds, ticketLabels) {
   const { data: tps } = await supabase
     .from("ticket_payments")
     .select("id, payment_id, ticket_id, allocated_amount, type")
@@ -93,10 +95,19 @@ async function freePaymentAllocations(ticketIds, ticketLabels) {
       .from("payments")
       .update({ unallocated_amount: (payment.unallocated_amount ?? 0) + entry.total, notes: newNotes })
       .eq("id", paymentId)
+
+    logActivity({
+      agentId,
+      paymentId,
+      eventType: "archive_freed_allocation",
+      description: noteLine,
+      metadata: { freed_amount: entry.total, from_tickets: Array.from(entry.labels) },
+    })
   }
 }
 
 export default function ArchiveConfirmModal({ isOpen, onClose, ticket, onArchived }) {
+  const { agent } = useAuth()
   const [descendants, setDescendants] = useState([])
   const [loadingChain, setLoadingChain] = useState(false)
   const [archiving, setArchiving] = useState(false)
@@ -125,7 +136,7 @@ export default function ArchiveConfirmModal({ isOpen, onClose, ticket, onArchive
     )
 
     try {
-      await freePaymentAllocations(allIds, ticketLabels)
+      await freePaymentAllocations(agent.id, allIds, ticketLabels)
     } catch (e) {
       setArchiving(false)
       setError(e.message ?? "Failed to free existing payment allocations")
@@ -141,6 +152,16 @@ export default function ArchiveConfirmModal({ isOpen, onClose, ticket, onArchive
       setError(error.message)
       return
     }
+
+    for (const id of allIds) {
+      logActivity({
+        agentId: agent.id,
+        ticketId: id,
+        eventType: "archived",
+        description: `Archived — ${ticketLabels.get(id)}`,
+      })
+    }
+
     onArchived(allIds)
     onClose()
   }

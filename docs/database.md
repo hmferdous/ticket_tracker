@@ -256,7 +256,7 @@ AllocationModal (client bulk payments) and SupplierAllocationModal (supplier bul
   - `id`, `agent_id`
   - `ticket_id` — nullable. Set for ticket-scoped events (price edits, void, reissue, archive).
   - `payment_id` — nullable, FK to payments. Set for payment-lifecycle events. A payment can touch zero, one, or many tickets over its life (bulk payments get allocated across several), so payment events are logged once per payment, not once per ticket — `metadata` lists which ticket(s) were affected. At least one of ticket_id/payment_id is set; both can be set together (e.g. "payment allocated to ticket X").
-  - `event_type` — plain text, not a CHECK-constrained enum, so a new event type never needs a migration. Current values: `void`. Planned as other flows get wired up: `ticket_created`, `ticket_price_edited`, `reissue_created`, `reissue_edited`, `archived`, `archive_freed_allocation`, `payment_created`, `payment_edited`, `payment_deleted`, `payment_allocated`, `refund_initiated`, `refund_terms_edited`, `refund_settled_supplier`, `refund_settled_client`, `refund_cancelled`
+  - `event_type` — plain text, not a CHECK-constrained enum, so a new event type never needs a migration. Wired up so far: `void` (VoidConfirmModal), `ticket_created`/`ticket_price_edited` (TicketModal), `reissue_created` (ReissueModal), `reissue_edited` (EditReissueModal), `archived`/`archive_freed_allocation` (ArchiveConfirmModal). Not yet wired: `payment_created`, `payment_edited`, `payment_deleted`, `payment_allocated`, `refund_initiated`, `refund_terms_edited`, `refund_settled_supplier`, `refund_settled_client`, `refund_cancelled`
   - `description` — human-readable one-liner
   - `metadata` — jsonb, structured before/after values for programmatic use
   - `created_at`

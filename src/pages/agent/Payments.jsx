@@ -204,6 +204,7 @@ export default function Payments() {
         )
         .eq("client_id", payment.client_id)
         .eq("agent_id", agent.id)
+        .is("archived_at", null)
       setAllocationTarget({ kind: "client", payment, tickets: data ?? [], name: payment.clients?.name })
     } else if (payment.supplier_id) {
       const { data } = await supabase
@@ -214,6 +215,7 @@ export default function Payments() {
         )
         .eq("supplier_id", payment.supplier_id)
         .eq("agent_id", agent.id)
+        .is("archived_at", null)
       const withSupplierPaid = (data ?? []).map((t) => ({
         ...t,
         supplierAmountPaid: (t.ticket_payments ?? [])

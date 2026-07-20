@@ -212,6 +212,7 @@ export default function SupplierDetail() {
           `)
           .eq("supplier_id", id)
           .eq("agent_id", agent.id)
+          .is("archived_at", null)
           .order("created_at", { ascending: false }),
         supabase
           .from("payments")
@@ -275,6 +276,7 @@ export default function SupplierDetail() {
       `)
       .eq("supplier_id", id)
       .eq("agent_id", agent.id)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
     const withSupplierPaid = (data ?? []).map((t) => ({
       ...t,

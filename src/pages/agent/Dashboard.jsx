@@ -216,7 +216,8 @@ export default function Dashboard() {
            void_fee_collected, void_fee_paid,
            office_markup, client_id, clients(name), ticket_payments(allocated_amount, type), created_at`
         )
-        .eq("agent_id", agent.id),
+        .eq("agent_id", agent.id)
+        .is("archived_at", null),
       supabase
         .from("payments")
         .select(

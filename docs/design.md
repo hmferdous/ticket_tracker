@@ -120,7 +120,7 @@ On save:
 
 ## Row Level Actions on Ticket List
 - Actions are grouped behind a hamburger-menu button per row (not inline buttons) — opens a dropdown, closes on outside click
-- Edit, Delete, and View are always present in the menu
+- Edit, Delete, and View are always present in the menu — "Delete" archives, it does not hard-delete (see "Archive Confirm Modal" below)
 - Contextual actions are shown/hidden per-action based on ticket state, not a fixed per-status table:
   - Void: status not void, not reissued, refund_status not closed
   - Refund: status not void, not reissued, refund_status is null
@@ -133,6 +133,12 @@ On save:
   - Edit Reissue Details: shown on reissue child tickets (is_reissue = true), not void
 - Actions that aren't applicable are omitted from the menu entirely, never shown disabled
 - Suppliers list also uses the same hamburger-menu pattern for row actions
+
+## Archive Confirm Modal
+- Opens from the "Delete" row action — replaces the old inline "Delete? Yes/No" row confirm, since archiving a chain needs room to list what's being archived
+- Before showing the confirm, walks the ticket's full reissue descendant tree (children, grandchildren, …) and lists each one (route, travel date, sell price) alongside the ticket being deleted, so the agent can see exactly what's about to be archived as a unit — a solo ticket with no reissue children just shows itself
+- Copy makes clear this archives, not permanently deletes: the ticket (and its real payment history) is retained for audit, just hidden from the app — no restore UI exists yet, so frame it as a one-way action for now
+- On confirm, sets archived_at on the ticket and every descendant in one action; the whole chain disappears from the list together
 
 ## Void Confirm Modal
 - Opens from the "Void" row action — still a confirm-to-proceed modal ("This cannot be undone"), not a full form

@@ -113,7 +113,8 @@ export default function Suppliers() {
         .from("tickets")
         .select("supplier_id, purchase_price")
         .eq("agent_id", agent.id)
-        .not("supplier_id", "is", null),
+        .not("supplier_id", "is", null)
+        .is("archived_at", null),
       supabase
         .from("payments")
         .select("supplier_id, amount, unallocated_amount")

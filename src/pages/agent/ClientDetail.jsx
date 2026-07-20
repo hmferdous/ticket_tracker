@@ -234,6 +234,7 @@ export default function ClientDetail() {
         `)
         .eq("client_id", id)
         .eq("agent_id", agent.id)
+        .is("archived_at", null)
         .order("created_at", { ascending: false }),
       supabase
         .from("payments")
@@ -292,6 +293,7 @@ export default function ClientDetail() {
       `)
       .eq("client_id", id)
       .eq("agent_id", agent.id)
+      .is("archived_at", null)
       .order("created_at", { ascending: false })
     setTickets(data ?? [])
     setAllocationTarget(payment)

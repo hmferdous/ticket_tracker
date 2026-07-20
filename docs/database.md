@@ -38,6 +38,7 @@ Never disable RLS on any table
 - refund_payable — how much you're liable to hand the client back, not a discount/target amount. 0 (or unset) = non-refundable, client still owes the full remaining sell_price. Equal to sell_price = full forgiveness. See "Client Net Position" under Refund Architecture for how this nets against amount_paid
 - refund_paid — actual refund paid to client
 - refund_notes — free-text note entered when initiating a refund (own column, not appended to narration)
+- archived_at — nullable timestamptz. Set when an agent "deletes" a ticket from the Tickets page — see "Archive Flow" below. Null = active/live ticket.
 
 ## Margin Calculations
 
@@ -246,6 +247,18 @@ AllocationModal (client bulk payments) and SupplierAllocationModal (supplier bul
   - Requires the ticket to actually have a client_id/supplier_id linked before that side's fee can be entered
   - void_fee_margin = void_fee_collected - void_fee_paid, folded into net_margin (see Margin Calculations)
 
+### Archive Flow
+- Tickets are never hard-deleted from the Tickets page. What used to be "Delete" now archives — sets archived_at = now() — so the row (and every real payment ever recorded against it) is retained for audit, never destroyed. There is no unarchive/restore UI yet; this is a one-way action from the agent's perspective.
+- A reissue chain archives as a unit. Because a reissue can itself be reissued (parent_ticket_id chains can be more than one level deep), archiving a ticket walks the full descendant tree (children, grandchildren, …) and archives all of them together in one action, never leaving an orphaned child pointing at an archived-but-still-"active" parent or vice versa. The confirm dialog lists every descendant that will be archived (route, date, sell_price) before the agent commits.
+- Archived tickets are excluded from: the Tickets page, Dashboard stats, Client Detail / Supplier Detail (ticket lists and aggregate stats), ticket pickers (allocation modals, log-payment ticket dropdowns), Clients/Suppliers list-page aggregate stats, and the Settings data export. There is no way for an agent to see an archived ticket right now — that's intentional; a dedicated archive view is a future feature, not part of this pass.
+- payments and ticket_payments rows are NEVER touched by archiving — only the tickets row's archived_at is set. A payment that was allocated to a now-archived ticket keeps its ticket_payments link exactly as before.
+- Client/Supplier/Channel Ledger reports are explicitly EXEMPT from the archived_at filter. They're the historical accounting record (invoiced from tickets, received from payments, computed as two independent queries) — filtering archived tickets out of the invoiced side while their real payments still land on the received side would desync the running balance. Ledgers always show the full history, archived or not.
+
+**New column needed** — archived_at doesn't exist in the schema yet:
+```sql
+ALTER TABLE tickets ADD COLUMN IF NOT EXISTS archived_at timestamptz;
+```
+
 ## Reissue Architecture
 
 ### Core Concept
@@ -266,13 +279,8 @@ Only reissue_margin and commission actually move the margin — airlines_penalty
 
 Each reissue is its own small, fully independent, auditable ticket row — its own sell_price, its own outstanding (sell_price - amount_paid - refund_payable), its own margin (sell_price - purchase_price). The parent ticket is untouched by the reissue — it keeps its full original sell_price/purchase_price permanently, in whatever period it was originally booked in, regardless of how many times it's later reissued. This is deliberate: a reissue happening in a later month must never retroactively change an earlier month's already-reported numbers, and the reissue's own fee must be tagged to the month it actually happened in — not smeared across both.
 
-**New columns needed** — airlines_penalty, reissue_margin, and commission don't exist in the schema yet and need to be added before this works:
-```sql
-ALTER TABLE tickets
-  ADD COLUMN airlines_penalty numeric,
-  ADD COLUMN reissue_margin numeric,
-  ADD COLUMN commission numeric;
-```
+airlines_penalty, reissue_margin, and commission columns — already applied.
+
 reissue_fee_collected and reissue_fee_paid are deprecated by this — new reissues no longer write to them (their old data stays for historical/audit purposes on existing rows, just not written going forward). If there's existing reissued-ticket data under the prior two-field breakdown model that needs preserving under the new one, that's a judgment call on how to map reissue_fee_collected/reissue_fee_paid onto the new fields (they don't correspond 1:1 — the old model didn't distinguish pass-through penalty from margin, or fare-difference-driven commission from a flat fee) rather than a mechanical migration — no SQL is prescribed for that.
 
 sell_price and purchase_price are directly editable inputs, not read-only displays — an agent who already knows the final numbers can type them straight in and skip the breakdown fields entirely, since those are optional. If the breakdown fields ARE used, they drive the price fields live — but only until the agent types into a price field directly, at which point that field detaches permanently (a manual edit always wins over the breakdown, regardless of entry order) and an inline hint surfaces if the two then disagree, with a one-click way to re-sync. Commission has this same detach/auto-calc/mismatch-hint behavior as its own field, independent of Sell Price/Purchase Price. See docs/design.md's Reissue Modal section for the full behavior. A separate reference-only "new ticket total" line (original_sell_price + whichever sell_price actually gets saved) is shown alongside for the agent's convenience, so they can still see the cumulative picture — it is never stored anywhere.

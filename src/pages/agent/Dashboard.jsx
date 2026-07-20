@@ -3,7 +3,7 @@ import { Eye, EyeOff } from "lucide-react"
 import { supabase } from "../../lib/supabase"
 import { useAuth } from "../../context/AuthContext"
 import AppLayout from "../../components/layout/AppLayout"
-import { clientOutstanding, clientOwedBack } from "../../lib/refunds"
+import { clientOutstanding, clientOwedBack, ticketNetMargin, ticketEffectiveSale } from "../../lib/refunds"
 
 function fmt(n) {
   return Number(n ?? 0).toLocaleString("en-BD")
@@ -12,17 +12,6 @@ function fmt(n) {
 function fmtDate(d) {
   if (!d) return "—"
   return new Date(d).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
-}
-
-function ticketNetMargin(t) {
-  const ticketMargin = (t.sell_price ?? 0) - (t.purchase_price ?? 0)
-  // Booked/agreed basis, matching ticket_margin's own accrual nature — uses
-  // refund_receivable (what the supplier agreed to) rather than refund_received
-  // (what's actually landed so far), so this reflects the deal's true
-  // economics instead of fluctuating with how far collection has progressed.
-  const refundMargin = (t.refund_receivable ?? 0) - (t.refund_payable ?? 0)
-  const voidFeeMargin = (t.void_fee_collected ?? 0) - (t.void_fee_paid ?? 0)
-  return ticketMargin + refundMargin + voidFeeMargin
 }
 
 function supplierAmountPaid(t) {
@@ -278,7 +267,7 @@ export default function Dashboard() {
   // Period stats — affected by date filter
   const periodStats = useMemo(() => ({
     totalTickets: filteredTickets.length,
-    totalRevenue: filteredTickets.reduce((sum, t) => sum + (t.sell_price ?? 0), 0),
+    totalRevenue: filteredTickets.reduce((sum, t) => sum + ticketEffectiveSale(t), 0),
     totalMargin: filteredTickets.reduce((sum, t) => sum + ticketNetMargin(t), 0),
     officeMargin: filteredTickets.reduce((sum, t) => sum + (t.office_markup ?? 0), 0),
   }), [filteredTickets])

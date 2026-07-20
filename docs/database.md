@@ -45,7 +45,7 @@ Never disable RLS on any table
 - ticket_margin = sell_price - purchase_price
 - refund_margin = refund_receivable - refund_payable — booked/agreed basis, matching ticket_margin's own accrual nature (sell_price/purchase_price are booked values too, not amounts actually collected/paid). Uses refund_receivable (what the supplier agreed to), not refund_received (what's actually landed so far) — otherwise net_margin would fluctuate purely with how far supplier-side collection has progressed rather than reflecting the deal's real economics, even though the agreed terms haven't changed
 - void_fee_margin = void_fee_collected - void_fee_paid
-- net_margin = ticket_margin + refund_margin + void_fee_margin
+- net_margin = ticket_margin + refund_margin + void_fee_margin — EXCEPT for an "untouched void" (is_void = true AND refund_status is still null — voided before any refund negotiation, i.e. no real money was ever actually transacted per Void Flow), where net_margin collapses to just void_fee_margin. ticket_margin/refund_margin are meaningless for a ticket that was never really bought or sold; only a standalone cancellation fee (if any) is real. A void ticket that WAS paid and then went through the refund flow (refund_status set) is not "untouched" — it's treated like any other refunded ticket, full formula above. See ticketNetMargin in src/lib/refunds.js (the canonical implementation — Dashboard/ClientDetail/SupplierDetail/Ledger reports all import it rather than reimplementing)
 
 Note: the reissue breakdown fields (airlines_penalty, reissue_margin, commission, fare_difference) are NOT separately added to net_margin. They are already embedded in sell_price and purchase_price on the child reissue ticket. Adding them again would double-count. void_fee_collected/void_fee_paid ARE separately added — they're a standalone transaction tied to the void event, not embedded in sell_price/purchase_price anywhere.
 
@@ -57,6 +57,8 @@ Note: the reissue breakdown fields (airlines_penalty, reissue_margin, commission
 - chain_net_margin = SUM(net_margin) across parent ticket and all tickets where parent_ticket_id = parent.id
 
 ### Dashboard Reporting
+- Total Sales (Dashboard) / Total Billed (Client Detail) = SUM(ticketEffectiveSale) across the relevant tickets — sell_price net of any agreed refund_payable, plus void_fee_collected, EXCEPT an untouched void (see "Per Ticket" above) which contributes only void_fee_collected, never its never-really-billed sell_price. See ticketEffectiveSale in src/lib/refunds.js
+- Total Purchased (Supplier Detail) = SUM(ticketEffectivePurchase) — the mirror: purchase_price net of refund_receivable, plus void_fee_paid, with the same untouched-void carve-out (contributes only void_fee_paid). See ticketEffectivePurchase in src/lib/refunds.js
 - Total Profit = SUM(net_margin) across all tickets in period
 - Office Margin = SUM(office_markup) across all tickets in period
 - Total Refunded to Clients = SUM(tickets.refund_paid) across all tickets — ticket-level, not the payments table. refund_paid is the running cumulative total (see "Refund Architecture"), kept in sync with the real client_refund payment rows by every recording path

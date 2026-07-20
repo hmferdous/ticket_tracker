@@ -11,7 +11,7 @@ import ViewPaymentModal from "../../components/payments/ViewPaymentModal"
 import DocumentsTab from "../../components/ui/DocumentsTab"
 import AppLayout from "../../components/layout/AppLayout"
 import { reverseTicketPaymentRow, TICKET_REVERSAL_FIELDS } from "../../lib/paymentReversal"
-import { clientOutstanding } from "../../lib/refunds"
+import { clientOutstanding, ticketEffectiveSale } from "../../lib/refunds"
 
 function fmt(n) {
   if (n == null) return "—"
@@ -257,7 +257,7 @@ export default function ClientDetail() {
     setSuppliers(supplierData ?? [])
   }
 
-  const totalBilled = useMemo(() => tickets.reduce((sum, t) => sum + (t.sell_price ?? 0), 0), [tickets])
+  const totalBilled = useMemo(() => tickets.reduce((sum, t) => sum + ticketEffectiveSale(t), 0), [tickets])
   const totalReceived = useMemo(() => payments.reduce((sum, p) => sum + (p.amount ?? 0), 0), [payments])
   // Void tickets don't represent a real collection expectation — sum
   // per-ticket outstanding instead of netting totalBilled against
